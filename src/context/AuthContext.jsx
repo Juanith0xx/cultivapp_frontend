@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect } from "react"
+import { createContext, useContext, useState, useEffect } from "react"
 
 export const AuthContext = createContext(null)
 
@@ -13,31 +13,39 @@ export const AuthProvider = ({ children }) => {
     return storedUser ? JSON.parse(storedUser) : null
   })
 
-  // Guardar token y usuario en localStorage
-  useEffect(() => {
-    if (token) {
-      localStorage.setItem("token", token)
-    } else {
-      localStorage.removeItem("token")
-    }
-  }, [token])
+  const [isAuthenticated, setIsAuthenticated] = useState(!!token)
 
+  // 🔐 Mantener sincronizado auth state
   useEffect(() => {
-    if (user) {
+    if (token && user) {
+      setIsAuthenticated(true)
+      localStorage.setItem("token", token)
       localStorage.setItem("user", JSON.stringify(user))
     } else {
+      setIsAuthenticated(false)
+      localStorage.removeItem("token")
       localStorage.removeItem("user")
     }
-  }, [user])
+  }, [token, user])
 
+  // 🚀 Login
   const login = (data) => {
     setToken(data.token)
-    setUser(data.user)
+    setUser(data.user) 
+    // data.user debería traer:
+    // { id, email, role, companyId }
   }
 
+  // 🚪 Logout limpio
   const logout = () => {
     setToken(null)
     setUser(null)
+  }
+
+  // 🛡 Verificar roles
+  const hasRole = (allowedRoles) => {
+    if (!user) return false
+    return allowedRoles.includes(user.role)
   }
 
   return (
@@ -45,11 +53,18 @@ export const AuthProvider = ({ children }) => {
       value={{
         user,
         token,
+        isAuthenticated,
         login,
-        logout
+        logout,
+        hasRole
       }}
     >
       {children}
     </AuthContext.Provider>
   )
+}
+
+// Custom hook profesional
+export const useAuth = () => {
+  return useContext(AuthContext)
 }

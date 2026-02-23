@@ -6,8 +6,6 @@ const CreateAdminClient = () => {
       <h2 className="text-2xl font-semibold text-gray-800 mb-6">
         Crear Administrador Cliente
       </h2>
-
-      <AdminClientForm />
     </div>
   )
 }

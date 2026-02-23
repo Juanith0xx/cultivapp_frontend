@@ -1,4 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { AuthProvider } from "./context/AuthContext"
+
 import Login from "./pages/Login"
 import RootDashboard from "./pages/RootDashboard"
 import ProtectedRoute from "./components/ProtectedRoute"
@@ -7,24 +9,26 @@ import "./App.css"
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
 
-        {/* Login */}
-        <Route path="/" element={<Login />} />
+          {/* Login */}
+          <Route path="/" element={<Login />} />
 
-        {/* Dashboard ROOT protegido */}
-        <Route
-          path="/root"
-          element={
-            <ProtectedRoute role="ROOT">
-              <RootDashboard />
-            </ProtectedRoute>
-          }
-        />
+          {/* Dashboard ROOT protegido */}
+          <Route
+            path="/root"
+            element={
+              <ProtectedRoute role="ROOT">
+                <RootDashboard />
+              </ProtectedRoute>
+            }
+          />
 
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   )
 }
 
