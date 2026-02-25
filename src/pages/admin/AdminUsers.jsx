@@ -2,28 +2,70 @@ import { useEffect, useState } from "react"
 
 const AdminOverview = () => {
 
-  const [stats, setStats] = useState(null)
+  const [stats, setStats] = useState({
+    counts: {
+      SUPERVISOR: 0,
+      USUARIO: 0,
+      VIEW: 0,
+      ADMIN_CLIENTE: 0
+    },
+    limits: {
+      max_supervisors: 0,
+      max_users: 0,
+      max_view: 0
+    }
+  })
+
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   const fetchStats = async () => {
-    const token = localStorage.getItem("token")
-    const user = JSON.parse(localStorage.getItem("user"))
+    try {
+      setLoading(true)
+      setError(null)
 
-    const res = await fetch(
-      `http://localhost:5000/api/users/company/${user.company_id}/stats`,
-      {
-        headers: { Authorization: `Bearer ${token}` }
+      const token = localStorage.getItem("token")
+      const user = JSON.parse(localStorage.getItem("user"))
+
+      if (!user?.company_id) {
+        throw new Error("Empresa no definida")
       }
-    )
 
-    const data = await res.json()
-    setStats(data)
+      const res = await fetch(
+        `http://localhost:5000/api/users/company/${user.company_id}/stats`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      )
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.message || "Error al obtener estadísticas")
+      }
+
+      setStats(data)
+
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
     fetchStats()
   }, [])
 
-  if (!stats) return <p>Cargando...</p>
+  if (loading) return <p>Cargando...</p>
+
+  if (error) {
+    return (
+      <p className="text-red-500">
+        {error}
+      </p>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -56,6 +98,7 @@ const AdminOverview = () => {
         </div>
 
       </div>
+
     </div>
   )
 }

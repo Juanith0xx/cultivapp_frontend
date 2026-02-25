@@ -1,27 +1,22 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
+import toast from "react-hot-toast"
 
 const LoginForm = () => {
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
   const { login } = useAuth()
   const navigate = useNavigate()
 
-  /* =========================================
-     HANDLE SUBMIT
-  ========================================= */
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setError(null)
     setLoading(true)
 
     try {
-
       const response = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",
         headers: {
@@ -36,10 +31,10 @@ const LoginForm = () => {
         throw new Error(data.message || "Error al iniciar sesión")
       }
 
-      // Guardar sesión en contexto
       login(data)
 
-      // Redirección inteligente según rol
+      toast.success("Bienvenido a Cultivapp")
+
       switch (data.user.role) {
         case "ROOT":
           navigate("/root")
@@ -54,7 +49,16 @@ const LoginForm = () => {
       }
 
     } catch (err) {
-      setError(err.message)
+
+      // 🔥 Mensajes inteligentes según error
+      if (err.message.includes("deshabilitada")) {
+        toast.error(err.message, { icon: "🚫" })
+      } else if (err.message.includes("Empresa")) {
+        toast.error(err.message, { icon: "🏢" })
+      } else {
+        toast.error(err.message)
+      }
+
     } finally {
       setLoading(false)
     }
@@ -76,7 +80,6 @@ const LoginForm = () => {
 
         {/* FORMULARIO */}
         <div className="flex flex-col min-h-screen md:min-h-0">
-
           <div className="md:hidden px-6 pt-10 pb-6">
             <h1 className="text-xl font-semibold text-gray-900">
               Iniciar sesión
@@ -87,10 +90,8 @@ const LoginForm = () => {
           </div>
 
           <div className="flex-1 px-6 pb-10 md:p-12 flex flex-col justify-center">
-
             <form onSubmit={handleSubmit} className="space-y-5">
 
-              {/* EMAIL */}
               <div>
                 <label className="block text-sm text-gray-600 mb-1">
                   Correo electrónico
@@ -108,7 +109,6 @@ const LoginForm = () => {
                 />
               </div>
 
-              {/* PASSWORD */}
               <div>
                 <label className="block text-sm text-gray-600 mb-1">
                   Contraseña
@@ -126,14 +126,6 @@ const LoginForm = () => {
                 />
               </div>
 
-              {/* ERROR */}
-              {error && (
-                <p className="text-red-500 text-sm">
-                  {error}
-                </p>
-              )}
-
-              {/* BOTÓN */}
               <button
                 type="submit"
                 disabled={loading}
@@ -152,7 +144,6 @@ const LoginForm = () => {
                 Recuperar
               </span>
             </p>
-
           </div>
         </div>
 
