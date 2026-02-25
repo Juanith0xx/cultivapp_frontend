@@ -1,20 +1,27 @@
-import { useState, useContext } from "react"
-import { AuthContext } from "../context/AuthContext"
+import { useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { useAuth } from "../context/AuthContext"
 
 const LoginForm = () => {
+
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(false)
 
-  const { login } = useContext(AuthContext)
+  const { login } = useAuth()
   const navigate = useNavigate()
 
+  /* =========================================
+     HANDLE SUBMIT
+  ========================================= */
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError(null)
+    setLoading(true)
 
     try {
+
       const response = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",
         headers: {
@@ -29,16 +36,27 @@ const LoginForm = () => {
         throw new Error(data.message || "Error al iniciar sesión")
       }
 
-      // Guardar en contexto
+      // Guardar sesión en contexto
       login(data)
 
-      // Redirigir según rol
-      if (data.user.role === "ROOT") {
-        navigate("/root")
+      // Redirección inteligente según rol
+      switch (data.user.role) {
+        case "ROOT":
+          navigate("/root")
+          break
+
+        case "ADMIN_CLIENTE":
+          navigate("/admin")
+          break
+
+        default:
+          navigate("/")
       }
 
     } catch (err) {
       setError(err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -46,6 +64,7 @@ const LoginForm = () => {
     <div className="min-h-screen bg-gray-50 md:bg-white flex md:items-center md:justify-center">
       <div className="w-full max-w-6xl bg-white md:rounded-2xl md:shadow-xl overflow-hidden grid md:grid-cols-2">
 
+        {/* PANEL IZQUIERDO */}
         <div className="hidden md:flex bg-[#87be00] text-white items-center justify-center p-12">
           <div>
             <h2 className="text-4xl font-bold mb-4">Bienvenido</h2>
@@ -55,7 +74,9 @@ const LoginForm = () => {
           </div>
         </div>
 
+        {/* FORMULARIO */}
         <div className="flex flex-col min-h-screen md:min-h-0">
+
           <div className="md:hidden px-6 pt-10 pb-6">
             <h1 className="text-xl font-semibold text-gray-900">
               Iniciar sesión
@@ -69,6 +90,7 @@ const LoginForm = () => {
 
             <form onSubmit={handleSubmit} className="space-y-5">
 
+              {/* EMAIL */}
               <div>
                 <label className="block text-sm text-gray-600 mb-1">
                   Correo electrónico
@@ -86,6 +108,7 @@ const LoginForm = () => {
                 />
               </div>
 
+              {/* PASSWORD */}
               <div>
                 <label className="block text-sm text-gray-600 mb-1">
                   Contraseña
@@ -103,17 +126,22 @@ const LoginForm = () => {
                 />
               </div>
 
+              {/* ERROR */}
               {error && (
-                <p className="text-red-500 text-sm">{error}</p>
+                <p className="text-red-500 text-sm">
+                  {error}
+                </p>
               )}
 
+              {/* BOTÓN */}
               <button
                 type="submit"
+                disabled={loading}
                 className="w-full bg-[#87be00] hover:bg-[#6e9e00] 
                            text-white font-medium py-3 rounded-xl 
-                           transition"
+                           transition disabled:opacity-50"
               >
-                Ingresar
+                {loading ? "Ingresando..." : "Ingresar"}
               </button>
 
             </form>
@@ -127,6 +155,7 @@ const LoginForm = () => {
 
           </div>
         </div>
+
       </div>
     </div>
   )

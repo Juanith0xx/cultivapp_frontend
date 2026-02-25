@@ -2,12 +2,18 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { AuthProvider } from "./context/AuthContext"
 
 import Login from "./pages/Login"
-import RootDashboard from "./pages/root/RootDashboard"
 
+/* ================= ROOT ================= */
+import RootDashboard from "./pages/root/RootDashboard"
 import Analytics from "./pages/root/Analytics"
 import Companies from "./pages/root/Companies"
 import Users from "./pages/root/Users"
 import Locales from "./pages/root/Locales"
+
+/* ================= ADMIN CLIENTE ================= */
+import AdminDashboard from "./pages/admin/AdminDashboard"
+import AdminOverview from "./pages/admin/AdminOverview"
+import AdminUsers from "./pages/admin/AdminUsers"
 
 import ProtectedRoute from "./components/ProtectedRoute"
 
@@ -31,17 +37,28 @@ function App() {
               </ProtectedRoute>
             }
           >
-
-            {/* Redirección automática a analytics */}
             <Route index element={<Navigate to="analytics" />} />
-
-            {/* Rutas SaaS reales */}
             <Route path="analytics" element={<Analytics />} />
             <Route path="companies" element={<Companies />} />
             <Route path="users" element={<Users />} />
             <Route path="locales" element={<Locales />} />
-
           </Route>
+
+          {/* ================= ADMIN CLIENTE LAYOUT ================= */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute role="ADMIN_CLIENTE">
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<AdminOverview />} />
+            <Route path="users" element={<AdminUsers />} />
+          </Route>
+
+          {/* ================= FALLBACK ================= */}
+          <Route path="*" element={<Navigate to="/" />} />
 
         </Routes>
       </BrowserRouter>
