@@ -13,36 +13,66 @@ export const AuthProvider = ({ children }) => {
     return storedUser ? JSON.parse(storedUser) : null
   })
 
+  const [mustChangePassword, setMustChangePassword] = useState(() =>
+    localStorage.getItem("mustChangePassword") === "true"
+  )
+
   const [isAuthenticated, setIsAuthenticated] = useState(!!token)
 
-  // 🔐 Mantener sincronizado auth state
+  /* =========================================
+     SINCRONIZAR ESTADO CON LOCALSTORAGE
+  ========================================= */
   useEffect(() => {
+
     if (token && user) {
       setIsAuthenticated(true)
+
       localStorage.setItem("token", token)
       localStorage.setItem("user", JSON.stringify(user))
+      localStorage.setItem(
+        "mustChangePassword",
+        mustChangePassword ? "true" : "false"
+      )
+
     } else {
       setIsAuthenticated(false)
+
       localStorage.removeItem("token")
       localStorage.removeItem("user")
+      localStorage.removeItem("mustChangePassword")
     }
-  }, [token, user])
 
-  // 🚀 Login
+  }, [token, user, mustChangePassword])
+
+  /* =========================================
+     LOGIN
+  ========================================= */
   const login = (data) => {
+
     setToken(data.token)
-    setUser(data.user) 
-    // data.user debería traer:
-    // { id, email, role, companyId }
+    setUser(data.user)
+    setMustChangePassword(!!data.must_change_password)
   }
 
-  // 🚪 Logout limpio
+  /* =========================================
+     LOGOUT
+  ========================================= */
   const logout = () => {
     setToken(null)
     setUser(null)
+    setMustChangePassword(false)
   }
 
-  // 🛡 Verificar roles
+  /* =========================================
+     DESPUÉS DE CAMBIAR PASSWORD
+  ========================================= */
+  const clearMustChangePassword = () => {
+    setMustChangePassword(false)
+  }
+
+  /* =========================================
+     VALIDAR ROLES
+  ========================================= */
   const hasRole = (allowedRoles) => {
     if (!user) return false
     return allowedRoles.includes(user.role)
@@ -54,9 +84,11 @@ export const AuthProvider = ({ children }) => {
         user,
         token,
         isAuthenticated,
+        mustChangePassword,
         login,
         logout,
-        hasRole
+        hasRole,
+        clearMustChangePassword
       }}
     >
       {children}
@@ -64,7 +96,9 @@ export const AuthProvider = ({ children }) => {
   )
 }
 
-// Custom hook profesional
+/* =========================================
+   CUSTOM HOOK
+========================================= */
 export const useAuth = () => {
   return useContext(AuthContext)
 }

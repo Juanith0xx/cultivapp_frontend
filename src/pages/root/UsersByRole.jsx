@@ -1,14 +1,20 @@
 import { useState, useEffect } from "react"
-import { FiPlus, FiTrash2 } from "react-icons/fi"
+import { FiPlus, FiTrash2, FiEdit2, FiKey } from "react-icons/fi"
 import CreateUserModal from "../../components/CreateUserModal"
+import EditUserContactModal from "../../components/EditUserContactModal"
+import ResetPasswordModal from "../../components/ResetPasswordModal"
 
 const UsersByRole = ({ role = null, title, buttonLabel }) => {
 
   const [openModal, setOpenModal] = useState(false)
   const [users, setUsers] = useState([])
 
+  const [selectedUser, setSelectedUser] = useState(null)
+  const [openEdit, setOpenEdit] = useState(false)
+  const [openReset, setOpenReset] = useState(false)
+
   /* =========================================
-     FETCH USERS (con o sin filtro)
+     FETCH USERS
   ========================================= */
   const fetchUsers = async () => {
     try {
@@ -19,9 +25,7 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
         : `http://localhost:5000/api/users`
 
       const res = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` }
       })
 
       const data = await res.json()
@@ -47,9 +51,7 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
         `http://localhost:5000/api/users/${id}/toggle`,
         {
           method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+          headers: { Authorization: `Bearer ${token}` }
         }
       )
 
@@ -74,9 +76,7 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
         `http://localhost:5000/api/users/${id}`,
         {
           method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+          headers: { Authorization: `Bearer ${token}` }
         }
       )
 
@@ -111,20 +111,9 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
 
       {/* STATS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-xl shadow-sm">
-          <p className="text-gray-500 text-sm">Total</p>
-          <p className="text-2xl font-semibold">{total}</p>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl shadow-sm">
-          <p className="text-gray-500 text-sm">Activos</p>
-          <p className="text-2xl font-semibold text-green-500">{activos}</p>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl shadow-sm">
-          <p className="text-gray-500 text-sm">Inactivos</p>
-          <p className="text-2xl font-semibold text-red-500">{inactivos}</p>
-        </div>
+        <StatCard label="Total" value={total} />
+        <StatCard label="Activos" value={activos} color="text-green-500" />
+        <StatCard label="Inactivos" value={inactivos} color="text-red-500" />
       </div>
 
       {/* TABLE */}
@@ -179,13 +168,38 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
                     </button>
                   </td>
 
-                  <td className="p-4">
+                  <td className="p-4 flex gap-3 items-center">
+
+                    {/* EDIT */}
+                    <button
+                      onClick={() => {
+                        setSelectedUser(user)
+                        setOpenEdit(true)
+                      }}
+                      className="text-blue-500 hover:text-blue-700 transition"
+                    >
+                      <FiEdit2 size={16} />
+                    </button>
+
+                    {/* RESET */}
+                    <button
+                      onClick={() => {
+                        setSelectedUser(user)
+                        setOpenReset(true)
+                      }}
+                      className="text-yellow-500 hover:text-yellow-700 transition"
+                    >
+                      <FiKey size={16} />
+                    </button>
+
+                    {/* DELETE */}
                     <button
                       onClick={() => deleteUser(user.id)}
                       className="text-red-500 hover:text-red-700 transition"
                     >
                       <FiTrash2 size={16} />
                     </button>
+
                   </td>
 
                 </tr>
@@ -195,7 +209,7 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
         </table>
       </div>
 
-      {/* MODAL */}
+      {/* MODALS */}
       <CreateUserModal
         isOpen={openModal}
         onClose={() => setOpenModal(false)}
@@ -203,8 +217,31 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
         defaultRole={role || ""}
       />
 
+      {openEdit && (
+        <EditUserContactModal
+          user={selectedUser}
+          onClose={() => setOpenEdit(false)}
+          onUpdated={fetchUsers}
+        />
+      )}
+
+      {openReset && (
+        <ResetPasswordModal
+          user={selectedUser}
+          onClose={() => setOpenReset(false)}
+        />
+      )}
+
     </div>
   )
 }
+
+/* Small reusable stat component */
+const StatCard = ({ label, value, color = "" }) => (
+  <div className="bg-white p-4 rounded-xl shadow-sm">
+    <p className="text-gray-500 text-sm">{label}</p>
+    <p className={`text-2xl font-semibold ${color}`}>{value}</p>
+  </div>
+)
 
 export default UsersByRole

@@ -3,6 +3,7 @@ import { AuthProvider } from "./context/AuthContext"
 import { Toaster } from "react-hot-toast"
 
 import Login from "./pages/Login"
+import ChangePassword from "./pages/auth/ChangePassword"
 
 /* ================= ROOT ================= */
 import RootDashboard from "./pages/root/RootDashboard"
@@ -43,6 +44,16 @@ function App() {
 
           {/* ================= LOGIN ================= */}
           <Route path="/" element={<Login />} />
+
+          {/* ================= CHANGE PASSWORD ================= */}
+          <Route
+            path="/change-password"
+            element={
+              <ProtectedRoute>
+                <ChangePassword />
+              </ProtectedRoute>
+            }
+          />
 
           {/* ================= ROOT LAYOUT ================= */}
           <Route

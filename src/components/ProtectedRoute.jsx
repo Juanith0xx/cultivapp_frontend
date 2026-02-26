@@ -1,16 +1,23 @@
 import { useContext } from "react"
-import { Navigate } from "react-router-dom"
+import { Navigate, useLocation } from "react-router-dom"
 import { AuthContext } from "../context/AuthContext"
 
 const ProtectedRoute = ({ children, role }) => {
-  const { user } = useContext(AuthContext)
 
-  // Si no está logueado
+  const { user, mustChangePassword } = useContext(AuthContext)
+  const location = useLocation()
+
+  // ❌ No autenticado
   if (!user) {
     return <Navigate to="/" replace />
   }
 
-  // Si tiene rol pero no coincide
+  // 🔐 Si debe cambiar contraseña y no está en esa ruta
+  if (mustChangePassword && location.pathname !== "/change-password") {
+    return <Navigate to="/change-password" replace />
+  }
+
+  // 🔒 Si tiene rol requerido y no coincide
   if (role && user.role !== role) {
     return <Navigate to="/" replace />
   }

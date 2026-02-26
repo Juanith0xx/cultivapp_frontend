@@ -14,6 +14,12 @@ const LoginForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    if (!email || !password) {
+      toast.error("Debes completar todos los campos")
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -31,7 +37,23 @@ const LoginForm = () => {
         throw new Error(data.message || "Error al iniciar sesión")
       }
 
+      // Guardar sesión en contexto
       login(data)
+
+      // 🔐 Si debe cambiar contraseña
+      if (data.must_change_password) {
+        toast("Debes cambiar tu contraseña antes de continuar", {
+          icon: "🔐"
+        })
+
+        navigate("/change-password")
+        return
+      }
+
+      // Seguridad extra
+      if (!data.user || !data.user.role) {
+        throw new Error("Error interno: datos de usuario inválidos")
+      }
 
       toast.success("Bienvenido a Cultivapp")
 
@@ -50,13 +72,16 @@ const LoginForm = () => {
 
     } catch (err) {
 
-      // 🔥 Mensajes inteligentes según error
-      if (err.message.includes("deshabilitada")) {
-        toast.error(err.message, { icon: "🚫" })
-      } else if (err.message.includes("Empresa")) {
-        toast.error(err.message, { icon: "🏢" })
+      const message = err.message || "Error inesperado"
+
+      if (message.includes("deshabilitada")) {
+        toast.error(message, { icon: "🚫" })
+      } else if (message.includes("Empresa")) {
+        toast.error(message, { icon: "🏢" })
+      } else if (message.includes("Credenciales")) {
+        toast.error("Correo o contraseña incorrectos", { icon: "🔑" })
       } else {
-        toast.error(err.message)
+        toast.error(message)
       }
 
     } finally {
