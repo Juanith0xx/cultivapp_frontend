@@ -1,10 +1,14 @@
 import { useState, useEffect } from "react"
 import { FiPlus, FiTrash2, FiEdit2, FiKey } from "react-icons/fi"
+import { useAuth } from "../../context/AuthContext"
+
 import CreateUserModal from "../../components/CreateUserModal"
 import EditUserContactModal from "../../components/EditUserContactModal"
 import ResetPasswordModal from "../../components/ResetPasswordModal"
 
 const UsersByRole = ({ role = null, title, buttonLabel }) => {
+
+  const { user: loggedUser } = useAuth()
 
   const [openModal, setOpenModal] = useState(false)
   const [users, setUsers] = useState([])
@@ -41,6 +45,41 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
   }, [role])
 
   /* =========================================
+     PERMISOS DELETE (VERSIÓN PRO)
+  ========================================= */
+  const canDeleteUser = (targetUser) => {
+
+    if (!loggedUser) return false
+
+    // Nunca eliminar ROOT
+    if (targetUser.role === "ROOT") return false
+
+    // No puede eliminarse a sí mismo
+    if (loggedUser.id === targetUser.id) return false
+
+    // ROOT puede eliminar cualquiera menos ROOT
+    if (loggedUser.role === "ROOT") return true
+
+    // ADMIN_CLIENTE reglas
+    if (loggedUser.role === "ADMIN_CLIENTE") {
+
+      // Solo puede eliminar usuarios de su empresa
+      if (targetUser.company_id !== loggedUser.company_id) {
+        return false
+      }
+
+      // No puede eliminar otro ADMIN_CLIENTE
+      if (targetUser.role === "ADMIN_CLIENTE") {
+        return false
+      }
+
+      return true
+    }
+
+    return false
+  }
+
+  /* =========================================
      TOGGLE
   ========================================= */
   const toggleUser = async (id) => {
@@ -66,19 +105,27 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
      DELETE
   ========================================= */
   const deleteUser = async (id) => {
+
     const confirmDelete = window.confirm("¿Seguro que deseas eliminar este usuario?")
     if (!confirmDelete) return
 
     try {
       const token = localStorage.getItem("token")
 
-      await fetch(
+      const res = await fetch(
         `http://localhost:5000/api/users/${id}`,
         {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` }
         }
       )
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        alert(data.message)
+        return
+      }
 
       fetchUsers()
 
@@ -123,11 +170,8 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
             <tr>
               <th className="p-4">Nombre</th>
               <th className="p-4">Email</th>
-
-              {/* Solo ROOT */}
               {!role && <th className="p-4">Empresa</th>}
               {!role && <th className="p-4">Rol</th>}
-
               <th className="p-4">Estado</th>
               <th className="p-4">Acciones</th>
             </tr>
@@ -155,7 +199,6 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
                     {user.email}
                   </td>
 
-                  {/* EMPRESA (solo ROOT) */}
                   {!role && (
                     <td className="p-4">
                       {user.company_name ? (
@@ -170,7 +213,6 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
                     </td>
                   )}
 
-                  {/* ROL */}
                   {!role && (
                     <td className="p-4">
                       <span className="text-gray-600 text-xs bg-gray-100 px-2 py-1 rounded-full">
@@ -179,7 +221,6 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
                     </td>
                   )}
 
-                  {/* ESTADO */}
                   <td className="p-4">
                     <button
                       onClick={() => toggleUser(user.id)}
@@ -195,7 +236,6 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
                     </button>
                   </td>
 
-                  {/* ACCIONES */}
                   <td className="p-4 flex gap-3 items-center">
 
                     <button
@@ -218,12 +258,14 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
                       <FiKey size={16} />
                     </button>
 
-                    <button
-                      onClick={() => deleteUser(user.id)}
-                      className="text-red-500 hover:text-red-700 transition"
-                    >
-                      <FiTrash2 size={16} />
-                    </button>
+                    {canDeleteUser(user) && (
+                      <button
+                        onClick={() => deleteUser(user.id)}
+                        className="text-red-500 hover:text-red-700 transition"
+                      >
+                        <FiTrash2 size={16} />
+                      </button>
+                    )}
 
                   </td>
 
@@ -261,7 +303,7 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
   )
 }
 
-/* Small reusable stat component */
+/* Stat Component */
 const StatCard = ({ label, value, color = "" }) => (
   <div className="bg-white p-4 rounded-xl shadow-sm">
     <p className="text-gray-500 text-sm">{label}</p>

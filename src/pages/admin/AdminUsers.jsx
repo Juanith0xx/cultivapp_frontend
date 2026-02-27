@@ -1,5 +1,11 @@
 import { useEffect, useState, useCallback } from "react"
-import { FiPlus, FiRefreshCw, FiEdit2 } from "react-icons/fi"
+import { 
+  FiUserPlus,
+  FiRotateCw,
+  FiEdit,
+  FiTrash
+} from "react-icons/fi"
+
 import CreateAdminUserModal from "../../components/CreateAdminUserModal"
 import EditAdminUserModal from "../../components/EditAdminUserModal"
 import ResetPasswordAdminModal from "../../components/ResetPasswordAdminModal"
@@ -27,13 +33,12 @@ const AdminUsers = () => {
   }
 
   /* ===========================
-     FETCH DATA (ANTI-CACHE FIX)
+     FETCH DATA
   =========================== */
   const fetchData = useCallback(async () => {
     try {
       setLoading(true)
-
-      const timestamp = Date.now() // 🔥 evita 304
+      const timestamp = Date.now()
 
       const [usersRes, statsRes] = await Promise.all([
         fetch(`${API_URL}?ts=${timestamp}`, {
@@ -75,7 +80,7 @@ const AdminUsers = () => {
   }, [fetchData])
 
   /* ===========================
-     TOGGLE
+     TOGGLE USER
   =========================== */
   const toggleUser = async (id) => {
     try {
@@ -83,10 +88,43 @@ const AdminUsers = () => {
         method: "PATCH",
         headers: { Authorization: `Bearer ${token}` }
       })
-
       fetchData()
     } catch (error) {
       console.error("TOGGLE ERROR:", error)
+    }
+  }
+
+  /* ===========================
+     DELETE USER
+  =========================== */
+  const deleteUser = async (targetUser) => {
+
+    if (targetUser.role === "ADMIN_CLIENTE") {
+      alert("No puedes eliminar otro ADMIN_CLIENTE")
+      return
+    }
+
+    if (targetUser.id === userLocal.id) {
+      alert("No puedes eliminar tu propio usuario")
+      return
+    }
+
+    const confirmDelete = window.confirm(
+      `¿Eliminar a ${targetUser.first_name}?`
+    )
+
+    if (!confirmDelete) return
+
+    try {
+      await fetch(`${API_URL}/${targetUser.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      fetchData()
+
+    } catch (error) {
+      console.error("DELETE ERROR:", error)
     }
   }
 
@@ -101,7 +139,7 @@ const AdminUsers = () => {
   if (!stats) return null
 
   /* ===========================
-     NORMALIZACIÓN
+     STATS
   =========================== */
   const usedSupervisors = safe(stats.counts?.SUPERVISOR)
   const usedUsers = safe(stats.counts?.USUARIO)
@@ -115,39 +153,20 @@ const AdminUsers = () => {
   const totalMax = maxSupervisors + maxUsers + maxView
   const isCompanyFull = totalMax > 0 && totalUsed >= totalMax
 
-  /* ===========================
-     CARD COMPONENT
-  =========================== */
   const Card = ({ title, used, max, color }) => {
-
     const percentage = max > 0 ? (used / max) * 100 : 0
-
-    const getBarColor = () => {
-      if (used >= max && max > 0) return "bg-red-500"
-      if (percentage > 75) return "bg-yellow-500"
-      return color
-    }
-
     return (
       <div className="bg-white p-6 rounded-2xl shadow border border-gray-100">
         <p className="text-sm text-gray-500 mb-2">{title}</p>
-
         <p className="text-3xl font-bold text-gray-800">
           {used} / {max}
         </p>
-
         <div className="w-full bg-gray-200 rounded-full h-2 mt-4">
           <div
-            className={`${getBarColor()} h-2 rounded-full transition-all duration-500`}
+            className={`${color} h-2 rounded-full transition-all duration-500`}
             style={{ width: `${percentage}%` }}
           />
         </div>
-
-        {used >= max && max > 0 && (
-          <p className="text-xs text-red-500 mt-3">
-            Límite alcanzado
-          </p>
-        )}
       </div>
     )
   }
@@ -155,14 +174,14 @@ const AdminUsers = () => {
   return (
     <div className="space-y-8">
 
-      {/* ===== RESUMEN ===== */}
+      {/* RESUMEN */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card title="Supervisores" used={usedSupervisors} max={maxSupervisors} color="bg-green-500" />
         <Card title="Usuarios" used={usedUsers} max={maxUsers} color="bg-blue-500" />
         <Card title="Solo Vista" used={usedView} max={maxView} color="bg-purple-500" />
       </div>
 
-      {/* ===== HEADER ===== */}
+      {/* HEADER */}
       <div className="flex justify-between items-center">
         <h1 className="text-xl font-semibold">
           Usuarios de la Empresa
@@ -173,12 +192,12 @@ const AdminUsers = () => {
           disabled={isCompanyFull}
           className="flex items-center gap-2 bg-[#87be00] text-white px-4 py-2 rounded-lg hover:opacity-90 transition disabled:opacity-40"
         >
-          <FiPlus />
+          <FiUserPlus />
           Crear Usuario
         </button>
       </div>
 
-      {/* ===== TABLA ===== */}
+      {/* TABLA */}
       <div className="bg-white rounded-xl shadow overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-left text-gray-500">
@@ -193,7 +212,8 @@ const AdminUsers = () => {
 
           <tbody>
             {users.map(user => (
-              <tr key={user.id} className="border-t">
+              <tr key={user.id} className="border-t hover:bg-gray-50 transition">
+
                 <td className="p-4">{user.first_name}</td>
                 <td className="p-4">{user.email}</td>
 
@@ -218,39 +238,50 @@ const AdminUsers = () => {
                   </button>
                 </td>
 
-                <td className="p-4 flex gap-4 items-center">
+                <td className="p-4 flex gap-5 items-center text-gray-600">
 
                   {/* EDIT */}
                   <button
                     onClick={() => setEditUser(user)}
-                    className="text-blue-600 hover:opacity-70"
+                    className="hover:text-blue-600 transition"
                   >
-                    <FiEdit2 />
+                    <FiEdit size={16} />
                   </button>
 
-                  {/* RESET PASSWORD */}
+                  {/* RESET */}
                   <button
                     onClick={() => setResetUser(user)}
-                    className="text-yellow-600 hover:opacity-70"
+                    className="hover:text-yellow-600 transition"
                   >
-                    <FiRefreshCw />
+                    <FiRotateCw size={16} />
                   </button>
 
+                  {/* DELETE */}
+                  {user.role !== "ADMIN_CLIENTE" &&
+                    user.id !== userLocal.id && (
+                      <button
+                        onClick={() => deleteUser(user)}
+                        className="hover:text-red-600 transition"
+                      >
+                        <FiTrash size={16} />
+                      </button>
+                    )}
+
                 </td>
+
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      {/* CREATE */}
+      {/* MODALS */}
       <CreateAdminUserModal
         isOpen={openModal}
         onClose={() => setOpenModal(false)}
         onCreated={fetchData}
       />
 
-      {/* EDIT */}
       <EditAdminUserModal
         isOpen={!!editUser}
         user={editUser}
@@ -259,7 +290,6 @@ const AdminUsers = () => {
         onUpdated={fetchData}
       />
 
-      {/* RESET PASSWORD */}
       {resetUser && (
         <ResetPasswordAdminModal
           user={resetUser}
