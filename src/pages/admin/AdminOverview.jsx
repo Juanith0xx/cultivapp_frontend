@@ -45,32 +45,29 @@ const AdminOverview = () => {
   }, [])
 
   if (loading) return <p>Cargando...</p>
-
-  if (error) {
-    return <p className="text-red-500">{error}</p>
-  }
-
+  if (error) return <p className="text-red-500">{error}</p>
   if (!stats) return null
 
-  // 🔒 Protección total contra NaN
-  const maxSupervisors = Number(stats?.limits?.max_supervisors || 0)
-  const maxUsers = Number(stats?.limits?.max_users || 0)
-  const maxView = Number(stats?.limits?.max_view || 0)
+  /* 🔒 Normalización TOTAL anti-NaN */
+  const safeNumber = (value) => {
+    const num = parseInt(value)
+    return isNaN(num) ? 0 : num
+  }
 
-  const usedSupervisors = Number(stats?.counts?.SUPERVISOR || 0)
-  const usedUsers = Number(stats?.counts?.USUARIO || 0)
-  const usedView = Number(stats?.counts?.VIEW || 0)
+  const usedSupervisors = safeNumber(stats?.counts?.SUPERVISOR)
+  const usedUsers = safeNumber(stats?.counts?.USUARIO)
+  const usedView = safeNumber(stats?.counts?.VIEW)
 
-  const availableSupervisors = Math.max(maxSupervisors - usedSupervisors, 0)
-  const availableUsers = Math.max(maxUsers - usedUsers, 0)
-  const availableView = Math.max(maxView - usedView, 0)
+  const maxSupervisors = safeNumber(stats?.limits?.max_supervisors)
+  const maxUsers = safeNumber(stats?.limits?.max_users)
+  const maxView = safeNumber(stats?.limits?.max_view)
 
-  const Card = ({ title, available, used, max, color }) => {
+  const Card = ({ title, used, max, color }) => {
 
     const percentage = max > 0 ? (used / max) * 100 : 0
 
     const getColor = () => {
-      if (available === 0) return "bg-red-500"
+      if (used >= max && max > 0) return "bg-red-500"
       if (percentage > 75) return "bg-yellow-500"
       return color
     }
@@ -84,12 +81,8 @@ const AdminOverview = () => {
 
         <div className="flex items-end justify-between">
           <p className="text-3xl font-bold text-gray-800">
-            {available}
-          </p>
-
-          <span className="text-xs text-gray-400">
             {used} / {max}
-          </span>
+          </p>
         </div>
 
         <div className="w-full bg-gray-200 rounded-full h-2 mt-4">
@@ -99,7 +92,7 @@ const AdminOverview = () => {
           />
         </div>
 
-        {available === 0 && (
+        {used >= max && max > 0 && (
           <p className="text-xs text-red-500 mt-3">
             Límite alcanzado
           </p>
@@ -117,31 +110,28 @@ const AdminOverview = () => {
           Resumen Empresa
         </h1>
         <p className="text-sm text-gray-500 mt-1">
-          Gestión de límites y disponibilidad de usuarios
+          Uso actual de cuentas permitidas
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
         <Card
-          title="Supervisores disponibles"
-          available={availableSupervisors}
+          title="Supervisores"
           used={usedSupervisors}
           max={maxSupervisors}
           color="bg-green-500"
         />
 
         <Card
-          title="Usuarios disponibles"
-          available={availableUsers}
+          title="Usuarios"
           used={usedUsers}
           max={maxUsers}
           color="bg-blue-500"
         />
 
         <Card
-          title="View disponibles"
-          available={availableView}
+          title="Solo Vista"
           used={usedView}
           max={maxView}
           color="bg-purple-500"

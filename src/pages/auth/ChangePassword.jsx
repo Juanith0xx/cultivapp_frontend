@@ -4,16 +4,14 @@ import { useAuth } from "../../context/AuthContext"
 import toast from "react-hot-toast"
 
 const ChangePassword = () => {
-
   const [password, setPassword] = useState("")
   const [confirm, setConfirm] = useState("")
   const [loading, setLoading] = useState(false)
 
   const navigate = useNavigate()
-  const { logout } = useAuth()
+  const { logout, clearMustChangePassword } = useAuth()
 
   const handleChange = async () => {
-
     if (password.length < 6) {
       toast.error("La contraseña debe tener al menos 6 caracteres")
       return
@@ -29,17 +27,14 @@ const ChangePassword = () => {
 
       const token = localStorage.getItem("token")
 
-      const res = await fetch(
-        "http://localhost:5000/api/auth/change-password",
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({ newPassword: password })
-        }
-      )
+      const res = await fetch("http://localhost:5000/api/auth/change-password", {
+        method: "PUT", // 👈 consistente con tu backend
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ newPassword: password })
+      })
 
       const data = await res.json()
 
@@ -48,6 +43,9 @@ const ChangePassword = () => {
       }
 
       toast.success("Contraseña actualizada correctamente")
+
+      // 🔥 Limpiar flag de cambio obligatorio
+      clearMustChangePassword()
 
       // 🔥 Invalidar sesión actual
       logout()

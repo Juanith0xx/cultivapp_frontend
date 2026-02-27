@@ -123,7 +123,11 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
             <tr>
               <th className="p-4">Nombre</th>
               <th className="p-4">Email</th>
+
+              {/* Solo ROOT */}
+              {!role && <th className="p-4">Empresa</th>}
               {!role && <th className="p-4">Rol</th>}
+
               <th className="p-4">Estado</th>
               <th className="p-4">Acciones</th>
             </tr>
@@ -135,16 +139,38 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
                 <td className="p-4">Sin registros</td>
                 <td className="p-4">-</td>
                 {!role && <td className="p-4">-</td>}
+                {!role && <td className="p-4">-</td>}
                 <td className="p-4">-</td>
                 <td className="p-4">-</td>
               </tr>
             ) : (
               users.map(user => (
-                <tr key={user.id} className="border-t">
+                <tr key={user.id} className="border-t hover:bg-gray-50 transition">
 
-                  <td className="p-4">{user.first_name}</td>
-                  <td className="p-4">{user.email}</td>
+                  <td className="p-4 font-medium text-gray-800">
+                    {user.first_name}
+                  </td>
 
+                  <td className="p-4 text-gray-600">
+                    {user.email}
+                  </td>
+
+                  {/* EMPRESA (solo ROOT) */}
+                  {!role && (
+                    <td className="p-4">
+                      {user.company_name ? (
+                        <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
+                          {user.company_name}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">
+                          Sin empresa
+                        </span>
+                      )}
+                    </td>
+                  )}
+
+                  {/* ROL */}
                   {!role && (
                     <td className="p-4">
                       <span className="text-gray-600 text-xs bg-gray-100 px-2 py-1 rounded-full">
@@ -153,6 +179,7 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
                     </td>
                   )}
 
+                  {/* ESTADO */}
                   <td className="p-4">
                     <button
                       onClick={() => toggleUser(user.id)}
@@ -168,9 +195,9 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
                     </button>
                   </td>
 
+                  {/* ACCIONES */}
                   <td className="p-4 flex gap-3 items-center">
 
-                    {/* EDIT */}
                     <button
                       onClick={() => {
                         setSelectedUser(user)
@@ -181,7 +208,6 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
                       <FiEdit2 size={16} />
                     </button>
 
-                    {/* RESET */}
                     <button
                       onClick={() => {
                         setSelectedUser(user)
@@ -192,7 +218,6 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
                       <FiKey size={16} />
                     </button>
 
-                    {/* DELETE */}
                     <button
                       onClick={() => deleteUser(user.id)}
                       className="text-red-500 hover:text-red-700 transition"
