@@ -1,15 +1,16 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { FiX } from "react-icons/fi"
 
 const CreateLocalModal = ({
   isOpen,
   onClose,
   onCreated,
-  companies
+  companies = [],
+  autoCompany = null // 👈 NUEVO
 }) => {
 
   const [form, setForm] = useState({
-    company_id: "",
+    company_id: autoCompany || "",
     cadena: "",
     region: "",
     comuna: "",
@@ -20,6 +21,18 @@ const CreateLocalModal = ({
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+
+  /* =========================================
+     SI autoCompany CAMBIA → ACTUALIZA FORM
+  ========================================= */
+  useEffect(() => {
+    if (autoCompany) {
+      setForm(prev => ({
+        ...prev,
+        company_id: autoCompany
+      }))
+    }
+  }, [autoCompany])
 
   if (!isOpen) return null
 
@@ -59,6 +72,17 @@ const CreateLocalModal = ({
       onCreated()
       onClose()
 
+      // Reset form
+      setForm({
+        company_id: autoCompany || "",
+        cadena: "",
+        region: "",
+        comuna: "",
+        direccion: "",
+        gerente: "",
+        telefono: ""
+      })
+
     } catch (err) {
       setError(err.message)
     } finally {
@@ -87,20 +111,23 @@ const CreateLocalModal = ({
             </div>
           )}
 
-          <select
-            name="company_id"
-            value={form.company_id}
-            onChange={handleChange}
-            required
-            className="w-full border rounded-lg px-3 py-2 text-sm"
-          >
-            <option value="">Seleccionar Empresa</option>
-            {companies.map(c => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          {/* 👇 SOLO ROOT VE EL SELECT */}
+          {!autoCompany && (
+            <select
+              name="company_id"
+              value={form.company_id}
+              onChange={handleChange}
+              required
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="">Seleccionar Empresa</option>
+              {companies.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
 
           <input
             type="text"

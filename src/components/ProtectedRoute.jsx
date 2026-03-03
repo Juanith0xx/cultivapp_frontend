@@ -2,27 +2,54 @@ import { useContext } from "react"
 import { Navigate, useLocation } from "react-router-dom"
 import { AuthContext } from "../context/AuthContext"
 
-const ProtectedRoute = ({ children, role }) => {
+const ProtectedRoute = ({ children, role, roles }) => {
 
   const { user, mustChangePassword } = useContext(AuthContext)
   const location = useLocation()
 
-  // ❌ No autenticado
+  /* ===============================
+     ❌ NO AUTENTICADO
+  =============================== */
   if (!user) {
     return <Navigate to="/" replace />
   }
 
-  // 🔐 Si debe cambiar contraseña y no está en esa ruta
+  /* ===============================
+     🔐 FORZAR CAMBIO DE CONTRASEÑA
+  =============================== */
   if (mustChangePassword && location.pathname !== "/change-password") {
     return <Navigate to="/change-password" replace />
   }
 
-  // 🔒 Si tiene rol requerido y no coincide
-  if (role && user.role !== role) {
-    return <Navigate to="/" replace />
+  /* ===============================
+     🔒 VALIDACIÓN DE ROLES
+  =============================== */
+
+  // Unificamos role y roles en un solo array
+  const allowedRoles = roles || (role ? [role] : null)
+
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return redirectByRole(user.role)
   }
 
   return children
+}
+
+/* =====================================
+   🔁 REDIRECCIÓN INTELIGENTE POR ROL
+===================================== */
+const redirectByRole = (role) => {
+
+  switch (role) {
+    case "ROOT":
+      return <Navigate to="/root" replace />
+
+    case "ADMIN_CLIENTE":
+      return <Navigate to="/admin" replace />
+
+    default:
+      return <Navigate to="/" replace />
+  }
 }
 
 export default ProtectedRoute

@@ -1,5 +1,6 @@
 import { useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, Link } from "react-router-dom"
+import { motion } from "framer-motion"
 import { useAuth } from "../context/AuthContext"
 import toast from "react-hot-toast"
 
@@ -23,12 +24,16 @@ const LoginForm = () => {
     setLoading(true)
 
     try {
+
       const response = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({
+          email: email.trim(),
+          password: password.trim()
+        })
       })
 
       const data = await response.json()
@@ -37,22 +42,18 @@ const LoginForm = () => {
         throw new Error(data.message || "Error al iniciar sesión")
       }
 
-      // Guardar sesión en contexto
       login(data)
 
-      // 🔐 Si debe cambiar contraseña
       if (data.must_change_password) {
         toast("Debes cambiar tu contraseña antes de continuar", {
           icon: "🔐"
         })
-
         navigate("/change-password")
         return
       }
 
-      // Seguridad extra
       if (!data.user || !data.user.role) {
-        throw new Error("Error interno: datos de usuario inválidos")
+        throw new Error("Error interno: datos inválidos")
       }
 
       toast.success("Bienvenido a Cultivapp")
@@ -90,14 +91,22 @@ const LoginForm = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 md:bg-white flex md:items-center md:justify-center">
-      <div className="w-full max-w-6xl bg-white md:rounded-2xl md:shadow-xl overflow-hidden grid md:grid-cols-2">
+    <div className="min-h-screen bg-gray-50 md:bg-white flex md:items-center md:justify-center font-[Outfit]">
+
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-6xl bg-white md:rounded-2xl md:shadow-2xl overflow-hidden grid md:grid-cols-2"
+      >
 
         {/* PANEL IZQUIERDO */}
         <div className="hidden md:flex bg-[#87be00] text-white items-center justify-center p-12">
           <div>
-            <h2 className="text-4xl font-bold mb-4">Bienvenido</h2>
-            <p className="opacity-85">
+            <h2 className="text-4xl font-bold mb-4">
+              Bienvenido
+            </h2>
+            <p className="opacity-90 text-lg">
               Plataforma interna Cultiva Strategic Partners
             </p>
           </div>
@@ -105,6 +114,7 @@ const LoginForm = () => {
 
         {/* FORMULARIO */}
         <div className="flex flex-col min-h-screen md:min-h-0">
+
           <div className="md:hidden px-6 pt-10 pb-6">
             <h1 className="text-xl font-semibold text-gray-900">
               Iniciar sesión
@@ -115,10 +125,12 @@ const LoginForm = () => {
           </div>
 
           <div className="flex-1 px-6 pb-10 md:p-12 flex flex-col justify-center">
-            <form onSubmit={handleSubmit} className="space-y-5">
 
+            <form onSubmit={handleSubmit} className="space-y-6">
+
+              {/* EMAIL */}
               <div>
-                <label className="block text-sm text-gray-600 mb-1">
+                <label className="block text-sm text-gray-600 mb-2">
                   Correo electrónico
                 </label>
                 <input
@@ -134,8 +146,9 @@ const LoginForm = () => {
                 />
               </div>
 
+              {/* PASSWORD */}
               <div>
-                <label className="block text-sm text-gray-600 mb-1">
+                <label className="block text-sm text-gray-600 mb-2">
                   Contraseña
                 </label>
                 <input
@@ -151,28 +164,39 @@ const LoginForm = () => {
                 />
               </div>
 
+              {/* BUTTON */}
               <button
                 type="submit"
                 disabled={loading}
                 className="w-full bg-[#87be00] hover:bg-[#6e9e00] 
                            text-white font-medium py-3 rounded-xl 
-                           transition disabled:opacity-50"
+                           transition disabled:opacity-50 flex justify-center items-center gap-2"
               >
+                {loading && (
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                )}
                 {loading ? "Ingresando..." : "Ingresar"}
               </button>
 
             </form>
 
+            {/* FORGOT PASSWORD */}
             <p className="text-sm text-gray-500 mt-6 text-center md:text-left">
               ¿Olvidaste tu contraseña?{" "}
-              <span className="text-[#87be00] hover:underline cursor-pointer">
+              <Link
+                to="/forgot-password"
+                className="text-[#87be00] hover:underline font-medium"
+              >
                 Recuperar
-              </span>
+              </Link>
             </p>
+
           </div>
+
         </div>
 
-      </div>
+      </motion.div>
+
     </div>
   )
 }

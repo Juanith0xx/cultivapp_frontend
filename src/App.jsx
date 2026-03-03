@@ -4,6 +4,8 @@ import { Toaster } from "react-hot-toast"
 
 import Login from "./pages/Login"
 import ChangePassword from "./pages/auth/ChangePassword"
+import ForgotPassword from "./pages/auth/ForgotPassword"
+import ResetPassword from "./pages/auth/ResetPassword"
 
 /* ================= ROOT ================= */
 import RootDashboard from "./pages/root/RootDashboard"
@@ -16,6 +18,7 @@ import Locales from "./pages/root/Locales"
 import AdminDashboard from "./pages/admin/AdminDashboard"
 import AdminOverview from "./pages/admin/AdminOverview"
 import AdminUsers from "./pages/admin/AdminUsers"
+import AdminLocales from "./components/AdminLocales"
 
 import ProtectedRoute from "./components/ProtectedRoute"
 
@@ -26,7 +29,6 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
 
-        {/* 🔔 Toaster Global SaaS */}
         <Toaster
           position="top-right"
           toastOptions={{
@@ -42,10 +44,14 @@ function App() {
 
         <Routes>
 
-          {/* ================= LOGIN ================= */}
+          {/* LOGIN */}
           <Route path="/" element={<Login />} />
 
-          {/* ================= CHANGE PASSWORD ================= */}
+          {/* NUEVAS RUTAS PÚBLICAS */}
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+
+          {/* CHANGE PASSWORD */}
           <Route
             path="/change-password"
             element={
@@ -55,7 +61,7 @@ function App() {
             }
           />
 
-          {/* ================= ROOT LAYOUT ================= */}
+          {/* ROOT */}
           <Route
             path="/root"
             element={
@@ -71,7 +77,7 @@ function App() {
             <Route path="locales" element={<Locales />} />
           </Route>
 
-          {/* ================= ADMIN CLIENTE LAYOUT ================= */}
+          {/* ADMIN CLIENTE */}
           <Route
             path="/admin"
             element={
@@ -82,12 +88,14 @@ function App() {
           >
             <Route index element={<AdminOverview />} />
             <Route path="users" element={<AdminUsers />} />
+            <Route path="locales" element={<AdminLocales />} />
           </Route>
 
-          {/* ================= FALLBACK ================= */}
+          {/* FALLBACK */}
           <Route path="*" element={<Navigate to="/" />} />
 
         </Routes>
+
       </BrowserRouter>
     </AuthProvider>
   )

@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom"
-import { FiHome, FiUsers } from "react-icons/fi"
+import { FiHome, FiUsers, FiMapPin } from "react-icons/fi"
 import { useAuth } from "../context/AuthContext"
 
 const AdminSidebar = () => {
@@ -57,6 +57,19 @@ const AdminSidebar = () => {
           >
             <FiUsers size={18} />
             Usuarios
+          </NavLink>
+
+          {/* 🔥 NUEVO: LOCALES */}
+          <NavLink
+            to="/admin/locales"
+            className={({ isActive }) =>
+              `${baseClasses} ${
+                isActive ? activeClasses : inactiveClasses
+              }`
+            }
+          >
+            <FiMapPin size={18} />
+            Locales
           </NavLink>
 
         </nav>
