@@ -52,21 +52,15 @@ const LoginForm = () => {
         return
       }
 
-      if (!data.user || !data.user.role) {
-        throw new Error("Error interno: datos inválidos")
-      }
-
       toast.success("Bienvenido a Cultivapp")
 
       switch (data.user.role) {
         case "ROOT":
           navigate("/root")
           break
-
         case "ADMIN_CLIENTE":
           navigate("/admin")
           break
-
         default:
           navigate("/")
       }
@@ -91,16 +85,33 @@ const LoginForm = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 md:bg-white flex md:items-center md:justify-center font-[Outfit]">
+    <div className="
+      min-h-screen
+      bg-gradient-to-b from-white to-gray-100
+      md:bg-gray-50
+      flex
+      md:items-center
+      md:justify-center
+      font-[Outfit]
+    ">
 
       <motion.div
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-6xl bg-white md:rounded-2xl md:shadow-2xl overflow-hidden grid md:grid-cols-2"
+        className="
+          w-full
+          max-w-6xl
+          bg-white
+          overflow-hidden
+          grid md:grid-cols-2
+          rounded-none
+          md:rounded-2xl
+          md:shadow-2xl
+        "
       >
 
-        {/* PANEL IZQUIERDO */}
+        {/* PANEL IZQUIERDO (DESKTOP SIN CAMBIOS) */}
         <div className="hidden md:flex bg-[#87be00] text-white items-center justify-center p-12">
           <div>
             <h2 className="text-4xl font-bold mb-4">
@@ -113,18 +124,28 @@ const LoginForm = () => {
         </div>
 
         {/* FORMULARIO */}
-        <div className="flex flex-col min-h-screen md:min-h-0">
+        <div className="
+          flex flex-col
+          min-h-screen
+          md:min-h-0
+          px-6
+          pt-20
+          pb-10
+          md:p-12
+          md:justify-center
+        ">
 
-          <div className="md:hidden px-6 pt-10 pb-6">
-            <h1 className="text-xl font-semibold text-gray-900">
+          {/* HEADER SOLO MOBILE */}
+          <div className="md:hidden mb-10 text-center">
+            <h1 className="text-2xl font-semibold text-gray-900">
               Iniciar sesión
             </h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-gray-500 mt-2">
               Accede a tu cuenta
             </p>
           </div>
 
-          <div className="flex-1 px-6 pb-10 md:p-12 flex flex-col justify-center">
+          <div className="flex-1 flex flex-col justify-center md:justify-start">
 
             <form onSubmit={handleSubmit} className="space-y-6">
 
@@ -135,14 +156,25 @@ const LoginForm = () => {
                 </label>
                 <input
                   type="email"
+                  inputMode="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 
-                             focus:outline-none 
-                             focus:ring-2 focus:ring-[#87be00]
-                             focus:border-[#87be00]
-                             transition"
+                  className="
+                    w-full
+                    px-4
+                    py-3
+                    rounded-2xl
+                    border border-gray-200
+                    bg-gray-50
+                    text-base
+                    focus:bg-white
+                    focus:outline-none
+                    focus:ring-2 focus:ring-[#87be00]
+                    focus:border-[#87be00]
+                    transition
+                  "
                 />
               </div>
 
@@ -153,14 +185,24 @@ const LoginForm = () => {
                 </label>
                 <input
                   type="password"
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 
-                             focus:outline-none 
-                             focus:ring-2 focus:ring-[#87be00]
-                             focus:border-[#87be00]
-                             transition"
+                  className="
+                    w-full
+                    px-4
+                    py-3
+                    rounded-2xl
+                    border border-gray-200
+                    bg-gray-50
+                    text-base
+                    focus:bg-white
+                    focus:outline-none
+                    focus:ring-2 focus:ring-[#87be00]
+                    focus:border-[#87be00]
+                    transition
+                  "
                 />
               </div>
 
@@ -168,9 +210,19 @@ const LoginForm = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-[#87be00] hover:bg-[#6e9e00] 
-                           text-white font-medium py-3 rounded-xl 
-                           transition disabled:opacity-50 flex justify-center items-center gap-2"
+                className="
+                  w-full
+                  bg-[#87be00]
+                  hover:bg-[#6e9e00]
+                  active:scale-[0.98]
+                  text-white
+                  font-medium
+                  py-3
+                  rounded-2xl
+                  transition
+                  disabled:opacity-50
+                  flex justify-center items-center gap-2
+                "
               >
                 {loading && (
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -181,7 +233,7 @@ const LoginForm = () => {
             </form>
 
             {/* FORGOT PASSWORD */}
-            <p className="text-sm text-gray-500 mt-6 text-center md:text-left">
+            <p className="text-sm text-gray-500 mt-8 text-center md:text-left">
               ¿Olvidaste tu contraseña?{" "}
               <Link
                 to="/forgot-password"

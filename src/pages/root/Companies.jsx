@@ -76,9 +76,9 @@ const Companies = () => {
             {companies.length === 0 ? (
               <tr className="border-t">
                 <td className="p-4">Sin registros</td>
-                <td className="p-4">-</td>
-                <td className="p-4">-</td>
-                <td className="p-4">-</td>
+                <td className="p-4">Supervisor</td>
+                <td className="p-4">Usuarios</td>
+                <td className="p-4">View</td>
               </tr>
             ) : (
               companies.map(company => (

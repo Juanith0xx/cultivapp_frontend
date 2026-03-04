@@ -149,7 +149,7 @@ const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
 
         <div className="flex justify-between items-center">
           <h3 className="text-xl font-semibold">
-            Crear Empresa + Administrador
+            Crear Empresa - Administrador
           </h3>
           <button onClick={onClose}>
             <FiX />
@@ -196,9 +196,9 @@ const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
           </h4>
 
           <div className="grid grid-cols-3 gap-3">
-            <input type="number" name="max_supervisors" value={form.max_supervisors} onChange={handleChange} className="input" />
-            <input type="number" name="max_users" value={form.max_users} onChange={handleChange} className="input" />
-            <input type="number" name="max_view" value={form.max_view} onChange={handleChange} className="input" />
+            <input type="number" name="max_supervisors" value={form.max_supervisors} onChange={handleChange} className="input" placeholder="Supervisor" />
+            <input type="number" name="max_users" value={form.max_users} onChange={handleChange} className="input" placeholder="Usuario" />
+            <input type="number" name="max_view" value={form.max_view} onChange={handleChange} className="input" placeholder="View" />
           </div>
 
           <h4 className="font-medium text-gray-700 mt-4">
