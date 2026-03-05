@@ -100,7 +100,7 @@ const CreateAdminUserModal = ({
         },
         body: JSON.stringify({
           ...form,
-          company_id: user.company_id // 👈 FORZAMOS EMPRESA
+          company_id: user.company_id 
         })
       })
 

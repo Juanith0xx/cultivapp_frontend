@@ -2,6 +2,8 @@ import { useEffect, useState } from "react"
 import { FiPlus } from "react-icons/fi"
 import CreateCompanyModal from "../../components/CreateCompanyModal"
 
+const API_URL = import.meta.env.VITE_API_URL
+
 const Companies = () => {
 
   const [companies, setCompanies] = useState([])
@@ -13,34 +15,44 @@ const Companies = () => {
 
   const fetchCompanies = async () => {
     try {
+
       const token = localStorage.getItem("token")
 
-      const res = await fetch("http://localhost:5000/api/companies", {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await fetch(`${API_URL}/api/companies`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       })
+
+      if (!res.ok) {
+        throw new Error("Error obteniendo empresas")
+      }
 
       const data = await res.json()
       setCompanies(data)
 
     } catch (err) {
-      console.error(err)
+      console.error("Error cargando empresas:", err)
     }
   }
 
-  // 🔥 Activar / Desactivar empresa
+  // Activar / Desactivar empresa
   const toggleCompany = async (id) => {
     try {
+
       const token = localStorage.getItem("token")
 
-      await fetch(`http://localhost:5000/api/companies/${id}/toggle`, {
+      await fetch(`${API_URL}/api/companies/${id}/toggle`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` }
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       })
 
       fetchCompanies()
 
     } catch (err) {
-      console.error(err)
+      console.error("Error cambiando estado de empresa:", err)
     }
   }
 
@@ -76,9 +88,9 @@ const Companies = () => {
             {companies.length === 0 ? (
               <tr className="border-t">
                 <td className="p-4">Sin registros</td>
-                <td className="p-4">Supervisor</td>
-                <td className="p-4">Usuarios</td>
-                <td className="p-4">View</td>
+                <td className="p-4">-</td>
+                <td className="p-4">-</td>
+                <td className="p-4">-</td>
               </tr>
             ) : (
               companies.map(company => (
@@ -92,14 +104,12 @@ const Companies = () => {
                     {company.rut}
                   </td>
 
-                  {/* Límites */}
                   <td className="p-4 text-xs text-gray-600">
-                    Sup: {company.max_supervisors} | 
-                    User: {company.max_users} | 
+                    Sup: {company.max_supervisors} |
+                    User: {company.max_users} |
                     View: {company.max_view}
                   </td>
 
-                  {/* Switch */}
                   <td className="p-4">
                     <button
                       onClick={() => toggleCompany(company.id)}

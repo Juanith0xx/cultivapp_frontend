@@ -6,6 +6,8 @@ import CreateUserModal from "../../components/CreateUserModal"
 import EditUserContactModal from "../../components/EditUserContactModal"
 import ResetPasswordModal from "../../components/ResetPasswordModal"
 
+const API_URL = import.meta.env.VITE_API_URL
+
 const UsersByRole = ({ role = null, title, buttonLabel }) => {
 
   const { user: loggedUser } = useAuth()
@@ -17,16 +19,14 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
   const [openEdit, setOpenEdit] = useState(false)
   const [openReset, setOpenReset] = useState(false)
 
-  /* =========================================
-     FETCH USERS
-  ========================================= */
   const fetchUsers = async () => {
     try {
+
       const token = localStorage.getItem("token")
 
       const url = role
-        ? `http://localhost:5000/api/users?role=${role}`
-        : `http://localhost:5000/api/users`
+        ? `${API_URL}/api/users?role=${role}`
+        : `${API_URL}/api/users`
 
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
@@ -44,31 +44,20 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
     fetchUsers()
   }, [role])
 
-  /* =========================================
-     PERMISOS DELETE (VERSIÓN PRO)
-  ========================================= */
   const canDeleteUser = (targetUser) => {
 
     if (!loggedUser) return false
-
-    // Nunca eliminar ROOT
     if (targetUser.role === "ROOT") return false
-
-    // No puede eliminarse a sí mismo
     if (loggedUser.id === targetUser.id) return false
 
-    // ROOT puede eliminar cualquiera menos ROOT
     if (loggedUser.role === "ROOT") return true
 
-    // ADMIN_CLIENTE reglas
     if (loggedUser.role === "ADMIN_CLIENTE") {
 
-      // Solo puede eliminar usuarios de su empresa
       if (targetUser.company_id !== loggedUser.company_id) {
         return false
       }
 
-      // No puede eliminar otro ADMIN_CLIENTE
       if (targetUser.role === "ADMIN_CLIENTE") {
         return false
       }
@@ -79,20 +68,15 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
     return false
   }
 
-  /* =========================================
-     TOGGLE
-  ========================================= */
   const toggleUser = async (id) => {
     try {
+
       const token = localStorage.getItem("token")
 
-      await fetch(
-        `http://localhost:5000/api/users/${id}/toggle`,
-        {
-          method: "PATCH",
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      )
+      await fetch(`${API_URL}/api/users/${id}/toggle`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` }
+      })
 
       fetchUsers()
 
@@ -101,24 +85,19 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
     }
   }
 
-  /* =========================================
-     DELETE
-  ========================================= */
   const deleteUser = async (id) => {
 
     const confirmDelete = window.confirm("¿Seguro que deseas eliminar este usuario?")
     if (!confirmDelete) return
 
     try {
+
       const token = localStorage.getItem("token")
 
-      const res = await fetch(
-        `http://localhost:5000/api/users/${id}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      )
+      const res = await fetch(`${API_URL}/api/users/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      })
 
       const data = await res.json()
 
@@ -141,11 +120,8 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
   return (
     <div className="space-y-6">
 
-      {/* HEADER */}
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold">
-          {title}
-        </h2>
+        <h2 className="text-2xl font-semibold">{title}</h2>
 
         <button
           onClick={() => setOpenModal(true)}
@@ -156,16 +132,15 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
         </button>
       </div>
 
-      {/* STATS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard label="Total" value={total} />
         <StatCard label="Activos" value={activos} color="text-green-500" />
         <StatCard label="Inactivos" value={inactivos} color="text-red-500" />
       </div>
 
-      {/* TABLE */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <table className="w-full text-sm">
+
           <thead className="bg-gray-50 text-left text-gray-500">
             <tr>
               <th className="p-4">Nombre</th>
@@ -273,10 +248,10 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
               ))
             )}
           </tbody>
+
         </table>
       </div>
 
-      {/* MODALS */}
       <CreateUserModal
         isOpen={openModal}
         onClose={() => setOpenModal(false)}
@@ -303,7 +278,6 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
   )
 }
 
-/* Stat Component */
 const StatCard = ({ label, value, color = "" }) => (
   <div className="bg-white p-4 rounded-xl shadow-sm">
     <p className="text-gray-500 text-sm">{label}</p>

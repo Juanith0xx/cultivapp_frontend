@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom"
 import { motion } from "framer-motion"
 import { useAuth } from "../context/AuthContext"
 import toast from "react-hot-toast"
+import api from "../api/apiClient"
 
 const LoginForm = () => {
 
@@ -25,22 +26,10 @@ const LoginForm = () => {
 
     try {
 
-      const response = await fetch("http://localhost:5000/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          email: email.trim(),
-          password: password.trim()
-        })
+      const data = await api.post("/api/auth/login", {
+        email: email.trim(),
+        password: password.trim()
       })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.message || "Error al iniciar sesión")
-      }
 
       login(data)
 
@@ -111,7 +100,6 @@ const LoginForm = () => {
         "
       >
 
-        {/* PANEL IZQUIERDO (DESKTOP SIN CAMBIOS) */}
         <div className="hidden md:flex bg-[#87be00] text-white items-center justify-center p-12">
           <div>
             <h2 className="text-4xl font-bold mb-4">
@@ -123,7 +111,6 @@ const LoginForm = () => {
           </div>
         </div>
 
-        {/* FORMULARIO */}
         <div className="
           flex flex-col
           min-h-screen
@@ -135,7 +122,6 @@ const LoginForm = () => {
           md:justify-center
         ">
 
-          {/* HEADER SOLO MOBILE */}
           <div className="md:hidden mb-10 text-center">
             <h1 className="text-2xl font-semibold text-gray-900">
               Iniciar sesión
@@ -149,15 +135,12 @@ const LoginForm = () => {
 
             <form onSubmit={handleSubmit} className="space-y-6">
 
-              {/* EMAIL */}
               <div>
                 <label className="block text-sm text-gray-600 mb-2">
                   Correo electrónico
                 </label>
                 <input
                   type="email"
-                  inputMode="email"
-                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -168,24 +151,18 @@ const LoginForm = () => {
                     rounded-2xl
                     border border-gray-200
                     bg-gray-50
-                    text-base
-                    focus:bg-white
-                    focus:outline-none
                     focus:ring-2 focus:ring-[#87be00]
-                    focus:border-[#87be00]
                     transition
                   "
                 />
               </div>
 
-              {/* PASSWORD */}
               <div>
                 <label className="block text-sm text-gray-600 mb-2">
                   Contraseña
                 </label>
                 <input
                   type="password"
-                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -196,17 +173,12 @@ const LoginForm = () => {
                     rounded-2xl
                     border border-gray-200
                     bg-gray-50
-                    text-base
-                    focus:bg-white
-                    focus:outline-none
                     focus:ring-2 focus:ring-[#87be00]
-                    focus:border-[#87be00]
                     transition
                   "
                 />
               </div>
 
-              {/* BUTTON */}
               <button
                 type="submit"
                 disabled={loading}
@@ -214,25 +186,18 @@ const LoginForm = () => {
                   w-full
                   bg-[#87be00]
                   hover:bg-[#6e9e00]
-                  active:scale-[0.98]
                   text-white
-                  font-medium
                   py-3
                   rounded-2xl
                   transition
                   disabled:opacity-50
-                  flex justify-center items-center gap-2
                 "
               >
-                {loading && (
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                )}
                 {loading ? "Ingresando..." : "Ingresar"}
               </button>
 
             </form>
 
-            {/* FORGOT PASSWORD */}
             <p className="text-sm text-gray-500 mt-8 text-center md:text-left">
               ¿Olvidaste tu contraseña?{" "}
               <Link

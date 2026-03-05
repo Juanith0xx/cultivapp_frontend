@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react"
 
+const API_URL = import.meta.env.VITE_API_URL
+
 const Analytics = () => {
 
   const [stats, setStats] = useState({
@@ -14,11 +16,18 @@ const Analytics = () => {
 
   const fetchStats = async () => {
     try {
+
       const token = localStorage.getItem("token")
 
-      const res = await fetch("http://localhost:5000/api/users", {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await fetch(`${API_URL}/api/users`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       })
+
+      if (!res.ok) {
+        throw new Error("Error obteniendo estadísticas")
+      }
 
       const users = await res.json()
 
@@ -30,7 +39,7 @@ const Analytics = () => {
       })
 
     } catch (err) {
-      console.error(err)
+      console.error("Error cargando analytics:", err)
     }
   }
 
