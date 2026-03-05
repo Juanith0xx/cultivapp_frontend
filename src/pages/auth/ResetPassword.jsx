@@ -2,6 +2,7 @@ import { useState } from "react"
 import { motion } from "framer-motion"
 import { useSearchParams, useNavigate } from "react-router-dom"
 import toast from "react-hot-toast"
+import api from "../../api/apiClient"
 
 const ResetPassword = () => {
 
@@ -15,6 +16,7 @@ const ResetPassword = () => {
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e) => {
+
     e.preventDefault()
 
     if (password !== confirmPassword) {
@@ -24,20 +26,11 @@ const ResetPassword = () => {
     setLoading(true)
 
     try {
-      const res = await fetch("http://localhost:5000/api/auth/reset-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          token,
-          newPassword: password
-        })
+
+      await api.post("/api/auth/reset-password", {
+        token,
+        newPassword: password
       })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.message)
-      }
 
       toast.success("Contraseña actualizada correctamente")
 
@@ -46,10 +39,15 @@ const ResetPassword = () => {
       }, 2000)
 
     } catch (error) {
-      toast.error(error.message)
+
+      toast.error(error.message || "Error al actualizar contraseña")
+
     } finally {
+
       setLoading(false)
+
     }
+
   }
 
   if (!token) {
@@ -61,6 +59,7 @@ const ResetPassword = () => {
   }
 
   return (
+
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6 font-[Outfit]">
 
       <motion.div
@@ -69,6 +68,7 @@ const ResetPassword = () => {
         transition={{ duration: 0.4 }}
         className="bg-white w-full max-w-md rounded-2xl shadow-xl p-8 space-y-6"
       >
+
         <h2 className="text-2xl font-bold text-gray-800 text-center">
           Nueva contraseña
         </h2>
@@ -106,6 +106,7 @@ const ResetPassword = () => {
       </motion.div>
 
     </div>
+
   )
 }
 

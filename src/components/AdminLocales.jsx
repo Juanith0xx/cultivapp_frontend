@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react"
-import { FiPlus, FiUpload, FiTrash, FiToggleRight } from "react-icons/fi"
+import { FiPlus, FiUpload, FiTrash } from "react-icons/fi"
+
+import api from "../api/apiClient"
 
 import CreateLocalModal from "./CreateLocalModal"
 import UploadLocalesModal from "./UploadLocalesModal"
-
-const API_URL = "http://localhost:5000/api/locales"
 
 const AdminLocales = () => {
 
@@ -13,42 +13,59 @@ const AdminLocales = () => {
   const [openUpload, setOpenUpload] = useState(false)
 
   const userLocal = JSON.parse(localStorage.getItem("user"))
-  const token = localStorage.getItem("token")
 
   useEffect(() => {
     fetchLocales()
   }, [])
 
+  /* ===========================
+     FETCH LOCALES
+  =========================== */
   const fetchLocales = async () => {
-    const res = await fetch(
-      `${API_URL}?company_id=${userLocal.company_id}`,
-      {
-        headers: { Authorization: `Bearer ${token}` }
-      }
-    )
+    try {
 
-    const data = await res.json()
-    setLocales(data)
+      const data = await api.get(
+        `/api/locales?company_id=${userLocal.company_id}`
+      )
+
+      setLocales(data)
+
+    } catch (error) {
+      console.error("FETCH LOCALES ERROR:", error)
+    }
   }
 
+  /* ===========================
+     TOGGLE LOCAL
+  =========================== */
   const toggleLocal = async (id) => {
-    await fetch(`${API_URL}/${id}/toggle`, {
-      method: "PATCH",
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    try {
 
-    fetchLocales()
+      await api.patch(`/api/locales/${id}/toggle`)
+
+      fetchLocales()
+
+    } catch (error) {
+      console.error("TOGGLE LOCAL ERROR:", error)
+    }
   }
 
+  /* ===========================
+     DELETE LOCAL
+  =========================== */
   const deleteLocal = async (id) => {
+
     if (!window.confirm("¿Eliminar local?")) return
 
-    await fetch(`${API_URL}/${id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    try {
 
-    fetchLocales()
+      await api.delete(`/api/locales/${id}`)
+
+      fetchLocales()
+
+    } catch (error) {
+      console.error("DELETE LOCAL ERROR:", error)
+    }
   }
 
   return (
@@ -56,6 +73,7 @@ const AdminLocales = () => {
 
       {/* HEADER */}
       <div className="flex justify-between items-center">
+
         <h2 className="text-2xl font-semibold">
           Gestión de Locales
         </h2>
@@ -79,11 +97,14 @@ const AdminLocales = () => {
           </button>
 
         </div>
+
       </div>
 
       {/* TABLA */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+
         <table className="w-full text-sm">
+
           <thead className="bg-gray-50 text-left text-gray-500">
             <tr>
               <th className="p-4">Cadena</th>
@@ -95,7 +116,9 @@ const AdminLocales = () => {
           </thead>
 
           <tbody>
+
             {locales.map(local => (
+
               <tr key={local.id} className="border-t hover:bg-gray-50">
 
                 <td className="p-4">{local.cadena}</td>
@@ -103,6 +126,7 @@ const AdminLocales = () => {
                 <td className="p-4">{local.comuna}</td>
 
                 <td className="p-4">
+
                   <button
                     onClick={() => toggleLocal(local.id)}
                     className={`px-3 py-1 rounded-full text-xs ${
@@ -113,29 +137,37 @@ const AdminLocales = () => {
                   >
                     {local.is_active ? "Activo" : "Inactivo"}
                   </button>
+
                 </td>
 
                 <td className="p-4">
+
                   <button
                     onClick={() => deleteLocal(local.id)}
                     className="text-red-500 hover:opacity-70"
                   >
                     <FiTrash size={16} />
                   </button>
+
                 </td>
 
               </tr>
+
             ))}
+
           </tbody>
+
         </table>
+
       </div>
 
       {/* MODALES */}
+
       <CreateLocalModal
         isOpen={openCreate}
         onClose={() => setOpenCreate(false)}
         onCreated={fetchLocales}
-        companies={[{ id: userLocal.company_id }]} // 👈 automático
+        companies={[{ id: userLocal.company_id }]}
         autoCompany={userLocal.company_id}
       />
 

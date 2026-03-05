@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { FiX } from "react-icons/fi"
+import api from "../api/apiClient"
 
 const EditAdminUserModal = ({
   isOpen,
@@ -19,13 +20,17 @@ const EditAdminUserModal = ({
   const [error, setError] = useState("")
 
   useEffect(() => {
+
     if (user) {
+
       setForm({
         first_name: user.first_name,
         email: user.email,
         role: user.role
       })
+
     }
+
   }, [user])
 
   if (!isOpen || !user) return null
@@ -34,7 +39,9 @@ const EditAdminUserModal = ({
      SAFE NUMBER
   =========================== */
   const safe = (value) => {
+
     const num = Number(value)
+
     return isNaN(num) ? 0 : num
   }
 
@@ -47,6 +54,7 @@ const EditAdminUserModal = ({
   const maxView = safe(stats?.limits?.max_view)
 
   const isRoleFull = (role) => {
+
     if (role === "SUPERVISOR")
       return usedSupervisors >= maxSupervisors && user.role !== "SUPERVISOR"
 
@@ -60,39 +68,29 @@ const EditAdminUserModal = ({
   }
 
   const handleSubmit = async (e) => {
+
     e.preventDefault()
+
     setError("")
     setLoading(true)
 
     try {
-      const token = localStorage.getItem("token")
 
-      const res = await fetch(
-        `http://localhost:5000/api/users/${user.id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify(form)
-        }
-      )
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.message || "Error actualizando usuario")
-      }
+      await api.put(`/api/users/${user.id}`, form)
 
       onUpdated()
       onClose()
 
     } catch (err) {
+
       setError(err.message)
+
     } finally {
+
       setLoading(false)
+
     }
+
   }
 
   return (
@@ -101,12 +99,15 @@ const EditAdminUserModal = ({
       <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6 space-y-6">
 
         <div className="flex justify-between items-center">
+
           <h3 className="text-xl font-semibold">
             Editar Usuario
           </h3>
+
           <button onClick={onClose}>
             <FiX size={20} />
           </button>
+
         </div>
 
         {error && (
@@ -118,9 +119,11 @@ const EditAdminUserModal = ({
         <form onSubmit={handleSubmit} className="space-y-4">
 
           <div>
+
             <label className="text-xs text-gray-500">
               Nombre
             </label>
+
             <input
               type="text"
               value={form.first_name}
@@ -130,12 +133,15 @@ const EditAdminUserModal = ({
               className="w-full border rounded-lg px-3 py-2 text-sm"
               required
             />
+
           </div>
 
           <div>
+
             <label className="text-xs text-gray-500">
               Email
             </label>
+
             <input
               type="email"
               value={form.email}
@@ -145,12 +151,15 @@ const EditAdminUserModal = ({
               className="w-full border rounded-lg px-3 py-2 text-sm"
               required
             />
+
           </div>
 
           <div>
+
             <label className="text-xs text-gray-500">
               Perfil
             </label>
+
             <select
               value={form.role}
               onChange={(e) =>
@@ -158,6 +167,7 @@ const EditAdminUserModal = ({
               }
               className="w-full border rounded-lg px-3 py-2 text-sm bg-white"
             >
+
               <option
                 value="SUPERVISOR"
                 disabled={isRoleFull("SUPERVISOR")}
@@ -178,7 +188,9 @@ const EditAdminUserModal = ({
               >
                 Solo Vista
               </option>
+
             </select>
+
           </div>
 
           <button
@@ -186,12 +198,15 @@ const EditAdminUserModal = ({
             disabled={loading}
             className="w-full bg-[#87be00] text-white py-2 rounded-lg hover:opacity-90 transition disabled:opacity-50"
           >
+
             {loading ? "Guardando..." : "Guardar Cambios"}
+
           </button>
 
         </form>
 
       </div>
+
     </div>
   )
 }

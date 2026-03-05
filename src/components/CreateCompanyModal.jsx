@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { FiX } from "react-icons/fi"
+import api from "../api/apiClient"
 
 const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
 
@@ -31,12 +32,16 @@ const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
      FORMATEAR RUT
   ====================================== */
   const formatRut = (rut) => {
+
     const clean = cleanRut(rut)
+
     if (clean.length <= 1) return clean
 
     const body = clean.slice(0, -1)
     const dv = clean.slice(-1)
+
     const formattedBody = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+
     return `${formattedBody}-${dv}`
   }
 
@@ -44,7 +49,9 @@ const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
      VALIDAR RUT
   ====================================== */
   const validateRut = (rut) => {
+
     const clean = cleanRut(rut)
+
     if (clean.length < 8) return false
 
     const body = clean.slice(0, -1)
@@ -54,16 +61,18 @@ const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
     let multiplier = 2
 
     for (let i = body.length - 1; i >= 0; i--) {
+
       sum += multiplier * parseInt(body[i])
+
       multiplier = multiplier === 7 ? 2 : multiplier + 1
     }
 
     const expected = 11 - (sum % 11)
 
     const dvCalc =
-      expected === 11 ? "0" :
-      expected === 10 ? "K" :
-      expected.toString()
+      expected === 11 ? "0"
+      : expected === 10 ? "K"
+      : expected.toString()
 
     return dvCalc === dv
   }
@@ -72,14 +81,18 @@ const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
      HANDLE CHANGE
   ====================================== */
   const handleChange = (e) => {
+
     const { name, value } = e.target
 
     if (name === "rut") {
+
       setForm(prev => ({
         ...prev,
         rut: formatRut(value)
       }))
+
     } else {
+
       setForm(prev => ({
         ...prev,
         [name]: value
@@ -91,18 +104,21 @@ const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
      SUBMIT
   ====================================== */
   const handleSubmit = async (e) => {
+
     e.preventDefault()
+
     setLoading(true)
     setError("")
 
     if (!validateRut(form.rut)) {
+
       setError("El RUT ingresado no es válido")
       setLoading(false)
+
       return
     }
 
     try {
-      const token = localStorage.getItem("token")
 
       const payload = {
         ...form,
@@ -112,31 +128,19 @@ const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
         max_view: parseInt(form.max_view) || 0
       }
 
-      const res = await fetch(
-        "http://localhost:5000/api/companies/with-admin",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify(payload)
-        }
-      )
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.message || "Error al crear empresa")
-      }
+      await api.post("/api/companies/with-admin", payload)
 
       setForm(initialState)
+
       onCreated()
       onClose()
 
     } catch (err) {
+
       setError(err.message)
+
     } finally {
+
       setLoading(false)
     }
   }
@@ -145,15 +149,19 @@ const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
+
       <div className="bg-white w-full max-w-xl rounded-2xl p-6 space-y-6">
 
         <div className="flex justify-between items-center">
+
           <h3 className="text-xl font-semibold">
             Crear Empresa - Administrador
           </h3>
+
           <button onClick={onClose}>
             <FiX />
           </button>
+
         </div>
 
         {error && (
@@ -162,7 +170,9 @@ const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
 
-          <h4 className="font-medium text-gray-700">Datos Empresa</h4>
+          <h4 className="font-medium text-gray-700">
+            Datos Empresa
+          </h4>
 
           <input
             name="rut"
@@ -196,20 +206,83 @@ const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
           </h4>
 
           <div className="grid grid-cols-3 gap-3">
-            <input type="number" name="max_supervisors" value={form.max_supervisors} onChange={handleChange} className="input" placeholder="Supervisor" />
-            <input type="number" name="max_users" value={form.max_users} onChange={handleChange} className="input" placeholder="Usuario" />
-            <input type="number" name="max_view" value={form.max_view} onChange={handleChange} className="input" placeholder="View" />
+
+            <input
+              type="number"
+              name="max_supervisors"
+              value={form.max_supervisors}
+              onChange={handleChange}
+              className="input"
+              placeholder="Supervisor"
+            />
+
+            <input
+              type="number"
+              name="max_users"
+              value={form.max_users}
+              onChange={handleChange}
+              className="input"
+              placeholder="Usuario"
+            />
+
+            <input
+              type="number"
+              name="max_view"
+              value={form.max_view}
+              onChange={handleChange}
+              className="input"
+              placeholder="View"
+            />
+
           </div>
 
           <h4 className="font-medium text-gray-700 mt-4">
             Administrador Cliente
           </h4>
 
-          <input name="admin_name" value={form.admin_name} onChange={handleChange} required className="input" placeholder="Nombre Usuario" />
-          <input name="admin_position" value={form.admin_position} onChange={handleChange} className="input" placeholder="Cargo" />
-          <input name="admin_email" value={form.admin_email} onChange={handleChange} required className="input" placeholder="Correo" />
-          <input name="admin_phone" value={form.admin_phone} onChange={handleChange} className="input" placeholder="Teléfono" />
-          <input type="password" name="admin_password" value={form.admin_password} onChange={handleChange} required className="input" placeholder="Contraseña inicial" />
+          <input
+            name="admin_name"
+            value={form.admin_name}
+            onChange={handleChange}
+            required
+            className="input"
+            placeholder="Nombre Usuario"
+          />
+
+          <input
+            name="admin_position"
+            value={form.admin_position}
+            onChange={handleChange}
+            className="input"
+            placeholder="Cargo"
+          />
+
+          <input
+            name="admin_email"
+            value={form.admin_email}
+            onChange={handleChange}
+            required
+            className="input"
+            placeholder="Correo"
+          />
+
+          <input
+            name="admin_phone"
+            value={form.admin_phone}
+            onChange={handleChange}
+            className="input"
+            placeholder="Teléfono"
+          />
+
+          <input
+            type="password"
+            name="admin_password"
+            value={form.admin_password}
+            onChange={handleChange}
+            required
+            className="input"
+            placeholder="Contraseña inicial"
+          />
 
           <button
             type="submit"
@@ -220,7 +293,9 @@ const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
           </button>
 
         </form>
+
       </div>
+
     </div>
   )
 }

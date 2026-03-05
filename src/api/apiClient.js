@@ -36,14 +36,18 @@ const request = async (endpoint, options = {}) => {
     return data
 
   } catch (error) {
+
     console.error("API Error:", error.message)
     throw error
+
   }
 
 }
 
 const api = {
-  get: (endpoint) => request(endpoint),
+
+  get: (endpoint) =>
+    request(endpoint),
 
   post: (endpoint, body) =>
     request(endpoint, {
@@ -54,19 +58,20 @@ const api = {
   patch: (endpoint, body) =>
     request(endpoint, {
       method: "PATCH",
-      body: JSON.stringify(body)
+      body: body ? JSON.stringify(body) : undefined
     }),
 
   put: (endpoint, body) =>
     request(endpoint, {
       method: "PUT",
-      body: JSON.stringify(body)
+      body: body ? JSON.stringify(body) : undefined
     }),
 
   delete: (endpoint) =>
     request(endpoint, {
       method: "DELETE"
     })
+
 }
 
 export default api

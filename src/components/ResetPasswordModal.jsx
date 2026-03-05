@@ -1,4 +1,5 @@
 import { useState } from "react"
+import api from "../api/apiClient"
 
 const ResetPasswordModal = ({ user, onClose }) => {
 
@@ -6,38 +7,32 @@ const ResetPasswordModal = ({ user, onClose }) => {
   const [loading, setLoading] = useState(false)
 
   const handleReset = async () => {
+
     try {
+
       setLoading(true)
 
-      const token = localStorage.getItem("token")
-
-      const res = await fetch(
-        `http://localhost:5000/api/users/${user.id}/reset-password`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
+      const data = await api.put(
+        `/api/users/${user.id}/reset-password`
       )
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        alert(data.message || "Error al resetear contraseña")
-        return
-      }
 
       setTempPassword(data.temporaryPassword)
 
     } catch (error) {
+
+      alert(error.message || "Error al resetear contraseña")
       console.error(error)
+
     } finally {
+
       setLoading(false)
+
     }
+
   }
 
   return (
+
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
 
       <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-6">
@@ -48,9 +43,12 @@ const ResetPasswordModal = ({ user, onClose }) => {
 
         {!tempPassword ? (
           <>
+
             <p className="text-sm text-gray-600 mb-6">
               ¿Deseas generar una contraseña temporal para{" "}
-              <span className="font-medium">{user.first_name}</span>?
+              <span className="font-medium">
+                {user.first_name}
+              </span>?
             </p>
 
             <div className="flex justify-end gap-3">
@@ -71,9 +69,11 @@ const ResetPasswordModal = ({ user, onClose }) => {
               </button>
 
             </div>
+
           </>
         ) : (
           <>
+
             <p className="text-sm text-gray-600 mb-3">
               Contraseña temporal generada:
             </p>
@@ -87,19 +87,23 @@ const ResetPasswordModal = ({ user, onClose }) => {
             </p>
 
             <div className="flex justify-end mt-6">
+
               <button
                 onClick={onClose}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
               >
                 Cerrar
               </button>
+
             </div>
+
           </>
         )}
 
       </div>
 
     </div>
+
   )
 }
 

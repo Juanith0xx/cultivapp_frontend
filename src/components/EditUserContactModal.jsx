@@ -1,4 +1,5 @@
 import { useState } from "react"
+import api from "../api/apiClient"
 
 const EditUserContactModal = ({ user, onClose, onUpdated }) => {
 
@@ -7,41 +8,35 @@ const EditUserContactModal = ({ user, onClose, onUpdated }) => {
   const [loading, setLoading] = useState(false)
 
   const handleSave = async () => {
+
     try {
+
       setLoading(true)
 
-      const token = localStorage.getItem("token")
-
-      const res = await fetch(
-        `http://localhost:5000/api/users/${user.id}/update-contact`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({ email, phone })
-        }
+      await api.put(
+        `/api/users/${user.id}/update-contact`,
+        { email, phone }
       )
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        alert(data.message || "Error al actualizar")
-        return
-      }
 
       onUpdated()
       onClose()
 
     } catch (error) {
+
+      alert(error.message || "Error al actualizar")
+
       console.error(error)
+
     } finally {
+
       setLoading(false)
+
     }
+
   }
 
   return (
+
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
 
       <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-6">
@@ -53,23 +48,33 @@ const EditUserContactModal = ({ user, onClose, onUpdated }) => {
         <div className="space-y-4">
 
           <div>
-            <label className="text-sm text-gray-500">Correo</label>
+
+            <label className="text-sm text-gray-500">
+              Correo
+            </label>
+
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full border rounded-lg px-3 py-2 mt-1"
             />
+
           </div>
 
           <div>
-            <label className="text-sm text-gray-500">Teléfono</label>
+
+            <label className="text-sm text-gray-500">
+              Teléfono
+            </label>
+
             <input
               type="text"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               className="w-full border rounded-lg px-3 py-2 mt-1"
             />
+
           </div>
 
         </div>
@@ -96,6 +101,7 @@ const EditUserContactModal = ({ user, onClose, onUpdated }) => {
       </div>
 
     </div>
+
   )
 }
 

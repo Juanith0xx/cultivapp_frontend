@@ -1,16 +1,16 @@
 import { useEffect, useState, useCallback } from "react"
-import { 
+import {
   FiUserPlus,
   FiRotateCw,
   FiEdit,
   FiTrash
 } from "react-icons/fi"
 
+import api from "../../api/apiClient"
+
 import CreateAdminUserModal from "../../components/CreateAdminUserModal"
 import EditAdminUserModal from "../../components/EditAdminUserModal"
 import ResetPasswordAdminModal from "../../components/ResetPasswordAdminModal"
-
-const API_URL = "http://localhost:5000/api/users"
 
 const AdminUsers = () => {
 
@@ -22,7 +22,6 @@ const AdminUsers = () => {
   const [loading, setLoading] = useState(true)
 
   const userLocal = JSON.parse(localStorage.getItem("user"))
-  const token = localStorage.getItem("token")
 
   /* ===========================
      SAFE NUMBER
@@ -36,34 +35,17 @@ const AdminUsers = () => {
      FETCH DATA
   =========================== */
   const fetchData = useCallback(async () => {
+
     try {
+
       setLoading(true)
+
       const timestamp = Date.now()
 
-      const [usersRes, statsRes] = await Promise.all([
-        fetch(`${API_URL}?ts=${timestamp}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Cache-Control": "no-cache"
-          }
-        }),
-        fetch(
-          `${API_URL}/company/${userLocal.company_id}/stats?ts=${timestamp}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Cache-Control": "no-cache"
-            }
-          }
-        )
+      const [usersData, statsData] = await Promise.all([
+        api.get(`/api/users?ts=${timestamp}`),
+        api.get(`/api/users/company/${userLocal.company_id}/stats?ts=${timestamp}`)
       ])
-
-      if (!usersRes.ok || !statsRes.ok) {
-        throw new Error("Error obteniendo datos")
-      }
-
-      const usersData = await usersRes.json()
-      const statsData = await statsRes.json()
 
       setUsers(usersData)
       setStats(statsData)
@@ -73,7 +55,8 @@ const AdminUsers = () => {
     } finally {
       setLoading(false)
     }
-  }, [token, userLocal.company_id])
+
+  }, [userLocal.company_id])
 
   useEffect(() => {
     fetchData()
@@ -84,11 +67,11 @@ const AdminUsers = () => {
   =========================== */
   const toggleUser = async (id) => {
     try {
-      await fetch(`${API_URL}/${id}/toggle`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` }
-      })
+
+      await api.patch(`/api/users/${id}/toggle`)
+
       fetchData()
+
     } catch (error) {
       console.error("TOGGLE ERROR:", error)
     }
@@ -116,10 +99,8 @@ const AdminUsers = () => {
     if (!confirmDelete) return
 
     try {
-      await fetch(`${API_URL}/${targetUser.id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
-      })
+
+      await api.delete(`/api/users/${targetUser.id}`)
 
       fetchData()
 
@@ -154,19 +135,27 @@ const AdminUsers = () => {
   const isCompanyFull = totalMax > 0 && totalUsed >= totalMax
 
   const Card = ({ title, used, max, color }) => {
+
     const percentage = max > 0 ? (used / max) * 100 : 0
+
     return (
       <div className="bg-white p-6 rounded-2xl shadow border border-gray-100">
-        <p className="text-sm text-gray-500 mb-2">{title}</p>
+
+        <p className="text-sm text-gray-500 mb-2">
+          {title}
+        </p>
+
         <p className="text-3xl font-bold text-gray-800">
           {used} / {max}
         </p>
+
         <div className="w-full bg-gray-200 rounded-full h-2 mt-4">
           <div
             className={`${color} h-2 rounded-full transition-all duration-500`}
             style={{ width: `${percentage}%` }}
           />
         </div>
+
       </div>
     )
   }
@@ -176,13 +165,33 @@ const AdminUsers = () => {
 
       {/* RESUMEN */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card title="Supervisores" used={usedSupervisors} max={maxSupervisors} color="bg-green-500" />
-        <Card title="Usuarios" used={usedUsers} max={maxUsers} color="bg-blue-500" />
-        <Card title="Solo Vista" used={usedView} max={maxView} color="bg-purple-500" />
+
+        <Card
+          title="Supervisores"
+          used={usedSupervisors}
+          max={maxSupervisors}
+          color="bg-green-500"
+        />
+
+        <Card
+          title="Usuarios"
+          used={usedUsers}
+          max={maxUsers}
+          color="bg-blue-500"
+        />
+
+        <Card
+          title="Solo Vista"
+          used={usedView}
+          max={maxView}
+          color="bg-purple-500"
+        />
+
       </div>
 
       {/* HEADER */}
       <div className="flex justify-between items-center">
+
         <h1 className="text-xl font-semibold">
           Usuarios de la Empresa
         </h1>
@@ -195,11 +204,14 @@ const AdminUsers = () => {
           <FiUserPlus />
           Crear Usuario
         </button>
+
       </div>
 
       {/* TABLA */}
       <div className="bg-white rounded-xl shadow overflow-hidden">
+
         <table className="w-full text-sm">
+
           <thead className="bg-gray-50 text-left text-gray-500">
             <tr>
               <th className="p-4">Nombre</th>
@@ -211,7 +223,9 @@ const AdminUsers = () => {
           </thead>
 
           <tbody>
+
             {users.map(user => (
+
               <tr key={user.id} className="border-t hover:bg-gray-50 transition">
 
                 <td className="p-4">{user.first_name}</td>
@@ -240,7 +254,6 @@ const AdminUsers = () => {
 
                 <td className="p-4 flex gap-5 items-center text-gray-600">
 
-                  {/* EDIT */}
                   <button
                     onClick={() => setEditUser(user)}
                     className="hover:text-blue-600 transition"
@@ -248,7 +261,6 @@ const AdminUsers = () => {
                     <FiEdit size={16} />
                   </button>
 
-                  {/* RESET */}
                   <button
                     onClick={() => setResetUser(user)}
                     className="hover:text-yellow-600 transition"
@@ -256,7 +268,6 @@ const AdminUsers = () => {
                     <FiRotateCw size={16} />
                   </button>
 
-                  {/* DELETE */}
                   {user.role !== "ADMIN_CLIENTE" &&
                     user.id !== userLocal.id && (
                       <button
@@ -270,9 +281,13 @@ const AdminUsers = () => {
                 </td>
 
               </tr>
+
             ))}
+
           </tbody>
+
         </table>
+
       </div>
 
       {/* MODALS */}

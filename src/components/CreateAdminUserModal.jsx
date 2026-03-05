@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { FiX } from "react-icons/fi"
+import api from "../api/apiClient"
 
 const CreateAdminUserModal = ({
   isOpen,
@@ -37,28 +38,26 @@ const CreateAdminUserModal = ({
      FETCH STATS EMPRESA ACTUAL
   ========================================= */
   const fetchCompanyStats = async () => {
-    try {
-      const token = localStorage.getItem("token")
 
-      const res = await fetch(
-        `http://localhost:5000/api/users/company/${user.company_id}/stats`,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
+    try {
+
+      const data = await api.get(
+        `/api/users/company/${user.company_id}/stats`
       )
 
-      const data = await res.json()
       setCompanyStats(data)
 
     } catch (error) {
-      console.error(error)
+      console.error("FETCH STATS ERROR:", error)
     }
+
   }
 
   /* =========================================
      VALIDAR CUPO
   ========================================= */
   const isRoleFull = (role) => {
+
     if (!companyStats) return false
 
     const { counts, limits } = companyStats
@@ -79,6 +78,7 @@ const CreateAdminUserModal = ({
      SUBMIT
   ========================================= */
   const handleSubmit = async (e) => {
+
     e.preventDefault()
     setLoading(true)
     setError("")
@@ -90,25 +90,11 @@ const CreateAdminUserModal = ({
     }
 
     try {
-      const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:5000/api/users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          ...form,
-          company_id: user.company_id 
-        })
+      await api.post("/api/users", {
+        ...form,
+        company_id: user.company_id
       })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.message || "Error al crear usuario")
-      }
 
       onCreated()
       onClose()
@@ -118,21 +104,26 @@ const CreateAdminUserModal = ({
     } finally {
       setLoading(false)
     }
+
   }
 
   if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+
       <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6 space-y-6">
 
         <div className="flex justify-between items-center">
+
           <h3 className="text-xl font-semibold">
             Crear Usuario
           </h3>
+
           <button onClick={onClose}>
             <FiX size={20} />
           </button>
+
         </div>
 
         {error && (
@@ -180,7 +171,10 @@ const CreateAdminUserModal = ({
               setForm({ ...form, role: e.target.value })
             }
           >
-            <option value="">Seleccionar Perfil</option>
+
+            <option value="">
+              Seleccionar Perfil
+            </option>
 
             <option
               value="SUPERVISOR"
@@ -216,6 +210,7 @@ const CreateAdminUserModal = ({
         </form>
 
       </div>
+
     </div>
   )
 }

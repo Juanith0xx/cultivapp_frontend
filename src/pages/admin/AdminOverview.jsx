@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import api from "../../api/apiClient"
 
 const AdminOverview = () => {
 
@@ -8,28 +9,19 @@ const AdminOverview = () => {
 
   const fetchStats = async () => {
     try {
+
       setLoading(true)
       setError(null)
 
-      const token = localStorage.getItem("token")
       const user = JSON.parse(localStorage.getItem("user"))
 
       if (!user?.company_id) {
         throw new Error("Empresa no definida")
       }
 
-      const res = await fetch(
-        `http://localhost:5000/api/users/company/${user.company_id}/stats`,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
+      const data = await api.get(
+        `/api/users/company/${user.company_id}/stats`
       )
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.message || "Error al obtener estadísticas")
-      }
 
       setStats(data)
 
@@ -48,7 +40,6 @@ const AdminOverview = () => {
   if (error) return <p className="text-red-500">{error}</p>
   if (!stats) return null
 
-  /* 🔒 Normalización TOTAL anti-NaN */
   const safeNumber = (value) => {
     const num = parseInt(value)
     return isNaN(num) ? 0 : num

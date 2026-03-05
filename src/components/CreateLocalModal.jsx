@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react"
 import { FiX } from "react-icons/fi"
+import api from "../api/apiClient"
 
 const CreateLocalModal = ({
   isOpen,
   onClose,
   onCreated,
   companies = [],
-  autoCompany = null // 👈 NUEVO
+  autoCompany = null
 }) => {
 
   const [form, setForm] = useState({
@@ -37,37 +38,24 @@ const CreateLocalModal = ({
   if (!isOpen) return null
 
   const handleChange = (e) => {
+
     setForm({
       ...form,
       [e.target.name]: e.target.value
     })
+
   }
 
   const handleSubmit = async (e) => {
+
     e.preventDefault()
+
     setLoading(true)
     setError("")
 
     try {
-      const token = localStorage.getItem("token")
 
-      const response = await fetch(
-        "http://localhost:5000/api/locales",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify(form)
-        }
-      )
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.message || "Error al crear local")
-      }
+      await api.post("/api/locales", form)
 
       onCreated()
       onClose()
@@ -84,23 +72,32 @@ const CreateLocalModal = ({
       })
 
     } catch (err) {
+
       setError(err.message)
+
     } finally {
+
       setLoading(false)
+
     }
+
   }
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+
       <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6 space-y-6">
 
         <div className="flex justify-between items-center">
+
           <h3 className="text-xl font-semibold">
             Crear Local
           </h3>
+
           <button onClick={onClose}>
             <FiX size={20} />
           </button>
+
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -111,7 +108,7 @@ const CreateLocalModal = ({
             </div>
           )}
 
-          {/* 👇 SOLO ROOT VE EL SELECT */}
+          {/* SOLO ROOT VE EL SELECT */}
           {!autoCompany && (
             <select
               name="company_id"
@@ -120,12 +117,17 @@ const CreateLocalModal = ({
               required
               className="w-full border rounded-lg px-3 py-2 text-sm"
             >
-              <option value="">Seleccionar Empresa</option>
+
+              <option value="">
+                Seleccionar Empresa
+              </option>
+
               {companies.map(c => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
+
             </select>
           )}
 
@@ -196,7 +198,9 @@ const CreateLocalModal = ({
           </button>
 
         </form>
+
       </div>
+
     </div>
   )
 }
