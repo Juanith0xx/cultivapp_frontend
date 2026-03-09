@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react"
-import { FiX } from "react-icons/fi"
+import { FiX, FiMapPin } from "react-icons/fi"
 import api from "../api/apiClient"
+
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 
 const CreateLocalModal = ({
   isOpen,
@@ -17,15 +19,15 @@ const CreateLocalModal = ({
     comuna: "",
     direccion: "",
     gerente: "",
-    telefono: ""
+    telefono: "",
+    lat: "",
+    lng: ""
   })
 
   const [loading, setLoading] = useState(false)
+  const [geoLoading, setGeoLoading] = useState(false)
   const [error, setError] = useState("")
 
-  /* =========================================
-     SI autoCompany CAMBIA → ACTUALIZA FORM
-  ========================================= */
   useEffect(() => {
     if (autoCompany) {
       setForm(prev => ({
@@ -39,10 +41,64 @@ const CreateLocalModal = ({
 
   const handleChange = (e) => {
 
+    const { name, value } = e.target
+
     setForm({
       ...form,
-      [e.target.name]: e.target.value
+      [name]: value
     })
+
+  }
+
+  /* =========================================
+     MAPBOX GEOCODING
+  ========================================= */
+
+  const geocodeAddress = async () => {
+
+    if (!form.direccion) {
+      setError("Ingresa una dirección primero")
+      return
+    }
+
+    try {
+
+      setGeoLoading(true)
+      setError("")
+
+      const address = `${form.direccion}, ${form.comuna}, ${form.region}, Chile`
+
+      const url =
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json` +
+        `?access_token=${MAPBOX_TOKEN}&limit=1&country=CL`
+
+      const res = await fetch(url)
+
+      const data = await res.json()
+
+      if (!data.features || data.features.length === 0) {
+        setError("No se pudo encontrar la ubicación")
+        return
+      }
+
+      const [lng, lat] = data.features[0].center
+
+      setForm(prev => ({
+        ...prev,
+        lat,
+        lng
+      }))
+
+    } catch (err) {
+
+      console.error(err)
+      setError("Error obteniendo coordenadas")
+
+    } finally {
+
+      setGeoLoading(false)
+
+    }
 
   }
 
@@ -55,12 +111,17 @@ const CreateLocalModal = ({
 
     try {
 
-      await api.post("/api/locales", form)
+      const payload = {
+        ...form,
+        lat: form.lat ? Number(form.lat) : null,
+        lng: form.lng ? Number(form.lng) : null
+      }
+
+      await api.post("/api/locales", payload)
 
       onCreated()
       onClose()
 
-      // Reset form
       setForm({
         company_id: autoCompany || "",
         cadena: "",
@@ -68,7 +129,9 @@ const CreateLocalModal = ({
         comuna: "",
         direccion: "",
         gerente: "",
-        telefono: ""
+        telefono: "",
+        lat: "",
+        lng: ""
       })
 
     } catch (err) {
@@ -108,7 +171,6 @@ const CreateLocalModal = ({
             </div>
           )}
 
-          {/* SOLO ROOT VE EL SELECT */}
           {!autoCompany && (
             <select
               name="company_id"
@@ -171,6 +233,23 @@ const CreateLocalModal = ({
             className="w-full border rounded-lg px-3 py-2 text-sm"
           />
 
+          {/* BOTON GEOCODING */}
+
+          <button
+            type="button"
+            onClick={geocodeAddress}
+            disabled={geoLoading}
+            className="flex items-center gap-2 text-sm bg-gray-100 px-3 py-2 rounded-lg hover:bg-gray-200 transition"
+          >
+
+            <FiMapPin size={16} />
+
+            {geoLoading
+              ? "Buscando ubicación..."
+              : "Obtener coordenadas automáticamente"}
+
+          </button>
+
           <input
             type="text"
             name="gerente"
@@ -188,6 +267,32 @@ const CreateLocalModal = ({
             onChange={handleChange}
             className="w-full border rounded-lg px-3 py-2 text-sm"
           />
+
+          {/* COORDENADAS */}
+
+          <div className="grid grid-cols-2 gap-2">
+
+            <input
+              type="number"
+              step="any"
+              name="lat"
+              placeholder="Latitud"
+              value={form.lat}
+              onChange={handleChange}
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+            />
+
+            <input
+              type="number"
+              step="any"
+              name="lng"
+              placeholder="Longitud"
+              value={form.lng}
+              onChange={handleChange}
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+            />
+
+          </div>
 
           <button
             type="submit"

@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react"
-import { FiPlus, FiUpload, FiTrash2 } from "react-icons/fi"
+import { FiPlus, FiUpload, FiTrash2, FiEdit } from "react-icons/fi"
+
 import CreateLocalModal from "../../components/CreateLocalModal"
 import UploadLocalesModal from "../../components/UploadLocalesModal"
+import EditLocalModal from "../../components/EditLocalModal"
+
 import api from "../../api/apiClient"
 
 const Locales = () => {
@@ -9,8 +12,16 @@ const Locales = () => {
   const [locales, setLocales] = useState([])
   const [companies, setCompanies] = useState([])
   const [selectedCompany, setSelectedCompany] = useState("")
+
   const [openCreate, setOpenCreate] = useState(false)
   const [openUpload, setOpenUpload] = useState(false)
+
+  const [openEdit, setOpenEdit] = useState(false)
+  const [selectedLocal, setSelectedLocal] = useState(null)
+
+  /* =================================
+     LOAD INITIAL DATA
+  ================================= */
 
   useEffect(() => {
     fetchCompanies()
@@ -19,6 +30,10 @@ const Locales = () => {
   useEffect(() => {
     fetchLocales()
   }, [selectedCompany])
+
+  /* =================================
+     FETCH COMPANIES
+  ================================= */
 
   const fetchCompanies = async () => {
 
@@ -34,6 +49,10 @@ const Locales = () => {
     }
 
   }
+
+  /* =================================
+     FETCH LOCALES
+  ================================= */
 
   const fetchLocales = async () => {
 
@@ -57,6 +76,10 @@ const Locales = () => {
 
   }
 
+  /* =================================
+     TOGGLE ACTIVO / INACTIVO
+  ================================= */
+
   const toggleLocal = async (id) => {
 
     try {
@@ -72,6 +95,10 @@ const Locales = () => {
     }
 
   }
+
+  /* =================================
+     DELETE LOCAL
+  ================================= */
 
   const deleteLocal = async (id) => {
 
@@ -91,11 +118,23 @@ const Locales = () => {
 
   }
 
+  /* =================================
+     OPEN EDIT MODAL
+  ================================= */
+
+  const openEditModal = (local) => {
+
+    setSelectedLocal(local)
+    setOpenEdit(true)
+
+  }
+
   return (
 
     <div className="space-y-6">
 
       {/* HEADER */}
+
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
 
         <h2 className="text-2xl font-semibold">
@@ -125,6 +164,7 @@ const Locales = () => {
       </div>
 
       {/* FILTRO EMPRESA */}
+
       <select
         value={selectedCompany}
         onChange={(e) => setSelectedCompany(e.target.value)}
@@ -146,6 +186,7 @@ const Locales = () => {
       </select>
 
       {/* TABLA */}
+
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
 
         <table className="w-full text-sm">
@@ -156,6 +197,9 @@ const Locales = () => {
               <th className="p-4">Cadena</th>
               <th className="p-4">Región</th>
               <th className="p-4">Comuna</th>
+              <th className="p-4">Dirección</th>
+              <th className="p-4">Gerente</th>
+              <th className="p-4">Telefono</th>
               <th className="p-4">Estado</th>
               <th className="p-4">Acciones</th>
             </tr>
@@ -181,6 +225,20 @@ const Locales = () => {
                 </td>
 
                 <td className="p-4">
+                {local.direccion}
+                </td>
+
+                <td className="p-4">
+                  {local.gerente}
+                </td>
+
+                <td className="p-4">
+                  {local.telefono}
+                </td>
+
+                {/* ESTADO */}
+
+                <td className="p-4">
 
                   <button
                     onClick={() => toggleLocal(local.id)}
@@ -197,11 +255,20 @@ const Locales = () => {
 
                 </td>
 
-                <td className="p-4">
+                {/* ACCIONES */}
+
+                <td className="p-4 flex gap-3">
+
+                  <button
+                    onClick={() => openEditModal(local)}
+                    className="text-blue-500 hover:text-blue-700"
+                  >
+                    <FiEdit size={16} />
+                  </button>
 
                   <button
                     onClick={() => deleteLocal(local.id)}
-                    className="text-red-500"
+                    className="text-red-500 hover:text-red-700"
                   >
                     <FiTrash2 size={16} />
                   </button>
@@ -219,6 +286,7 @@ const Locales = () => {
       </div>
 
       {/* MODALES */}
+
       <CreateLocalModal
         isOpen={openCreate}
         onClose={() => setOpenCreate(false)}
@@ -233,9 +301,18 @@ const Locales = () => {
         companies={companies}
       />
 
+      <EditLocalModal
+        isOpen={openEdit}
+        onClose={() => setOpenEdit(false)}
+        onUpdated={fetchLocales}
+        companies={companies}
+        local={selectedLocal}
+      />
+
     </div>
 
   )
+
 }
 
 export default Locales

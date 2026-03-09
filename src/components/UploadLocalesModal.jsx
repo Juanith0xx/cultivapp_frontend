@@ -7,7 +7,7 @@ const UploadLocalesModal = ({
   isOpen,
   onClose,
   onUploaded,
-  companies
+  companies = []
 }) => {
 
   const [company_id, setCompanyId] = useState("")
@@ -18,23 +18,47 @@ const UploadLocalesModal = ({
 
   if (!isOpen) return null
 
+  const resetState = () => {
+    setCompanyId("")
+    setFile(null)
+    setError("")
+    setResult(null)
+    setLoading(false)
+  }
+
+  const handleClose = () => {
+    resetState()
+    onClose()
+  }
+
   const handleSubmit = async (e) => {
 
     e.preventDefault()
 
-    setLoading(true)
     setError("")
     setResult(null)
 
+    if (!company_id) {
+      setError("Debes seleccionar una empresa")
+      return
+    }
+
     if (!file) {
+      setError("Selecciona un archivo Excel")
+      return
+    }
 
-      setError("Selecciona un archivo")
-      setLoading(false)
+    const allowedExtensions = [".xlsx", ".xls"]
+    const fileExtension = file.name.substring(file.name.lastIndexOf("."))
 
+    if (!allowedExtensions.includes(fileExtension)) {
+      setError("El archivo debe ser Excel (.xlsx o .xls)")
       return
     }
 
     try {
+
+      setLoading(true)
 
       const token = localStorage.getItem("token")
 
@@ -57,7 +81,7 @@ const UploadLocalesModal = ({
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message)
+        throw new Error(data.message || "Error al subir archivo")
       }
 
       setResult(data)
@@ -66,7 +90,8 @@ const UploadLocalesModal = ({
 
     } catch (err) {
 
-      setError(err.message)
+      console.error(err)
+      setError(err.message || "Error inesperado")
 
     } finally {
 
@@ -82,30 +107,32 @@ const UploadLocalesModal = ({
 
       <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6 space-y-6">
 
+        {/* HEADER */}
         <div className="flex justify-between items-center">
 
           <h3 className="text-xl font-semibold">
             Carga Masiva Excel
           </h3>
 
-          <button onClick={onClose}>
+          <button onClick={handleClose}>
             <FiX size={20} />
           </button>
 
         </div>
 
+        {/* FORM */}
         <form onSubmit={handleSubmit} className="space-y-4">
 
           {error && (
-            <div className="text-red-500 text-sm">
+            <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg">
               {error}
             </div>
           )}
 
+          {/* EMPRESA */}
           <select
             value={company_id}
             onChange={(e) => setCompanyId(e.target.value)}
-            required
             className="w-full border rounded-lg px-3 py-2 text-sm"
           >
 
@@ -121,13 +148,25 @@ const UploadLocalesModal = ({
 
           </select>
 
-          <input
-            type="file"
-            accept=".xlsx,.xls"
-            onChange={(e) => setFile(e.target.files[0])}
-            className="w-full text-sm"
-          />
+          {/* ARCHIVO */}
+          <div className="space-y-2">
 
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={(e) => setFile(e.target.files[0])}
+              className="w-full text-sm"
+            />
+
+            {file && (
+              <p className="text-xs text-gray-500">
+                Archivo seleccionado: <strong>{file.name}</strong>
+              </p>
+            )}
+
+          </div>
+
+          {/* BOTÓN */}
           <button
             type="submit"
             disabled={loading}
@@ -136,22 +175,37 @@ const UploadLocalesModal = ({
 
             <FiUpload size={16} />
 
-            {loading ? "Subiendo..." : "Subir Archivo"}
+            {loading ? "Subiendo archivo..." : "Subir Archivo"}
 
           </button>
 
+          {/* RESULTADO */}
           {result && (
 
-            <div className="bg-green-50 p-3 rounded-lg text-sm">
+            <div className="bg-green-50 p-4 rounded-lg text-sm space-y-2">
 
-              <p>
-                Locales insertados: {result.inserted}
+              <p className="text-green-700 font-medium">
+                ✔ Locales insertados: {result.inserted}
               </p>
 
               {result.errors?.length > 0 && (
-                <p className="text-red-500">
-                  Errores: {result.errors.length}
-                </p>
+
+                <div className="text-red-500">
+
+                  <p>Errores detectados: {result.errors.length}</p>
+
+                  <ul className="text-xs mt-1 list-disc ml-4">
+
+                    {result.errors.slice(0,5).map((err, index) => (
+                      <li key={index}>
+                        Fila {err.row}: {err.error}
+                      </li>
+                    ))}
+
+                  </ul>
+
+                </div>
+
               )}
 
             </div>

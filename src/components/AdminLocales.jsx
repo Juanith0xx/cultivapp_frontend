@@ -110,6 +110,9 @@ const AdminLocales = () => {
               <th className="p-4">Cadena</th>
               <th className="p-4">Región</th>
               <th className="p-4">Comuna</th>
+              <th className="p-4">Dirección</th>
+              <th className="p-4">Gerente</th>
+              <th className="p-4">Teléfono de Contacto</th>
               <th className="p-4">Estado</th>
               <th className="p-4">Acciones</th>
             </tr>
@@ -124,6 +127,9 @@ const AdminLocales = () => {
                 <td className="p-4">{local.cadena}</td>
                 <td className="p-4">{local.region}</td>
                 <td className="p-4">{local.comuna}</td>
+                <td className="p-4">{local.direccion}</td>
+                <td className="p-4">{local.gerente}</td>
+                <td className="p-4">{local.telefono}</td>
 
                 <td className="p-4">
 

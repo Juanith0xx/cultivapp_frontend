@@ -19,30 +19,80 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
   const [openEdit, setOpenEdit] = useState(false)
   const [openReset, setOpenReset] = useState(false)
 
-  const fetchUsers = async () => {
+  /* NUEVO */
+  const [companies, setCompanies] = useState([])
+  const [selectedCompany, setSelectedCompany] = useState("")
+
+  /* ===============================
+     FETCH COMPANIES (ROOT)
+  =============================== */
+  const fetchCompanies = async () => {
+
     try {
 
       const token = localStorage.getItem("token")
 
-      const url = role
-        ? `${API_URL}/api/users?role=${role}`
-        : `${API_URL}/api/users`
+      const res = await fetch(`${API_URL}/api/companies`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      const data = await res.json()
+
+      setCompanies(data)
+
+    } catch (error) {
+      console.error(error)
+    }
+
+  }
+
+  /* ===============================
+     FETCH USERS
+  =============================== */
+  const fetchUsers = async () => {
+
+    try {
+
+      const token = localStorage.getItem("token")
+
+      let url = `${API_URL}/api/users`
+
+      const params = []
+
+      if (role) params.push(`role=${role}`)
+      if (selectedCompany) params.push(`company_id=${selectedCompany}`)
+
+      if (params.length) {
+        url += `?${params.join("&")}`
+      }
 
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
       })
 
       const data = await res.json()
+
       setUsers(data)
 
     } catch (error) {
       console.error(error)
     }
+
   }
 
   useEffect(() => {
+
     fetchUsers()
-  }, [role])
+
+  }, [role, selectedCompany])
+
+  useEffect(() => {
+
+    if (loggedUser?.role === "ROOT") {
+      fetchCompanies()
+    }
+
+  }, [])
 
   const canDeleteUser = (targetUser) => {
 
@@ -69,6 +119,7 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
   }
 
   const toggleUser = async (id) => {
+
     try {
 
       const token = localStorage.getItem("token")
@@ -83,6 +134,7 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
     } catch (error) {
       console.error(error)
     }
+
   }
 
   const deleteUser = async (id) => {
@@ -111,6 +163,7 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
     } catch (error) {
       console.error(error)
     }
+
   }
 
   const total = users.length
@@ -121,6 +174,7 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
     <div className="space-y-6">
 
       <div className="flex items-center justify-between">
+
         <h2 className="text-2xl font-semibold">{title}</h2>
 
         <button
@@ -130,7 +184,34 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
           <FiPlus size={16} />
           {buttonLabel}
         </button>
+
       </div>
+
+      {/* FILTRO EMPRESA (SOLO ROOT) */}
+
+      {loggedUser?.role === "ROOT" && !role && (
+
+        <select
+          value={selectedCompany}
+          onChange={(e) => setSelectedCompany(e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm w-full md:w-64"
+        >
+
+          <option value="">
+            Todas las empresas
+          </option>
+
+          {companies.map(company => (
+
+            <option key={company.id} value={company.id}>
+              {company.name}
+            </option>
+
+          ))}
+
+        </select>
+
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard label="Total" value={total} />
@@ -138,10 +219,14 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
         <StatCard label="Inactivos" value={inactivos} color="text-red-500" />
       </div>
 
+      {/* TABLA */}
+
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+
         <table className="w-full text-sm">
 
           <thead className="bg-gray-50 text-left text-gray-500">
+
             <tr>
               <th className="p-4">Nombre</th>
               <th className="p-4">Email</th>
@@ -150,20 +235,28 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
               <th className="p-4">Estado</th>
               <th className="p-4">Acciones</th>
             </tr>
+
           </thead>
 
           <tbody>
+
             {users.length === 0 ? (
+
               <tr className="border-t">
+
                 <td className="p-4">Sin registros</td>
                 <td className="p-4">-</td>
                 {!role && <td className="p-4">-</td>}
                 {!role && <td className="p-4">-</td>}
                 <td className="p-4">-</td>
                 <td className="p-4">-</td>
+
               </tr>
+
             ) : (
+
               users.map(user => (
+
                 <tr key={user.id} className="border-t hover:bg-gray-50 transition">
 
                   <td className="p-4 font-medium text-gray-800">
@@ -175,40 +268,56 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
                   </td>
 
                   {!role && (
+
                     <td className="p-4">
+
                       {user.company_name ? (
+
                         <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
                           {user.company_name}
                         </span>
+
                       ) : (
+
                         <span className="text-xs text-gray-400">
                           Sin empresa
                         </span>
+
                       )}
+
                     </td>
+
                   )}
 
                   {!role && (
+
                     <td className="p-4">
+
                       <span className="text-gray-600 text-xs bg-gray-100 px-2 py-1 rounded-full">
                         {user.role}
                       </span>
+
                     </td>
+
                   )}
 
                   <td className="p-4">
+
                     <button
                       onClick={() => toggleUser(user.id)}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
                         user.is_active ? "bg-green-500" : "bg-gray-300"
                       }`}
                     >
+
                       <span
                         className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
                           user.is_active ? "translate-x-6" : "translate-x-1"
                         }`}
                       />
+
                     </button>
+
                   </td>
 
                   <td className="p-4 flex gap-3 items-center">
@@ -245,11 +354,15 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
                   </td>
 
                 </tr>
+
               ))
+
             )}
+
           </tbody>
 
         </table>
+
       </div>
 
       <CreateUserModal
