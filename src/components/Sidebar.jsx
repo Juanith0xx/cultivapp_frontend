@@ -3,7 +3,8 @@ import {
   FiBarChart2,
   FiUsers,
   FiBriefcase,
-  FiHome
+  FiHome,
+  FiHelpCircle
 } from "react-icons/fi"
 
 const Sidebar = () => {
@@ -71,6 +72,17 @@ const Sidebar = () => {
         >
           <FiHome size={16} />
           Locales
+        </NavLink>
+
+        {/* NUEVA SECCIÓN */}
+        <NavLink
+          to="/root/questions"
+          className={({ isActive }) =>
+            `${linkBase} ${isActive ? linkActive : linkInactive}`
+          }
+        >
+          <FiHelpCircle size={16} />
+          Preguntas
         </NavLink>
 
       </nav>

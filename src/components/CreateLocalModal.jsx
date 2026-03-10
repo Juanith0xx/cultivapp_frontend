@@ -12,11 +12,14 @@ const CreateLocalModal = ({
   autoCompany = null
 }) => {
 
+  const [regions, setRegions] = useState([])
+  const [comunas, setComunas] = useState([])
+
   const [form, setForm] = useState({
     company_id: autoCompany || "",
     cadena: "",
-    region: "",
-    comuna: "",
+    region_id: "",
+    comuna_id: "",
     direccion: "",
     gerente: "",
     telefono: "",
@@ -28,13 +31,69 @@ const CreateLocalModal = ({
   const [geoLoading, setGeoLoading] = useState(false)
   const [error, setError] = useState("")
 
+  /* =========================
+     CARGAR REGIONES
+  ========================= */
+
   useEffect(() => {
+
+    const loadRegions = async () => {
+
+      try {
+
+        const data = await api.get("/api/regions")
+        setRegions(data)
+
+      } catch (err) {
+
+        console.error("Error cargando regiones")
+
+      }
+
+    }
+
+    loadRegions()
+
+  }, [])
+
+  /* =========================
+     CARGAR COMUNAS
+  ========================= */
+
+  useEffect(() => {
+
+    if (!form.region_id) return
+
+    const loadComunas = async () => {
+
+      try {
+
+        const data = await api.get(`/api/comunas?region_id=${form.region_id}`)
+        setComunas(data)
+
+      } catch (err) {
+
+        console.error("Error cargando comunas")
+
+      }
+
+    }
+
+    loadComunas()
+
+  }, [form.region_id])
+
+  useEffect(() => {
+
     if (autoCompany) {
+
       setForm(prev => ({
         ...prev,
         company_id: autoCompany
       }))
+
     }
+
   }, [autoCompany])
 
   if (!isOpen) return null
@@ -43,42 +102,47 @@ const CreateLocalModal = ({
 
     const { name, value } = e.target
 
-    setForm({
-      ...form,
+    setForm(prev => ({
+      ...prev,
       [name]: value
-    })
+    }))
 
   }
 
-  /* =========================================
-     MAPBOX GEOCODING
-  ========================================= */
+  /* =========================
+     GEOCODING MAPBOX
+  ========================= */
 
   const geocodeAddress = async () => {
 
-    if (!form.direccion) {
-      setError("Ingresa una dirección primero")
+    if (!form.direccion || !form.comuna_id || !form.region_id) {
+
+      setError("Completa dirección, región y comuna")
       return
+
     }
 
     try {
 
       setGeoLoading(true)
-      setError("")
 
-      const address = `${form.direccion}, ${form.comuna}, ${form.region}, Chile`
+      const comuna = comunas.find(c => c.id === form.comuna_id)?.name
+      const region = regions.find(r => r.id === form.region_id)?.name
+
+      const address = `${form.direccion}, ${comuna}, ${region}, Chile`
 
       const url =
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json` +
         `?access_token=${MAPBOX_TOKEN}&limit=1&country=CL`
 
       const res = await fetch(url)
-
       const data = await res.json()
 
       if (!data.features || data.features.length === 0) {
+
         setError("No se pudo encontrar la ubicación")
         return
+
       }
 
       const [lng, lat] = data.features[0].center
@@ -102,6 +166,10 @@ const CreateLocalModal = ({
 
   }
 
+  /* =========================
+     SUBMIT
+  ========================= */
+
   const handleSubmit = async (e) => {
 
     e.preventDefault()
@@ -122,18 +190,6 @@ const CreateLocalModal = ({
       onCreated()
       onClose()
 
-      setForm({
-        company_id: autoCompany || "",
-        cadena: "",
-        region: "",
-        comuna: "",
-        direccion: "",
-        gerente: "",
-        telefono: "",
-        lat: "",
-        lng: ""
-      })
-
     } catch (err) {
 
       setError(err.message)
@@ -147,6 +203,7 @@ const CreateLocalModal = ({
   }
 
   return (
+
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
 
       <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6 space-y-6">
@@ -158,7 +215,7 @@ const CreateLocalModal = ({
           </h3>
 
           <button onClick={onClose}>
-            <FiX size={20} />
+            <FiX size={20}/>
           </button>
 
         </div>
@@ -172,6 +229,7 @@ const CreateLocalModal = ({
           )}
 
           {!autoCompany && (
+
             <select
               name="company_id"
               value={form.company_id}
@@ -180,9 +238,7 @@ const CreateLocalModal = ({
               className="w-full border rounded-lg px-3 py-2 text-sm"
             >
 
-              <option value="">
-                Seleccionar Empresa
-              </option>
+              <option value="">Seleccionar Empresa</option>
 
               {companies.map(c => (
                 <option key={c.id} value={c.id}>
@@ -191,6 +247,7 @@ const CreateLocalModal = ({
               ))}
 
             </select>
+
           )}
 
           <input
@@ -203,25 +260,45 @@ const CreateLocalModal = ({
             className="w-full border rounded-lg px-3 py-2 text-sm"
           />
 
-          <input
-            type="text"
-            name="region"
-            placeholder="Región"
-            value={form.region}
-            onChange={handleChange}
-            required
-            className="w-full border rounded-lg px-3 py-2 text-sm"
-          />
+          {/* REGION */}
 
-          <input
-            type="text"
-            name="comuna"
-            placeholder="Comuna"
-            value={form.comuna}
+          <select
+            name="region_id"
+            value={form.region_id}
             onChange={handleChange}
             required
             className="w-full border rounded-lg px-3 py-2 text-sm"
-          />
+          >
+
+            <option value="">Seleccionar Región</option>
+
+            {regions.map(r => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+
+          </select>
+
+          {/* COMUNA */}
+
+          <select
+            name="comuna_id"
+            value={form.comuna_id}
+            onChange={handleChange}
+            required
+            className="w-full border rounded-lg px-3 py-2 text-sm"
+          >
+
+            <option value="">Seleccionar Comuna</option>
+
+            {comunas.map(c => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+
+          </select>
 
           <input
             type="text"
@@ -239,10 +316,10 @@ const CreateLocalModal = ({
             type="button"
             onClick={geocodeAddress}
             disabled={geoLoading}
-            className="flex items-center gap-2 text-sm bg-gray-100 px-3 py-2 rounded-lg hover:bg-gray-200 transition"
+            className="flex items-center gap-2 text-sm bg-gray-100 px-3 py-2 rounded-lg hover:bg-gray-200"
           >
 
-            <FiMapPin size={16} />
+            <FiMapPin size={16}/>
 
             {geoLoading
               ? "Buscando ubicación..."
@@ -268,8 +345,6 @@ const CreateLocalModal = ({
             className="w-full border rounded-lg px-3 py-2 text-sm"
           />
 
-          {/* COORDENADAS */}
-
           <div className="grid grid-cols-2 gap-2">
 
             <input
@@ -279,7 +354,7 @@ const CreateLocalModal = ({
               placeholder="Latitud"
               value={form.lat}
               onChange={handleChange}
-              className="w-full border rounded-lg px-3 py-2 text-sm"
+              className="border rounded-lg px-3 py-2 text-sm"
             />
 
             <input
@@ -289,7 +364,7 @@ const CreateLocalModal = ({
               placeholder="Longitud"
               value={form.lng}
               onChange={handleChange}
-              className="w-full border rounded-lg px-3 py-2 text-sm"
+              className="border rounded-lg px-3 py-2 text-sm"
             />
 
           </div>
@@ -297,9 +372,11 @@ const CreateLocalModal = ({
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-black text-white py-2 rounded-lg hover:opacity-90 transition disabled:opacity-50"
+            className="w-full bg-black text-white py-2 rounded-lg"
           >
+
             {loading ? "Creando..." : "Crear Local"}
+
           </button>
 
         </form>
@@ -307,7 +384,9 @@ const CreateLocalModal = ({
       </div>
 
     </div>
+
   )
+
 }
 
 export default CreateLocalModal

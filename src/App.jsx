@@ -20,6 +20,9 @@ import AdminOverview from "./pages/admin/AdminOverview"
 import AdminUsers from "./pages/admin/AdminUsers"
 import AdminLocales from "./components/AdminLocales"
 
+/* ================= QUESTIONS ================= */
+import QuestionsManager from "./pages/admin/QuestionsManager"
+
 import ProtectedRoute from "./components/ProtectedRoute"
 
 import "./App.css"
@@ -75,6 +78,16 @@ function App() {
             <Route path="companies" element={<Companies />} />
             <Route path="users" element={<Users />} />
             <Route path="locales" element={<Locales />} />
+
+            {/* NUEVA RUTA */}
+            <Route
+  path="questions"
+  element={
+    <ProtectedRoute roles={["ROOT", "ADMIN_CLIENTE"]}>
+      <QuestionsManager />
+    </ProtectedRoute>
+  }
+/>
           </Route>
 
           {/* ADMIN CLIENTE */}
@@ -89,6 +102,9 @@ function App() {
             <Route index element={<AdminOverview />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="locales" element={<AdminLocales />} />
+
+            {/* NUEVA RUTA */}
+            <Route path="questions" element={<QuestionsManager />} />
           </Route>
 
           {/* FALLBACK */}
