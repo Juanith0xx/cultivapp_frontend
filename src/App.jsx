@@ -7,6 +7,9 @@ import ChangePassword from "./pages/auth/ChangePassword"
 import ForgotPassword from "./pages/auth/ForgotPassword"
 import ResetPassword from "./pages/auth/ResetPassword"
 
+// --- COMPONENTE DE CREDENCIAL (UBICACIÓN CORREGIDA) ---
+import UserCredential from "./components/UserCredential" 
+
 /* ================= ROOT ================= */
 import RootDashboard from "./pages/root/RootDashboard"
 import Analytics from "./pages/root/Analytics"
@@ -54,10 +57,12 @@ function App() {
 
         <Routes>
 
-          {/* LOGIN */}
+          {/* ================= RUTAS PÚBLICAS ================= */}
           <Route path="/" element={<Login />} />
+          
+          {/* RUTA DE VERIFICACIÓN QR (Accesible para todos) */}
+          <Route path="/verify/:id" element={<UserCredential />} />
 
-          {/* RECUPERAR CONTRASEÑA */}
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
 
