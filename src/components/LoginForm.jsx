@@ -15,7 +15,10 @@ const LoginForm = () => {
   const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+
+    if (e && e.preventDefault) {
+      e.preventDefault()
+    }
 
     if (!email || !password) {
       toast.error("Debes completar todos los campos")
@@ -33,26 +36,37 @@ const LoginForm = () => {
 
       login(data)
 
+      /* ==============================
+         FORZAR CAMBIO DE CONTRASEÑA
+      ============================== */
+
       if (data.must_change_password) {
+
         toast("Debes cambiar tu contraseña antes de continuar", {
           icon: "🔐"
         })
+
         navigate("/change-password")
         return
+
       }
 
       toast.success("Bienvenido a Cultivapp")
 
-      switch (data.user.role) {
-        case "ROOT":
-          navigate("/root")
-          break
-        case "ADMIN_CLIENTE":
-          navigate("/admin")
-          break
-        default:
-          navigate("/")
+      /* ==============================
+         REDIRECCIÓN POR ROL
+      ============================== */
+
+      const roleRoutes = {
+        ROOT: "/root",
+        ADMIN_CLIENTE: "/admin",
+        USER: "/usuario",
+        USUARIO: "/usuario"
       }
+
+      const redirect = roleRoutes[data.user.role]
+
+      navigate(redirect || "/")
 
     } catch (err) {
 
@@ -60,21 +74,28 @@ const LoginForm = () => {
 
       if (message.includes("deshabilitada")) {
         toast.error(message, { icon: "🚫" })
-      } else if (message.includes("Empresa")) {
+      } 
+      else if (message.includes("Empresa")) {
         toast.error(message, { icon: "🏢" })
-      } else if (message.includes("Credenciales")) {
+      } 
+      else if (message.includes("Credenciales")) {
         toast.error("Correo o contraseña incorrectos", { icon: "🔑" })
-      } else {
+      } 
+      else {
         toast.error(message)
       }
 
     } finally {
+
       setLoading(false)
+
     }
+
   }
 
   return (
-    <div className="
+    <div
+      className="
       min-h-screen
       bg-gradient-to-b from-white to-gray-100
       md:bg-gray-50
@@ -82,7 +103,8 @@ const LoginForm = () => {
       md:items-center
       md:justify-center
       font-[Outfit]
-    ">
+    "
+    >
 
       <motion.div
         initial={{ opacity: 0, y: 40 }}
@@ -100,6 +122,7 @@ const LoginForm = () => {
         "
       >
 
+        {/* PANEL IZQUIERDO */}
         <div className="hidden md:flex bg-[#87be00] text-white items-center justify-center p-12">
           <div>
             <h2 className="text-4xl font-bold mb-4">
@@ -111,7 +134,9 @@ const LoginForm = () => {
           </div>
         </div>
 
-        <div className="
+        {/* FORMULARIO */}
+        <div
+          className="
           flex flex-col
           min-h-screen
           md:min-h-0
@@ -120,7 +145,8 @@ const LoginForm = () => {
           pb-10
           md:p-12
           md:justify-center
-        ">
+        "
+        >
 
           <div className="md:hidden mb-10 text-center">
             <h1 className="text-2xl font-semibold text-gray-900">
@@ -135,10 +161,12 @@ const LoginForm = () => {
 
             <form onSubmit={handleSubmit} className="space-y-6">
 
+              {/* EMAIL */}
               <div>
                 <label className="block text-sm text-gray-600 mb-2">
                   Correo electrónico
                 </label>
+
                 <input
                   type="email"
                   value={email}
@@ -157,10 +185,12 @@ const LoginForm = () => {
                 />
               </div>
 
+              {/* PASSWORD */}
               <div>
                 <label className="block text-sm text-gray-600 mb-2">
                   Contraseña
                 </label>
+
                 <input
                   type="password"
                   value={password}
@@ -179,6 +209,7 @@ const LoginForm = () => {
                 />
               </div>
 
+              {/* BOTÓN LOGIN */}
               <button
                 type="submit"
                 disabled={loading}
@@ -198,6 +229,7 @@ const LoginForm = () => {
 
             </form>
 
+            {/* RECUPERAR PASSWORD */}
             <p className="text-sm text-gray-500 mt-8 text-center md:text-left">
               ¿Olvidaste tu contraseña?{" "}
               <Link

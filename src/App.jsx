@@ -20,6 +20,13 @@ import AdminOverview from "./pages/admin/AdminOverview"
 import AdminUsers from "./pages/admin/AdminUsers"
 import AdminLocales from "./components/AdminLocales"
 
+/* ================= USUARIO ================= */
+import UserDashboard from "./pages/user/UserDashboard"
+import UserHome from "./pages/user/UserHome"
+import UserLocales from "./pages/user/UserLocales"
+import UserRoutes from "./pages/user/UserRoutes"
+import UserForm from "./pages/user/UserForm"
+
 /* ================= QUESTIONS ================= */
 import QuestionsManager from "./pages/admin/QuestionsManager"
 
@@ -50,11 +57,11 @@ function App() {
           {/* LOGIN */}
           <Route path="/" element={<Login />} />
 
-          {/* NUEVAS RUTAS PÚBLICAS */}
+          {/* RECUPERAR CONTRASEÑA */}
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
 
-          {/* CHANGE PASSWORD */}
+          {/* CAMBIO DE CONTRASEÑA */}
           <Route
             path="/change-password"
             element={
@@ -64,7 +71,7 @@ function App() {
             }
           />
 
-          {/* ROOT */}
+          {/* ================= ROOT ================= */}
           <Route
             path="/root"
             element={
@@ -78,19 +85,10 @@ function App() {
             <Route path="companies" element={<Companies />} />
             <Route path="users" element={<Users />} />
             <Route path="locales" element={<Locales />} />
-
-            {/* NUEVA RUTA */}
-            <Route
-  path="questions"
-  element={
-    <ProtectedRoute roles={["ROOT", "ADMIN_CLIENTE"]}>
-      <QuestionsManager />
-    </ProtectedRoute>
-  }
-/>
+            <Route path="questions" element={<QuestionsManager />} />
           </Route>
 
-          {/* ADMIN CLIENTE */}
+          {/* ================= ADMIN CLIENTE ================= */}
           <Route
             path="/admin"
             element={
@@ -102,9 +100,22 @@ function App() {
             <Route index element={<AdminOverview />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="locales" element={<AdminLocales />} />
-
-            {/* NUEVA RUTA */}
             <Route path="questions" element={<QuestionsManager />} />
+          </Route>
+
+          {/* ================= USUARIO ================= */}
+          <Route
+            path="/usuario"
+            element={
+              <ProtectedRoute role="USUARIO">
+                <UserDashboard />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<UserHome />} />
+            <Route path="locales" element={<UserLocales />} />
+            <Route path="routes" element={<UserRoutes />} />
+            <Route path="form" element={<UserForm />} />
           </Route>
 
           {/* FALLBACK */}

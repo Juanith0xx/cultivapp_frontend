@@ -3,19 +3,47 @@ import { createContext, useContext, useState, useEffect } from "react"
 export const AuthContext = createContext(null)
 
 export const AuthProvider = ({ children }) => {
-  const [token, setToken] = useState(localStorage.getItem("token"))
-  const [user, setUser] = useState(() => {
-    const storedUser = localStorage.getItem("user")
-    return storedUser ? JSON.parse(storedUser) : null
-  })
 
-  const [mustChangePassword, setMustChangePassword] = useState(
-    localStorage.getItem("mustChangePassword") === "true"
-  )
+  const [token, setToken] = useState(null)
+  const [user, setUser] = useState(null)
+  const [mustChangePassword, setMustChangePassword] = useState(false)
 
-  const [isAuthenticated, setIsAuthenticated] = useState(!!token)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  /* =====================================
+     CARGAR SESIÓN DESDE LOCAL STORAGE
+  ===================================== */
 
   useEffect(() => {
+
+    const storedToken = localStorage.getItem("token")
+    const storedUser = localStorage.getItem("user")
+    const storedPasswordFlag = localStorage.getItem("mustChangePassword")
+
+    if (storedToken) {
+      setToken(storedToken)
+      setIsAuthenticated(true)
+    }
+
+    if (storedUser) {
+      setUser(JSON.parse(storedUser))
+    }
+
+    if (storedPasswordFlag === "true") {
+      setMustChangePassword(true)
+    }
+
+    setLoading(false)
+
+  }, [])
+
+  /* =====================================
+     SINCRONIZAR LOCAL STORAGE
+  ===================================== */
+
+  useEffect(() => {
+
     if (token) {
       localStorage.setItem("token", token)
       setIsAuthenticated(true)
@@ -30,29 +58,62 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem("user")
     }
 
-    localStorage.setItem("mustChangePassword", mustChangePassword ? "true" : "false")
+    localStorage.setItem(
+      "mustChangePassword",
+      mustChangePassword ? "true" : "false"
+    )
+
   }, [token, user, mustChangePassword])
 
+  /* =====================================
+     LOGIN
+  ===================================== */
+
   const login = (data) => {
+
     setToken(data.token)
-    if (data.user) setUser(data.user)
-    setMustChangePassword(!!data.mustChangePassword) // 👈 camelCase
+
+    if (data.user) {
+      setUser(data.user)
+    }
+
+    setMustChangePassword(!!data.mustChangePassword)
+
   }
 
+  /* =====================================
+     LOGOUT
+  ===================================== */
+
   const logout = () => {
+
     setToken(null)
     setUser(null)
     setMustChangePassword(false)
+
   }
+
+  /* =====================================
+     LIMPIAR FLAG PASSWORD
+  ===================================== */
 
   const clearMustChangePassword = () => {
+
     setMustChangePassword(false)
     localStorage.setItem("mustChangePassword", "false")
+
   }
 
+  /* =====================================
+     VALIDAR ROLES
+  ===================================== */
+
   const hasRole = (allowedRoles) => {
+
     if (!user) return false
+
     return allowedRoles.includes(user.role)
+
   }
 
   return (
@@ -60,6 +121,7 @@ export const AuthProvider = ({ children }) => {
       value={{
         user,
         token,
+        loading,
         isAuthenticated,
         mustChangePassword,
         login,

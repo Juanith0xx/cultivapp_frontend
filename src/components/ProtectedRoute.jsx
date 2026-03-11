@@ -25,7 +25,6 @@ const ProtectedRoute = ({ children, role, roles }) => {
      🔒 VALIDACIÓN DE ROLES
   =============================== */
 
-  // Unificamos role y roles en un solo array
   const allowedRoles = roles || (role ? [role] : null)
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
@@ -38,18 +37,24 @@ const ProtectedRoute = ({ children, role, roles }) => {
 /* =====================================
    🔁 REDIRECCIÓN INTELIGENTE POR ROL
 ===================================== */
+
 const redirectByRole = (role) => {
 
   switch (role) {
+
     case "ROOT":
       return <Navigate to="/root" replace />
 
     case "ADMIN_CLIENTE":
       return <Navigate to="/admin" replace />
 
+    case "USER":
+      return <Navigate to="/users" replace />
+
     default:
       return <Navigate to="/" replace />
   }
+
 }
 
 export default ProtectedRoute

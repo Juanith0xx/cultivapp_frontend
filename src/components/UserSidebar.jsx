@@ -1,8 +1,8 @@
 import { NavLink } from "react-router-dom"
-import { FiHome, FiUsers, FiMapPin, FiHelpCircle } from "react-icons/fi"
+import { FiHome, FiMapPin, FiClipboard, FiFileText } from "react-icons/fi"
 import { useAuth } from "../context/AuthContext"
 
-const AdminSidebar = () => {
+const UserSidebar = () => {
 
   const { user } = useAuth()
 
@@ -21,13 +21,13 @@ const AdminSidebar = () => {
       {/* TOP */}
       <div>
 
-        {/* Logo / Brand */}
+        {/* Logo */}
         <div className="mb-10">
           <h2 className="text-2xl font-bold text-[#87be00] tracking-tight">
             Cultivapp
           </h2>
           <p className="text-xs text-gray-400 mt-1">
-            Panel Administrador
+            Panel Usuario
           </p>
         </div>
 
@@ -35,12 +35,10 @@ const AdminSidebar = () => {
         <nav className="space-y-2">
 
           <NavLink
-            to="/admin"
+            to="/user"
             end
             className={({ isActive }) =>
-              `${baseClasses} ${
-                isActive ? activeClasses : inactiveClasses
-              }`
+              `${baseClasses} ${isActive ? activeClasses : inactiveClasses}`
             }
           >
             <FiHome size={18} />
@@ -48,46 +46,41 @@ const AdminSidebar = () => {
           </NavLink>
 
           <NavLink
-            to="/admin/users"
+            to="/user/locales"
             className={({ isActive }) =>
-              `${baseClasses} ${
-                isActive ? activeClasses : inactiveClasses
-              }`
-            }
-          >
-            <FiUsers size={18} />
-            Usuarios
-          </NavLink>
-
-          <NavLink
-            to="/admin/locales"
-            className={({ isActive }) =>
-              `${baseClasses} ${
-                isActive ? activeClasses : inactiveClasses
-              }`
+              `${baseClasses} ${isActive ? activeClasses : inactiveClasses}`
             }
           >
             <FiMapPin size={18} />
-            Locales
+            Mis Locales
           </NavLink>
 
-          {/* NUEVA SECCIÓN */}
           <NavLink
-            to="/admin/questions"
+            to="/user/routes"
             className={({ isActive }) =>
-              `${baseClasses} ${
-                isActive ? activeClasses : inactiveClasses
-              }`
+              `${baseClasses} ${isActive ? activeClasses : inactiveClasses}`
             }
           >
-            <FiHelpCircle size={18} />
-            Preguntas
+            <FiClipboard size={18} />
+            Mis Rutas
+          </NavLink>
+
+          {/* NUEVO */}
+          <NavLink
+            to="/user/form"
+            className={({ isActive }) =>
+              `${baseClasses} ${isActive ? activeClasses : inactiveClasses}`
+            }
+          >
+            <FiFileText size={18} />
+            Formulario
           </NavLink>
 
         </nav>
+
       </div>
 
-      {/* BOTTOM USER INFO */}
+      {/* USER INFO */}
       <div className="pt-6 border-t border-gray-100">
 
         <div className="bg-gray-50 p-4 rounded-xl">
@@ -108,4 +101,4 @@ const AdminSidebar = () => {
   )
 }
 
-export default AdminSidebar
+export default UserSidebar
