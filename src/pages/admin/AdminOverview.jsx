@@ -20,7 +20,7 @@ const AdminOverview = () => {
       }
 
       const data = await api.get(
-        `/api/users/company/${user.company_id}/stats`
+        `users/company/${user.company_id}/stats`
       )
 
       setStats(data)

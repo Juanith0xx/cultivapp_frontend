@@ -14,7 +14,7 @@ const UserCredential = () => {
     const fetchUser = async () => {
       try {
         setLoading(true);
-        const data = await api.get(`/api/users/public/verify/${id}`);
+        const data = await api.get(`users/public/verify/${id}`);
         setUser(data);
       } catch (err) {
         console.error("Error:", err);

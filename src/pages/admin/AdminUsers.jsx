@@ -43,8 +43,8 @@ const AdminUsers = () => {
       const timestamp = Date.now()
 
       const [usersData, statsData] = await Promise.all([
-        api.get(`/api/users?ts=${timestamp}`),
-        api.get(`/api/users/company/${userLocal.company_id}/stats?ts=${timestamp}`)
+        api.get(`users?ts=${timestamp}`),
+        api.get(`users/company/${userLocal.company_id}/stats?ts=${timestamp}`)
       ])
 
       setUsers(usersData)
@@ -68,7 +68,7 @@ const AdminUsers = () => {
   const toggleUser = async (id) => {
     try {
 
-      await api.patch(`/api/users/${id}/toggle`)
+      await api.patch(`users/${id}/toggle`)
 
       fetchData()
 
@@ -100,7 +100,7 @@ const AdminUsers = () => {
 
     try {
 
-      await api.delete(`/api/users/${targetUser.id}`)
+      await api.delete(`users/${targetUser.id}`)
 
       fetchData()
 

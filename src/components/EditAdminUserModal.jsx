@@ -69,7 +69,7 @@ const EditAdminUserModal = ({ isOpen, onClose, onUpdated, user, stats }) => {
       if (documentoAchs) formData.append("documento_achs", documentoAchs)
 
       // Usamos PUT o PATCH según tu backend
-      await api.put(`/api/users/${user.id}`, formData)
+      await api.put(`/users/${user.id}`, formData)
 
       onUpdated()
       onClose()

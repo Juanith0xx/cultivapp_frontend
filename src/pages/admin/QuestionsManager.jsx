@@ -24,7 +24,7 @@ const QuestionsManager = () => {
 
     try {
 
-      const data = await api.get("/api/questions")
+      const data = await api.get("/questions")
 
       setQuestions(data)
 
@@ -56,7 +56,7 @@ const QuestionsManager = () => {
 
     try {
 
-      await api.delete(`/api/questions/${id}`)
+      await api.delete(`questions/${id}`)
 
       loadQuestions()
 
