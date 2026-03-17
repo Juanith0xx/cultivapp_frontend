@@ -7,8 +7,10 @@ import ChangePassword from "./pages/auth/ChangePassword"
 import ForgotPassword from "./pages/auth/ForgotPassword"
 import ResetPassword from "./pages/auth/ResetPassword"
 
-// --- COMPONENTE DE CREDENCIAL (UBICACIÓN CORREGIDA) ---
+// --- COMPONENTES GLOBALES ---
 import UserCredential from "./components/UserCredential" 
+import ProtectedRoute from "./components/ProtectedRoute"
+import WorkerCalendar from "./components/WorkerCalendar" // El nuevo calendario inteligente
 
 /* ================= ROOT ================= */
 import RootDashboard from "./pages/root/RootDashboard"
@@ -23,17 +25,14 @@ import AdminOverview from "./pages/admin/AdminOverview"
 import AdminUsers from "./pages/admin/AdminUsers"
 import AdminLocales from "./components/AdminLocales"
 
-/* ================= USUARIO ================= */
+/* ================= USUARIO (MERCADERISTA) ================= */
 import UserDashboard from "./pages/user/UserDashboard"
 import UserHome from "./pages/user/UserHome"
 import UserLocales from "./pages/user/UserLocales"
-import UserRoutes from "./pages/user/UserRoutes"
-import UserForm from "./pages/user/UserForm"
+import UserForm from "./pages/user/UserForm" // Verifica que este archivo tenga el reporte diario
 
 /* ================= QUESTIONS ================= */
 import QuestionsManager from "./pages/admin/QuestionsManager"
-
-import ProtectedRoute from "./components/ProtectedRoute"
 
 import "./App.css"
 
@@ -59,10 +58,7 @@ function App() {
 
           {/* ================= RUTAS PÚBLICAS ================= */}
           <Route path="/" element={<Login />} />
-          
-          {/* RUTA DE VERIFICACIÓN QR (Accesible para todos) */}
           <Route path="/verify/:id" element={<UserCredential />} />
-
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
 
@@ -76,7 +72,7 @@ function App() {
             }
           />
 
-          {/* ================= ROOT ================= */}
+          {/* ================= SECCIÓN ROOT ================= */}
           <Route
             path="/root"
             element={
@@ -93,7 +89,7 @@ function App() {
             <Route path="questions" element={<QuestionsManager />} />
           </Route>
 
-          {/* ================= ADMIN CLIENTE ================= */}
+          {/* ================= SECCIÓN ADMIN CLIENTE ================= */}
           <Route
             path="/admin"
             element={
@@ -108,7 +104,7 @@ function App() {
             <Route path="questions" element={<QuestionsManager />} />
           </Route>
 
-          {/* ================= USUARIO ================= */}
+          {/* ================= SECCIÓN USUARIO (SaaS) ================= */}
           <Route
             path="/usuario"
             element={
@@ -117,13 +113,17 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<UserHome />} />
+            {/* CORRECCIÓN: Al entrar a /usuario, carga el Calendario directamente */}
+            <Route index element={<WorkerCalendar />} />
+            
+            {/* Rutas de navegación interna */}
+            <Route path="routes" element={<WorkerCalendar />} />
             <Route path="locales" element={<UserLocales />} />
-            <Route path="routes" element={<UserRoutes />} />
             <Route path="form" element={<UserForm />} />
+            <Route path="home" element={<UserHome />} />
           </Route>
 
-          {/* FALLBACK */}
+          {/* FALLBACK SEGURIDAD */}
           <Route path="*" element={<Navigate to="/" />} />
 
         </Routes>
