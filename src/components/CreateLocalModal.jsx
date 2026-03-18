@@ -41,7 +41,7 @@ const CreateLocalModal = ({
 
       try {
 
-        const data = await api.get("/api/regions")
+        const data = await api.get("/regions")
         setRegions(data)
 
       } catch (err) {
@@ -68,7 +68,7 @@ const CreateLocalModal = ({
 
       try {
 
-        const data = await api.get(`/api/comunas?region_id=${form.region_id}`)
+        const data = await api.get(`/comunas?region_id=${form.region_id}`)
         setComunas(data)
 
       } catch (err) {
@@ -185,7 +185,7 @@ const CreateLocalModal = ({
         lng: form.lng ? Number(form.lng) : null
       }
 
-      await api.post("/api/locales", payload)
+      await api.post("/locales", payload)
 
       onCreated()
       onClose()

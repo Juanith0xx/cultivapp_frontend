@@ -25,7 +25,7 @@ const AdminLocales = () => {
     try {
 
       const data = await api.get(
-        `/api/locales?company_id=${userLocal.company_id}`
+        `/locales?company_id=${userLocal.company_id}`
       )
 
       setLocales(data)
@@ -41,7 +41,7 @@ const AdminLocales = () => {
   const toggleLocal = async (id) => {
     try {
 
-      await api.patch(`/api/locales/${id}/toggle`)
+      await api.patch(`/locales/${id}/toggle`)
 
       fetchLocales()
 
@@ -59,7 +59,7 @@ const AdminLocales = () => {
 
     try {
 
-      await api.delete(`/api/locales/${id}`)
+      await api.delete(`/locales/${id}`)
 
       fetchLocales()
 

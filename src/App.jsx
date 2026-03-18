@@ -10,7 +10,7 @@ import ResetPassword from "./pages/auth/ResetPassword"
 // --- COMPONENTES GLOBALES ---
 import UserCredential from "./components/UserCredential" 
 import ProtectedRoute from "./components/ProtectedRoute"
-import WorkerCalendar from "./components/WorkerCalendar" // El nuevo calendario inteligente
+import WorkerCalendar from "./components/WorkerCalendar" 
 
 /* ================= ROOT ================= */
 import RootDashboard from "./pages/root/RootDashboard"
@@ -24,12 +24,14 @@ import AdminDashboard from "./pages/admin/AdminDashboard"
 import AdminOverview from "./pages/admin/AdminOverview"
 import AdminUsers from "./pages/admin/AdminUsers"
 import AdminLocales from "./components/AdminLocales"
+// CORRECCIÓN SEGÚN TU ESTRUCTURA:
+import AdminRoutes from "./pages/admin/AdminRoutes" 
 
 /* ================= USUARIO (MERCADERISTA) ================= */
 import UserDashboard from "./pages/user/UserDashboard"
 import UserHome from "./pages/user/UserHome"
 import UserLocales from "./pages/user/UserLocales"
-import UserForm from "./pages/user/UserForm" // Verifica que este archivo tenga el reporte diario
+import UserForm from "./pages/user/UserForm" 
 
 /* ================= QUESTIONS ================= */
 import QuestionsManager from "./pages/admin/QuestionsManager"
@@ -101,6 +103,8 @@ function App() {
             <Route index element={<AdminOverview />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="locales" element={<AdminLocales />} />
+            {/* INTEGRACIÓN DEL MÓDULO DE PLANIFICACIÓN */}
+            <Route path="routes" element={<AdminRoutes />} />
             <Route path="questions" element={<QuestionsManager />} />
           </Route>
 
@@ -113,10 +117,7 @@ function App() {
               </ProtectedRoute>
             }
           >
-            {/* CORRECCIÓN: Al entrar a /usuario, carga el Calendario directamente */}
             <Route index element={<WorkerCalendar />} />
-            
-            {/* Rutas de navegación interna */}
             <Route path="routes" element={<WorkerCalendar />} />
             <Route path="locales" element={<UserLocales />} />
             <Route path="form" element={<UserForm />} />
