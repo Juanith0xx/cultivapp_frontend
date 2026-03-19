@@ -10,7 +10,6 @@ import ResetPassword from "./pages/auth/ResetPassword"
 // --- COMPONENTES GLOBALES ---
 import UserCredential from "./components/UserCredential" 
 import ProtectedRoute from "./components/ProtectedRoute"
-import WorkerCalendar from "./components/WorkerCalendar" 
 
 /* ================= ROOT ================= */
 import RootDashboard from "./pages/root/RootDashboard"
@@ -24,12 +23,11 @@ import AdminDashboard from "./pages/admin/AdminDashboard"
 import AdminOverview from "./pages/admin/AdminOverview"
 import AdminUsers from "./pages/admin/AdminUsers"
 import AdminLocales from "./components/AdminLocales"
-// CORRECCIÓN SEGÚN TU ESTRUCTURA:
 import AdminRoutes from "./pages/admin/AdminRoutes" 
 
 /* ================= USUARIO (MERCADERISTA) ================= */
 import UserDashboard from "./pages/user/UserDashboard"
-import UserHome from "./pages/user/UserHome"
+import UserHome from "./pages/user/UserHome" // Este es el Timeline con calendario
 import UserLocales from "./pages/user/UserLocales"
 import UserForm from "./pages/user/UserForm" 
 
@@ -64,7 +62,6 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
 
-          {/* CAMBIO DE CONTRASEÑA */}
           <Route
             path="/change-password"
             element={
@@ -103,12 +100,11 @@ function App() {
             <Route index element={<AdminOverview />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="locales" element={<AdminLocales />} />
-            {/* INTEGRACIÓN DEL MÓDULO DE PLANIFICACIÓN */}
             <Route path="routes" element={<AdminRoutes />} />
             <Route path="questions" element={<QuestionsManager />} />
           </Route>
 
-          {/* ================= SECCIÓN USUARIO (SaaS) ================= */}
+          {/* ================= SECCIÓN USUARIO (MERCADERISTA) ================= */}
           <Route
             path="/usuario"
             element={
@@ -117,11 +113,15 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<WorkerCalendar />} />
-            <Route path="routes" element={<WorkerCalendar />} />
-            <Route path="locales" element={<UserLocales />} />
-            <Route path="form" element={<UserForm />} />
+            {/* 🟢 MEJORA: Definimos UserHome como el index para cargar el Timeline de inmediato */}
+            <Route index element={<UserHome />} />
             <Route path="home" element={<UserHome />} />
+            
+            {/* Si el usuario pincha 'Agenda' en el sidebar, también ve el Timeline con calendario */}
+            <Route path="agenda" element={<UserHome />} /> 
+            
+            <Route path="locales" element={<UserLocales />} />
+            <Route path="reporte" element={<UserForm />} />
           </Route>
 
           {/* FALLBACK SEGURIDAD */}

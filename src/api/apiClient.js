@@ -1,4 +1,3 @@
-// Si en tu .env dice "http://localhost:5000", aquí nos aseguramos que termine en /api
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const API_URL = BASE_URL.endsWith("/api") ? BASE_URL : `${BASE_URL}/api`;
 
@@ -7,71 +6,97 @@ const getToken = () => localStorage.getItem("token");
 const request = async (endpoint, options = {}) => {
   const token = getToken();
   
-  // VERIFICACIÓN: ¿Es el cuerpo de la petición un FormData?
-  const isFormData = options.body instanceof FormData;
+  // LOG PARA DEBUG (Puedes quitarlo después)
+  console.log(`📡 Llamando a: ${endpoint} | Token: ${token ? "SI" : "NO"}`);
 
-  // IMPORTANTE: Aseguramos que el endpoint empiece con /
+  const isFormData = options.body instanceof FormData;
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
 
   const config = {
     ...options,
     headers: {
+      // Si es FormData (fotos), el navegador pone el Content-Type solo con el boundary
       ...(!isFormData && { "Content-Type": "application/json" }),
+      // IMPORTANTE: Aseguramos que el prefijo Bearer esté bien formado
       ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
     },
   };
 
   try {
-    // Aquí se construye la URL final: http://localhost:5000/api/routes/...
     const response = await fetch(`${API_URL}${cleanEndpoint}`, config);
-    const contentType = response.headers.get("content-type");
+    
+    // Manejo de 401 (Sesión expirada o Token inválido)
+    if (response.status === 401) {
+      console.warn("⚠️ Sesión expirada o no autorizada. Limpiando...");
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      // Solo redirigir si no estamos ya en el login
+      if (window.location.pathname !== "/") {
+        window.location.href = "/?expired=true";
+      }
+      throw new Error("No autorizado");
+    }
 
+    const contentType = response.headers.get("content-type");
     let data = null;
+
     if (contentType && contentType.includes("application/json")) {
       data = await response.json();
     }
 
-    if (response.status === 401) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      if (window.location.pathname !== "/") window.location.href = "/";
-      throw new Error("No autorizado");
-    }
-
+    // Si la respuesta no es OK (incluye el error 400 que mencionaste)
     if (!response.ok) {
-      throw new Error(data?.message || `Error ${response.status}: ${response.statusText}`);
+      const errorMsg = data?.message || `Error ${response.status}: ${response.statusText}`;
+      throw new Error(errorMsg);
     }
 
     return data;
   } catch (error) {
-    console.error("API Error:", error.message);
+    // Si el error es de conexión (Servidor apagado)
+    if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+      console.error("❌ No se pudo conectar con el servidor de Render");
+      throw new Error("Error de conexión con el servidor");
+    }
+    
+    console.error("❌ API Error:", error.message);
     throw error;
   }
 };
 
 const api = {
-  get: (endpoint) => request(endpoint, { method: "GET" }),
+  // Quitamos la necesidad de pasar el query de fecha manualmente si quieres
+  get: (endpoint, params = null) => {
+    let url = endpoint;
+    if (params) {
+      const query = new URLSearchParams(params).toString();
+      url += `${url.includes('?') ? '&' : '?'}${query}`;
+    }
+    return request(url, { method: "GET" });
+  },
 
   post: (endpoint, body) =>
     request(endpoint, {
       method: "POST",
-      body: body instanceof FormData ? body : JSON.stringify(body),
+      body: isFormData(body) ? body : JSON.stringify(body),
     }),
 
   patch: (endpoint, body) =>
     request(endpoint, {
       method: "PATCH",
-      body: body instanceof FormData ? body : (body ? JSON.stringify(body) : undefined),
+      body: isFormData(body) ? body : (body ? JSON.stringify(body) : undefined),
     }),
 
   put: (endpoint, body) =>
     request(endpoint, {
       method: "PUT",
-      body: body instanceof FormData ? body : (body ? JSON.stringify(body) : undefined),
+      body: isFormData(body) ? body : (body ? JSON.stringify(body) : undefined),
     }),
 
   delete: (endpoint) => request(endpoint, { method: "DELETE" }),
 };
+
+// Función auxiliar para detectar FormData
+const isFormData = (val) => val instanceof FormData;
 
 export default api;
