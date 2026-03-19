@@ -1,41 +1,46 @@
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-const API_URL = BASE_URL.endsWith("/api") ? BASE_URL : `${BASE_URL}/api`;
+// Si la URL ya trae /api, la dejamos, si no, la agregamos asegurando un solo slash
+const API_URL = BASE_URL.replace(/\/+$/, "") + (BASE_URL.includes("/api") ? "" : "/api");
 
-const getToken = () => localStorage.getItem("token");
+const getToken = () => {
+  const token = localStorage.getItem("token");
+  if (!token) return null;
+  // Normalización: Si el token ya tiene "Bearer ", lo devolvemos tal cual. 
+  // Si no, lo devolvemos limpio para que el request le ponga el prefijo.
+  return token.startsWith("Bearer ") ? token.split(" ")[1] : token;
+};
 
 const request = async (endpoint, options = {}) => {
   const token = getToken();
   
-  // LOG PARA DEBUG (Puedes quitarlo después)
-  console.log(`📡 Llamando a: ${endpoint} | Token: ${token ? "SI" : "NO"}`);
+  // Limpiamos el endpoint para que no tenga slashes duplicados
+  const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  const finalUrl = `${API_URL}${cleanEndpoint}`;
 
   const isFormData = options.body instanceof FormData;
-  const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
 
   const config = {
     ...options,
     headers: {
-      // Si es FormData (fotos), el navegador pone el Content-Type solo con el boundary
       ...(!isFormData && { "Content-Type": "application/json" }),
-      // IMPORTANTE: Aseguramos que el prefijo Bearer esté bien formado
-      ...(token && { Authorization: `Bearer ${token}` }),
+      ...(token && { Authorization: `Bearer ${token}` }), // Siempre enviamos un solo "Bearer "
       ...options.headers,
     },
   };
 
   try {
-    const response = await fetch(`${API_URL}${cleanEndpoint}`, config);
+    const response = await fetch(finalUrl, config);
     
-    // Manejo de 401 (Sesión expirada o Token inválido)
+    // 🚩 Manejo de 401: Token inválido o expirado
     if (response.status === 401) {
-      console.warn("⚠️ Sesión expirada o no autorizada. Limpiando...");
+      console.error("⚠️ No autorizado: Limpiando sesión...");
       localStorage.removeItem("token");
       localStorage.removeItem("user");
-      // Solo redirigir si no estamos ya en el login
+      
       if (window.location.pathname !== "/") {
         window.location.href = "/?expired=true";
       }
-      throw new Error("No autorizado");
+      throw new Error("Sesión expirada. Por favor, inicia sesión nuevamente.");
     }
 
     const contentType = response.headers.get("content-type");
@@ -45,7 +50,6 @@ const request = async (endpoint, options = {}) => {
       data = await response.json();
     }
 
-    // Si la respuesta no es OK (incluye el error 400 que mencionaste)
     if (!response.ok) {
       const errorMsg = data?.message || `Error ${response.status}: ${response.statusText}`;
       throw new Error(errorMsg);
@@ -53,10 +57,9 @@ const request = async (endpoint, options = {}) => {
 
     return data;
   } catch (error) {
-    // Si el error es de conexión (Servidor apagado)
     if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
-      console.error("❌ No se pudo conectar con el servidor de Render");
-      throw new Error("Error de conexión con el servidor");
+      console.error("❌ Error de red: El servidor podría estar apagado.");
+      throw new Error("No se pudo conectar con el servidor.");
     }
     
     console.error("❌ API Error:", error.message);
@@ -65,7 +68,6 @@ const request = async (endpoint, options = {}) => {
 };
 
 const api = {
-  // Quitamos la necesidad de pasar el query de fecha manualmente si quieres
   get: (endpoint, params = null) => {
     let url = endpoint;
     if (params) {

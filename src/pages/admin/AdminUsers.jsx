@@ -1,263 +1,320 @@
-import { useEffect, useState, useCallback } from "react";
-import { FiPlus, FiTrash2, FiCalendar, FiClock, FiUser, FiMapPin, FiRepeat } from "react-icons/fi";
-import api from "../../api/apiClient";
-import toast from "react-hot-toast";
+import { useEffect, useState, useCallback } from "react"
+import {
+  FiUserPlus,
+  FiRotateCw,
+  FiEdit,
+  FiTrash
+} from "react-icons/fi"
 
-const AdminRoutes = () => {
-  const [routes, setRoutes] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [locales, setLocales] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+import api from "../../api/apiClient"
 
-  // Estado del Formulario
-  const [formData, setFormData] = useState({
-    user_id: "",
-    local_id: "",
-    start_time: "09:00",
-    visit_date: "",        // Para fecha única
-    selectedDays: [],      // Para recurrentes
-    is_recurring: false    // Switch de modo
-  });
+import CreateAdminUserModal from "../../components/CreateAdminUserModal"
+import EditAdminUserModal from "../../components/EditAdminUserModal"
+import ResetPasswordAdminModal from "../../components/ResetPasswordAdminModal"
 
+const AdminUsers = () => {
+
+  const [users, setUsers] = useState([])
+  const [stats, setStats] = useState(null)
+  const [openModal, setOpenModal] = useState(false)
+  const [editUser, setEditUser] = useState(null)
+  const [resetUser, setResetUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  const userLocal = JSON.parse(localStorage.getItem("user"))
+
+  /* ===========================
+     SAFE NUMBER
+  =========================== */
+  const safe = (value) => {
+    const num = Number(value)
+    return isNaN(num) ? 0 : num
+  }
+
+  /* ===========================
+     FETCH DATA
+  =========================== */
   const fetchData = useCallback(async () => {
+
     try {
-      setLoading(true);
-      const [routesData, usersData, localesData] = await Promise.all([
-        api.get("routes"),
-        api.get("users"),
-        api.get("locales")
-      ]);
-      setRoutes(routesData);
-      setUsers(usersData.filter(u => u.role === "USUARIO"));
-      setLocales(localesData);
+
+      setLoading(true)
+
+      const timestamp = Date.now()
+
+      const [usersData, statsData] = await Promise.all([
+        api.get(`users?ts=${timestamp}`),
+        api.get(`users/company/${userLocal.company_id}/stats?ts=${timestamp}`)
+      ])
+
+      setUsers(usersData)
+      setStats(statsData)
+
     } catch (error) {
-      toast.error("Error al cargar datos");
+      console.error("FETCH ERROR:", error)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  }, [userLocal.company_id])
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  /* ===========================
+     TOGGLE USER
+  =========================== */
+  const toggleUser = async (id) => {
     try {
-      if (!formData.user_id || !formData.local_id) return toast.error("Usuario y Local son obligatorios");
-      
-      // Validación según tipo
-      if (!formData.is_recurring && !formData.visit_date) return toast.error("Seleccione una fecha");
-      if (formData.is_recurring && formData.selectedDays.length === 0) return toast.error("Seleccione al menos un día");
 
-      await api.post("routes", formData);
-      toast.success("Ruta agendada correctamente");
-      setIsModalOpen(false);
-      setFormData({ user_id: "", local_id: "", start_time: "09:00", visit_date: "", selectedDays: [], is_recurring: false });
-      fetchData();
+      await api.patch(`users/${id}/toggle`)
+
+      fetchData()
+
     } catch (error) {
-      toast.error(error.message);
+      console.error("TOGGLE ERROR:", error)
     }
-  };
+  }
 
-  const deleteRoute = async (id) => {
-    if (!window.confirm("¿Eliminar esta planificación?")) return;
+  /* ===========================
+     DELETE USER
+  =========================== */
+  const deleteUser = async (targetUser) => {
+
+    if (targetUser.role === "ADMIN_CLIENTE") {
+      alert("No puedes eliminar otro ADMIN_CLIENTE")
+      return
+    }
+
+    if (targetUser.id === userLocal.id) {
+      alert("No puedes eliminar tu propio usuario")
+      return
+    }
+
+    const confirmDelete = window.confirm(
+      `¿Eliminar a ${targetUser.first_name}?`
+    )
+
+    if (!confirmDelete) return
+
     try {
-      await api.delete(`routes/${id}`);
-      toast.success("Eliminado");
-      fetchData();
-    } catch (error) { toast.error("No se pudo eliminar"); }
-  };
 
-  const toggleDay = (day) => {
-    const current = formData.selectedDays;
-    setFormData({
-      ...formData,
-      selectedDays: current.includes(day) ? current.filter(d => d !== day) : [...current, day]
-    });
-  };
+      await api.delete(`users/${targetUser.id}`)
+
+      fetchData()
+
+    } catch (error) {
+      console.error("DELETE ERROR:", error)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="text-center py-10 text-gray-500">
+        Cargando información...
+      </div>
+    )
+  }
+
+  if (!stats) return null
+
+  /* ===========================
+     STATS
+  =========================== */
+  const usedSupervisors = safe(stats.counts?.SUPERVISOR)
+  const usedUsers = safe(stats.counts?.USUARIO)
+  const usedView = safe(stats.counts?.VIEW)
+
+  const maxSupervisors = safe(stats.limits?.max_supervisors)
+  const maxUsers = safe(stats.limits?.max_users)
+  const maxView = safe(stats.limits?.max_view)
+
+  const totalUsed = usedSupervisors + usedUsers + usedView
+  const totalMax = maxSupervisors + maxUsers + maxView
+  const isCompanyFull = totalMax > 0 && totalUsed >= totalMax
+
+  const Card = ({ title, used, max, color }) => {
+
+    const percentage = max > 0 ? (used / max) * 100 : 0
+
+    return (
+      <div className="bg-white p-6 rounded-2xl shadow border border-gray-100">
+
+        <p className="text-sm text-gray-500 mb-2">
+          {title}
+        </p>
+
+        <p className="text-3xl font-bold text-gray-800">
+          {used} / {max}
+        </p>
+
+        <div className="w-full bg-gray-200 rounded-full h-2 mt-4">
+          <div
+            className={`${color} h-2 rounded-full transition-all duration-500`}
+            style={{ width: `${percentage}%` }}
+          />
+        </div>
+
+      </div>
+    )
+  }
 
   return (
-    <div className="p-6 space-y-6 font-[Outfit]">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Planificación de Rutas</h1>
-          <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Asigna locales a tus mercaderistas</p>
-        </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-[#87be00] text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] flex items-center gap-2 hover:bg-black transition-all shadow-lg shadow-[#87be00]/20"
-        >
-          <FiPlus size={18} /> Nueva Asignación
-        </button>
+    <div className="space-y-8">
+
+      {/* RESUMEN */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        <Card
+          title="Supervisores"
+          used={usedSupervisors}
+          max={maxSupervisors}
+          color="bg-green-500"
+        />
+
+        <Card
+          title="Usuarios"
+          used={usedUsers}
+          max={maxUsers}
+          color="bg-blue-500"
+        />
+
+        <Card
+          title="Solo Vista"
+          used={usedView}
+          max={maxView}
+          color="bg-purple-500"
+        />
+
       </div>
 
-      {/* TABLA DE RUTAS */}
-      <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-gray-50/50 border-b border-gray-100">
-              <th className="p-5 text-[10px] font-black uppercase text-gray-400 tracking-widest">Mercaderista</th>
-              <th className="p-5 text-[10px] font-black uppercase text-gray-400 tracking-widest">Punto de Venta</th>
-              <th className="p-5 text-[10px] font-black uppercase text-gray-400 tracking-widest">Tipo / Fecha</th>
-              <th className="p-5 text-[10px] font-black uppercase text-gray-400 tracking-widest text-right">Acciones</th>
+      {/* HEADER */}
+      <div className="flex justify-between items-center">
+
+        <h1 className="text-xl font-semibold">
+          Usuarios de la Empresa
+        </h1>
+
+        <button
+          onClick={() => setOpenModal(true)}
+          disabled={isCompanyFull}
+          className="flex items-center gap-2 bg-[#87be00] text-white px-4 py-2 rounded-lg hover:opacity-90 transition disabled:opacity-40"
+        >
+          <FiUserPlus />
+          Crear Usuario
+        </button>
+
+      </div>
+
+      {/* TABLA */}
+      <div className="bg-white rounded-xl shadow overflow-hidden">
+
+        <table className="w-full text-sm">
+
+          <thead className="bg-gray-50 text-left text-gray-500">
+            <tr>
+              <th className="p-4">Nombre</th>
+              <th className="p-4">Email</th>
+              <th className="p-4">Rol</th>
+              <th className="p-4">Estado</th>
+              <th className="p-4">Acciones</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
-            {routes.map(route => (
-              <tr key={route.id} className="hover:bg-gray-50/50 transition-colors group">
-                <td className="p-5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center font-black text-gray-500 text-xs uppercase">
-                      {route.first_name?.[0]}{route.last_name?.[0]}
-                    </div>
-                    <div>
-                      <p className="text-sm font-black text-gray-800 uppercase leading-none">{route.first_name} {route.last_name}</p>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">ID: {route.user_rut}</p>
-                    </div>
-                  </div>
+
+          <tbody>
+
+            {users.map(user => (
+
+              <tr key={user.id} className="border-t hover:bg-gray-50 transition">
+
+                <td className="p-4">{user.first_name}</td>
+                <td className="p-4">{user.email}</td>
+
+                <td className="p-4">
+                  <span className="text-xs bg-gray-100 px-2 py-1 rounded-full">
+                    {user.role}
+                  </span>
                 </td>
-                <td className="p-5">
-                  <p className="text-sm font-black text-gray-700 uppercase leading-none">{route.cadena}</p>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">{route.direccion}</p>
-                </td>
-                <td className="p-5">
-                  {route.is_recurring ? (
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[9px] bg-blue-50 text-blue-500 px-2 py-0.5 rounded-full font-black uppercase w-fit">Recurrente</span>
-                      <p className="text-[10px] font-bold text-gray-400">Días: {route.days_array?.join(', ')}</p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[9px] bg-orange-50 text-orange-500 px-2 py-0.5 rounded-full font-black uppercase w-fit">Fecha Única</span>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase italic">{new Date(route.visit_date).toLocaleDateString()}</p>
-                    </div>
-                  )}
-                </td>
-                <td className="p-5 text-right">
-                  <button onClick={() => deleteRoute(route.id)} className="p-3 text-gray-300 hover:text-red-500 transition-colors">
-                    <FiTrash2 size={18} />
+
+                <td className="p-4">
+                  <button
+                    onClick={() => toggleUser(user.id)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full ${
+                      user.is_active ? "bg-green-500" : "bg-gray-300"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white ${
+                        user.is_active ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
                   </button>
                 </td>
+
+                <td className="p-4 flex gap-5 items-center text-gray-600">
+
+                  <button
+                    onClick={() => setEditUser(user)}
+                    className="hover:text-blue-600 transition"
+                  >
+                    <FiEdit size={16} />
+                  </button>
+
+                  <button
+                    onClick={() => setResetUser(user)}
+                    className="hover:text-yellow-600 transition"
+                  >
+                    <FiRotateCw size={16} />
+                  </button>
+
+                  {user.role !== "ADMIN_CLIENTE" &&
+                    user.id !== userLocal.id && (
+                      <button
+                        onClick={() => deleteUser(user)}
+                        className="hover:text-red-600 transition"
+                      >
+                        <FiTrash size={16} />
+                      </button>
+                    )}
+
+                </td>
+
               </tr>
+
             ))}
+
           </tbody>
+
         </table>
+
       </div>
 
-      {/* MODAL DE CREACIÓN */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 animate-in zoom-in-95 duration-300">
-            <h2 className="text-xl font-black text-gray-800 uppercase tracking-tight mb-6 flex items-center gap-2">
-              <FiCalendar className="text-[#87be00]" /> Agendar Visita
-            </h2>
+      {/* MODALS */}
+      <CreateAdminUserModal
+        isOpen={openModal}
+        onClose={() => setOpenModal(false)}
+        onCreated={fetchData}
+      />
 
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Mercaderista */}
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Mercaderista</label>
-                <select 
-                  className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-sm"
-                  value={formData.user_id}
-                  onChange={e => setFormData({...formData, user_id: e.target.value})}
-                >
-                  <option value="">Seleccionar...</option>
-                  {users.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>)}
-                </select>
-              </div>
+      <EditAdminUserModal
+        isOpen={!!editUser}
+        user={editUser}
+        stats={stats}
+        onClose={() => setEditUser(null)}
+        onUpdated={fetchData}
+      />
 
-              {/* Local */}
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Punto de Venta</label>
-                <select 
-                  className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-sm"
-                  value={formData.local_id}
-                  onChange={e => setFormData({...formData, local_id: e.target.value})}
-                >
-                  <option value="">Seleccionar...</option>
-                  {locales.map(l => <option key={l.id} value={l.id}>{l.cadena} - {l.direccion}</option>)}
-                </select>
-              </div>
-
-              {/* SWITCH TIPO DE RUTA */}
-              <div className="flex bg-gray-100 p-1 rounded-2xl">
-                <button 
-                  type="button"
-                  onClick={() => setFormData({...formData, is_recurring: false, selectedDays: []})}
-                  className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${!formData.is_recurring ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'}`}
-                >
-                  Fecha Única
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => setFormData({...formData, is_recurring: true, visit_date: ""})}
-                  className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${formData.is_recurring ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'}`}
-                >
-                  Recurrente
-                </button>
-              </div>
-
-              {/* CONFIGURACIÓN DE FECHA O DÍAS */}
-              {!formData.is_recurring ? (
-                <div className="space-y-2 animate-in slide-in-from-top-2">
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-2">¿Cuándo?</label>
-                  <input 
-                    type="date" 
-                    className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold outline-none focus:ring-2 focus:ring-[#87be00]/20"
-                    value={formData.visit_date}
-                    onChange={e => setFormData({...formData, visit_date: e.target.value})}
-                  />
-                </div>
-              ) : (
-                <div className="space-y-4 animate-in slide-in-from-top-2">
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Días de la Semana</label>
-                  <div className="flex justify-between gap-1">
-                    {[1,2,3,4,5,6,0].map(d => (
-                      <button
-                        key={d}
-                        type="button"
-                        onClick={() => toggleDay(d)}
-                        className={`w-9 h-9 rounded-full font-black text-[10px] transition-all ${formData.selectedDays.includes(d) ? 'bg-[#87be00] text-white shadow-md' : 'bg-gray-100 text-gray-400'}`}
-                      >
-                        {['D','L','M','X','J','V','S'][d]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Hora */}
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Hora de Inicio Estimada</label>
-                <input 
-                  type="time" 
-                  className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold outline-none"
-                  value={formData.start_time}
-                  onChange={e => setFormData({...formData, start_time: e.target.value})}
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button 
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="flex-1 py-4 text-[10px] font-black uppercase text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="submit"
-                  className="flex-[2] bg-black text-white py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all"
-                >
-                  Confirmar Plan
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {resetUser && (
+        <ResetPasswordAdminModal
+          user={resetUser}
+          onClose={() => setResetUser(null)}
+          onUpdated={fetchData}
+        />
       )}
-    </div>
-  );
-};
 
-export default AdminRoutes;
+    </div>
+  )
+}
+
+export default AdminUsers
