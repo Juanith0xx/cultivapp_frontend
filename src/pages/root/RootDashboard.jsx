@@ -242,5 +242,4 @@ const RootDashboard = () => {
     </div>
   )
 }
-
 export default RootDashboard
