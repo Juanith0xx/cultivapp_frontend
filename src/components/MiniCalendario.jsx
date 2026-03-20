@@ -1,4 +1,7 @@
-const WeeklyStatus = ({ activeDay }) => {
+const WeeklyStatus = ({ activeDays = [] }) => {
+  // Aseguramos que activeDays sea un array, incluso si llega un solo número
+  const daysArray = Array.isArray(activeDays) ? activeDays : [activeDays];
+
   const days = [
     { id: 1, label: 'L' },
     { id: 2, label: 'M' },
@@ -10,20 +13,25 @@ const WeeklyStatus = ({ activeDay }) => {
   ];
 
   return (
-    <div className="flex gap-1 justify-center">
-      {days.map((d) => (
-        <div
-          key={d.id}
-          title={d.label}
-          className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black transition-all border ${
-            activeDay === d.id
-              ? "bg-[#87be00] border-[#87be00] text-white shadow-sm scale-110"
-              : "bg-gray-50 border-gray-100 text-gray-300"
-          }`}
-        >
-          {d.label}
-        </div>
-      ))}
+    <div className="flex gap-1.5 justify-start">
+      {days.map((d) => {
+        // Verificamos si este día específico (d.id) está en nuestra lista de días activos
+        const isActive = daysArray.includes(Number(d.id));
+
+        return (
+          <div
+            key={d.id}
+            title={d.label}
+            className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black transition-all border ${
+              isActive
+                ? "bg-[#87be00] border-[#87be00] text-white shadow-md shadow-[#87be00]/20 scale-105"
+                : "bg-gray-50 border-gray-100 text-gray-300"
+            }`}
+          >
+            {d.label}
+          </div>
+        );
+      })}
     </div>
   );
 };

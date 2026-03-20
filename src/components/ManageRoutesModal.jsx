@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { FiUpload, FiClock, FiCalendar, FiUser, FiMapPin, FiX, FiFilter, FiTrash2 } from "react-icons/fi";
+import { FiUpload, FiClock, FiCalendar, FiUser, FiMapPin, FiX, FiFilter, FiTrash2, FiLoader } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import api from "../api/apiClient";
 import toast from "react-hot-toast";
@@ -26,11 +26,13 @@ const ManageRoutesModal = ({ isOpen, onClose, users, locales, onCreated, initial
 
   useEffect(() => {
     if (initialData && isOpen) {
-      // Si editamos una ruta agrupada, el backend nos manda 'days_array'
-      // Si es una ruta simple, nos manda 'day_of_week'
-      const activeDays = initialData.days_array 
-        ? initialData.days_array.map(Number) 
-        : initialData.day_of_week !== undefined ? [Number(initialData.day_of_week)] : [];
+      // 🚩 MEJORA: Aseguramos que los días sean números puros para evitar fallos de comparación
+      let activeDays = [];
+      if (initialData.days_array && Array.isArray(initialData.days_array)) {
+        activeDays = initialData.days_array.map(d => parseInt(d, 10)).filter(d => !isNaN(d));
+      } else if (initialData.day_of_week !== undefined && initialData.day_of_week !== null) {
+        activeDays = [parseInt(initialData.day_of_week, 10)];
+      }
 
       setManualTask({
         user_id: initialData.user_id || "",
@@ -58,37 +60,53 @@ const ManageRoutesModal = ({ isOpen, onClose, users, locales, onCreated, initial
   const uniqueComunas = [...new Set(locales?.filter(l => !filters.region || l.region === filters.region).map(l => l.comuna))].filter(Boolean).sort();
   const uniqueCadenas = [...new Set(locales?.map(l => l.cadena))].filter(Boolean).sort();
 
-  // MEJORA: toggleDay ahora permite multiselección siempre
   const toggleDay = (dayId) => {
+    // 🚩 Forzamos que el ID sea numérico
+    const numericId = parseInt(dayId, 10);
     setManualTask(prev => ({
       ...prev,
-      selectedDays: prev.selectedDays.includes(dayId) 
-        ? prev.selectedDays.filter(d => d !== dayId)
-        : [...prev.selectedDays, dayId]
+      selectedDays: prev.selectedDays.includes(numericId) 
+        ? prev.selectedDays.filter(d => d !== numericId)
+        : [...prev.selectedDays, numericId]
     }));
   };
 
   const handleManualSubmit = async (e) => {
     e.preventDefault();
-    if (!manualTask.user_id || !manualTask.local_id || manualTask.selectedDays.length === 0) {
+    
+    // 🚩 LIMPIEZA DE DATOS: Evita el error "NaN" en PostgreSQL
+    const finalDays = manualTask.selectedDays.map(Number).filter(d => !isNaN(d));
+
+    if (!manualTask.user_id || !manualTask.local_id || finalDays.length === 0) {
       return toast.error("Completa todos los campos, incluyendo al menos un día");
     }
 
     try {
       setLoading(true);
+      
+      const payload = {
+        user_id: manualTask.user_id,
+        local_id: manualTask.local_id,
+        start_time: manualTask.start_time,
+        selectedDays: finalDays,
+        is_recurring: true,
+        visit_date: null // Seteamos null en recurrente para evitar conflictos de fecha
+      };
+
       if (isEditing) {
-        // Al editar, enviamos el array completo de días seleccionados
-        // El backend debe procesar esto para actualizar el grupo
-        await api.put(`/routes/${initialData.id}`, manualTask);
+        // Usamos el ID de la planificación para el PUT
+        await api.put(`/routes/${initialData.id}`, payload);
         toast.success("Planificación actualizada");
       } else {
-        await api.post("/routes/bulk", manualTask); 
+        await api.post("/routes", payload); 
         toast.success("Rutas programadas con éxito");
       }
+      
       onCreated();
       onClose();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Error en la operación");
+      console.error("❌ Error API:", error.response?.data);
+      toast.error(error.response?.data?.message || "Error al procesar la solicitud");
     } finally {
       setLoading(false);
     }
@@ -98,7 +116,6 @@ const ManageRoutesModal = ({ isOpen, onClose, users, locales, onCreated, initial
     if (window.confirm("¿Estás seguro de eliminar esta planificación completa?")) {
       try {
         setLoading(true);
-        // El backend usará el ID para encontrar el grupo y borrarlo
         await api.delete(`/routes/${initialData.id}`);
         toast.success("Planificación eliminada");
         onCreated();
@@ -175,7 +192,7 @@ const ManageRoutesModal = ({ isOpen, onClose, users, locales, onCreated, initial
               </div>
 
               <div className="space-y-3">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2"><FiCalendar className="text-[#87be00]" /> {isEditing ? "Días de Visita (Editar)" : "Días de Visita"}</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2"><FiCalendar className="text-[#87be00]" /> Días de Visita</label>
                 <div className="flex justify-between gap-1.5">
                   {DAYS_OF_WEEK.map((day) => (
                     <button
@@ -192,7 +209,7 @@ const ManageRoutesModal = ({ isOpen, onClose, users, locales, onCreated, initial
 
               <div className="flex flex-col gap-3 pt-4">
                 <button type="submit" disabled={loading} className="w-full bg-gray-900 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl hover:bg-black transition-all">
-                  {loading ? "Procesando..." : isEditing ? "Guardar Cambios" : "Confirmar Agendamiento"}
+                  {loading ? <div className="flex items-center gap-2"><FiLoader className="animate-spin" /> Procesando...</div> : isEditing ? "Guardar Cambios" : "Confirmar Agendamiento"}
                 </button>
 
                 {isEditing && (
@@ -203,13 +220,13 @@ const ManageRoutesModal = ({ isOpen, onClose, users, locales, onCreated, initial
               </div>
             </form>
           ) : (
-            <div className="text-center py-10">
-               <FiUpload size={40} className="mx-auto text-gray-300" />
-               <input type="file" accept=".xlsx, .xls" className="mt-4" />
+            <div className="text-center py-10 border-2 border-dashed border-gray-100 rounded-[2rem]">
+               <FiUpload size={40} className="mx-auto text-gray-300 mb-4" />
+               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Módulo de carga masiva próximamente</p>
             </div>
           )}
           
-          <button onClick={onClose} className="w-full text-center mt-6 text-[10px] font-black text-gray-300 uppercase tracking-[0.3em] hover:text-red-400 transition-colors">Cancelar operación</button>
+          <button onClick={onClose} type="button" className="w-full text-center mt-6 text-[10px] font-black text-gray-300 uppercase tracking-[0.3em] hover:text-red-400 transition-colors">Cancelar operación</button>
         </div>
       </div>
     </div>
