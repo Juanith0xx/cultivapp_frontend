@@ -1,62 +1,88 @@
 import { useEffect, useState, useCallback } from "react";
-import { FiMapPin, FiPlay, FiClock, FiCalendar, FiSend, FiChevronLeft, FiChevronRight } from "react-icons/fi";
+import { FiMapPin, FiPlay, FiClock, FiCalendar, FiSend, FiChevronLeft, FiChevronRight, FiLoader } from "react-icons/fi";
 import api from "../../api/apiClient";
 import toast from "react-hot-toast";
-import { useAuth } from "../../context/AuthContext"; // 🟢 Importante para validar sesión
+import { useAuth } from "../../context/AuthContext";
 
 const UserHome = () => {
-  const { user } = useAuth(); // 🟢 Obtenemos el usuario autenticado
+  const { user } = useAuth();
   const [allTasks, setAllTasks] = useState([]); 
   const [displayTasks, setDisplayTasks] = useState([]); 
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(null); 
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  // 1. Función para cargar datos (Memoizada para evitar re-renders infinitos)
   const fetchData = useCallback(async () => {
-    // 🟢 No disparamos la petición si no hay usuario o token listo
     const token = localStorage.getItem("token");
     if (!token || !user) return;
 
     try {
       setLoading(true);
-      // Enviamos la fecha seleccionada a la API para que el filtrado sea desde el servidor
       const dateStr = selectedDate.toLocaleDateString('en-CA');
       const data = await api.get(`/routes/my-tasks?date=${dateStr}`);
       setAllTasks(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error al sincronizar agenda:", error);
-      // Solo mostrar toast si el error no es de "no autorizado" (que manejamos en apiClient)
-      if (error.message !== "No autorizado") {
-        toast.error("No se pudo cargar la agenda");
-      }
+      if (error.status !== 401) toast.error("No se pudo cargar la agenda");
     } finally {
       setLoading(false);
     }
-  }, [user, selectedDate]); // 🟢 Se vuelve a disparar si el usuario cambia o el calendario se mueve
+  }, [user, selectedDate]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  // 2. Filtro local (Doble seguridad para mostrar solo tareas del día)
   useEffect(() => {
     const dateStr = selectedDate.toLocaleDateString('en-CA'); 
     const filtered = allTasks.filter(t => {
-        // Soporte para visit_date (fecha fija) o day_of_week (recurrencia)
         const taskDate = t.visit_date ? new Date(t.visit_date).toLocaleDateString('en-CA') : null;
         return taskDate === dateStr || (t.is_recurring && t.day_of_week === (selectedDate.getDay() || 7));
     });
     setDisplayTasks(filtered);
   }, [selectedDate, allTasks]);
 
-  // Generar los 7 días de la semana
+  // 🟢 FUNCIÓN ACTUALIZADA: Ahora envía el ID en la URL y usa lat_in/lng_in
+  const handleStartVisit = async (taskId) => {
+    if (!navigator.geolocation) {
+      return toast.error("Tu dispositivo no permite geolocalización");
+    }
+
+    setActionLoading(taskId); 
+    const toastId = toast.loading("Validando posición GPS...");
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+
+        try {
+          // 🚩 CAMBIO CLAVE: La URL ahora incluye el ID y el body usa lat_in/lng_in
+          await api.post(`/routes/${taskId}/check-in`, {
+            lat_in: latitude,
+            lng_in: longitude
+          });
+
+          toast.success("Visita iniciada con éxito", { id: toastId });
+          fetchData(); // Refrescamos la lista para ver el cambio de estado
+        } catch (error) {
+          const msg = error.response?.data?.message || "Error al validar posición";
+          toast.error(msg, { id: toastId });
+        } finally {
+          setActionLoading(null);
+        }
+      },
+      (error) => {
+        toast.error("Debes activar el GPS para iniciar la visita", { id: toastId });
+        setActionLoading(null);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
   const getWeekDays = () => {
     const days = [];
     const baseDate = new Date(selectedDate);
     const day = baseDate.getDay();
     const diff = baseDate.getDate() - day + (day === 0 ? -6 : 1); 
     const monday = new Date(baseDate.setDate(diff));
-
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
@@ -65,7 +91,6 @@ const UserHome = () => {
     return days;
   };
 
-  // 🟢 Mientras no haya usuario o estemos cargando los primeros datos
   if (!user || (loading && allTasks.length === 0)) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] animate-pulse">
@@ -125,7 +150,7 @@ const UserHome = () => {
             displayTasks.map((task, idx) => (
               <div key={task.id} className="relative animate-in slide-in-from-left duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
                 <div className="absolute -left-[30px] top-1/2 -translate-y-1/2 w-6 h-6 bg-white flex items-center justify-center z-10">
-                  <div className="w-2.5 h-2.5 bg-orange-500 rounded-full border-2 border-white shadow-sm"></div>
+                  <div className={`w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm ${task.status === 'PENDING' ? 'bg-orange-500' : 'bg-[#87be00]'}`}></div>
                 </div>
 
                 <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-50 flex flex-col md:flex-row items-center justify-between gap-6 hover:border-[#87be00]/30 transition-all group">
@@ -140,7 +165,7 @@ const UserHome = () => {
                         {task.status}
                       </span>
                     </div>
-                    <h2 className="text-xl font-black text-gray-800 uppercase tracking-tight leading-none mb-1 group-hover:text-[#87be00] transition-colors">{task.cadena}</h2>
+                    <h2 className="text-xl font-black text-gray-800 uppercase tracking-tight mb-1 group-hover:text-[#87be00] transition-colors">{task.cadena}</h2>
                     <div className="flex items-center gap-2 text-gray-400">
                       <FiMapPin size={12} className="text-[#87be00]" />
                       <p className="text-[10px] font-bold uppercase tracking-tighter">{task.direccion}</p>
@@ -148,13 +173,22 @@ const UserHome = () => {
                   </div>
 
                   <div className="flex items-center gap-3 w-full md:w-auto">
-                    <button 
-                      onClick={() => toast.success("Iniciando Visita...")}
-                      className="flex-1 md:flex-none bg-[#87be00] text-white px-10 py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-black transition-all shadow-xl shadow-[#87be00]/20 active:scale-95"
-                    >
-                      <FiPlay size={18} />
-                      <span className="text-[10px] font-black uppercase tracking-[0.2em]">Iniciar Visita</span>
-                    </button>
+                    {task.status === 'PENDING' ? (
+                      <button 
+                        onClick={() => handleStartVisit(task.id)}
+                        disabled={actionLoading === task.id}
+                        className="flex-1 md:flex-none bg-[#87be00] text-white px-10 py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-black transition-all shadow-xl shadow-[#87be00]/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {actionLoading === task.id ? <FiLoader className="animate-spin" /> : <FiPlay size={18} />}
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+                          {actionLoading === task.id ? 'Validando...' : 'Iniciar Visita'}
+                        </span>
+                      </button>
+                    ) : (
+                      <div className="bg-green-50 text-[#87be00] px-6 py-4 rounded-2xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest border border-green-100 font-black">
+                        En Proceso
+                      </div>
+                    )}
                     <button className="bg-[#0f172a] text-white p-4 rounded-2xl hover:bg-black transition-all shadow-lg"><FiSend size={18}/></button>
                   </div>
                 </div>

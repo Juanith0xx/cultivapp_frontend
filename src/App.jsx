@@ -24,10 +24,11 @@ import AdminOverview from "./pages/admin/AdminOverview"
 import AdminUsers from "./pages/admin/AdminUsers"
 import AdminLocales from "./components/AdminLocales"
 import AdminRoutes from "./pages/admin/AdminRoutes" 
+import GpsMonitor from "./pages/admin/GpsMonitor" // 🟢 NUEVA IMPORTACIÓN
 
 /* ================= USUARIO (MERCADERISTA) ================= */
 import UserDashboard from "./pages/user/UserDashboard"
-import UserHome from "./pages/user/UserHome" // Este es el Timeline con calendario
+import UserHome from "./pages/user/UserHome" 
 import UserLocales from "./pages/user/UserLocales"
 import UserForm from "./pages/user/UserForm" 
 
@@ -85,6 +86,7 @@ function App() {
             <Route path="companies" element={<Companies />} />
             <Route path="users" element={<Users />} />
             <Route path="locales" element={<Locales />} />
+            <Route path="gps" element={<GpsMonitor />} /> {/* 🟢 GPS para Root */}
             <Route path="questions" element={<QuestionsManager />} />
           </Route>
 
@@ -101,6 +103,7 @@ function App() {
             <Route path="users" element={<AdminUsers />} />
             <Route path="locales" element={<AdminLocales />} />
             <Route path="routes" element={<AdminRoutes />} />
+            <Route path="gps" element={<GpsMonitor />} /> {/* 🟢 NUEVA RUTA GPS */}
             <Route path="questions" element={<QuestionsManager />} />
           </Route>
 
@@ -113,13 +116,9 @@ function App() {
               </ProtectedRoute>
             }
           >
-            {/* 🟢 MEJORA: Definimos UserHome como el index para cargar el Timeline de inmediato */}
             <Route index element={<UserHome />} />
             <Route path="home" element={<UserHome />} />
-            
-            {/* Si el usuario pincha 'Agenda' en el sidebar, también ve el Timeline con calendario */}
             <Route path="agenda" element={<UserHome />} /> 
-            
             <Route path="locales" element={<UserLocales />} />
             <Route path="reporte" element={<UserForm />} />
           </Route>

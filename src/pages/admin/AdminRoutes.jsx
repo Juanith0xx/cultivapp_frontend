@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { 
-  FiPlus, FiRefreshCw, FiAlertCircle, FiEdit3, 
-  FiCalendar, FiList, FiChevronLeft, FiChevronRight 
+  FiPlus, FiRefreshCw, FiEdit3, 
+  FiCalendar, FiList, FiChevronLeft, FiChevronRight, FiNavigation 
 } from "react-icons/fi";
 import api from "../../api/apiClient";
 import ManageRoutesModal from "../../components/ManageRoutesModal";
+import RouteMapModal from "../../components/RouteMapModal"; // 🟢 Nuevo componente
 import toast from "react-hot-toast";
 
 // --- COMPONENTE: Estatus Semanal (Círculos) ---
@@ -84,11 +85,12 @@ const AdminCalendarView = ({ routes, onSelectDate }) => {
 };
 
 const AdminRoutes = () => {
-  const [viewMode, setViewMode] = useState("list"); // "list" o "calendar"
+  const [viewMode, setViewMode] = useState("list");
   const [routes, setRoutes] = useState([]);
   const [users, setUsers] = useState([]);
   const [locales, setLocales] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedRouteGps, setSelectedRouteGps] = useState(null); // 🟢 Estado para el mapa GPS
   const [loading, setLoading] = useState(true);
   const [selectedRoute, setSelectedRoute] = useState(null);
 
@@ -110,7 +112,6 @@ const AdminRoutes = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Abrir modal con fecha pre-seleccionada desde el calendario
   const handleCalendarSelect = (dateStr) => {
     setSelectedRoute({ visit_date: dateStr, is_recurring: false });
     setIsModalOpen(true);
@@ -168,8 +169,8 @@ const AdminRoutes = () => {
                 <tr>
                   <th className="p-6 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Mercaderista</th>
                   <th className="p-6 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Punto de Venta</th>
-                  <th className="p-6 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Planificación (Día/Fecha)</th>
-                  <th className="p-6 text-center text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Estado</th>
+                  <th className="p-6 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Planificación</th>
+                  <th className="p-6 text-center text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Estado / GPS</th>
                   <th className="p-6 text-right text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Acción</th>
                 </tr>
               </thead>
@@ -193,7 +194,7 @@ const AdminRoutes = () => {
                       </div>
                     </td>
                     <td className="p-6">
-                      {r.is_recurring && r.days_array && r.days_array[0] !== null ? (
+                      {r.is_recurring && r.days_array?.length > 0 && r.days_array[0] !== null ? (
                         <div className="space-y-2">
                           <div className="flex items-center gap-2 text-[9px] font-black text-[#87be00] uppercase tracking-widest"><FiRefreshCw size={10} /> Semanal</div>
                           <WeeklyStatus activeDays={r.days_array} />
@@ -206,7 +207,19 @@ const AdminRoutes = () => {
                       )}
                     </td>
                     <td className="p-6 text-center">
-                      <span className="px-4 py-1.5 rounded-full bg-gray-100 text-gray-400 text-[9px] font-black uppercase tracking-widest">{r.status}</span>
+                      <div className="flex flex-col items-center gap-2">
+                        <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${r.status === 'PENDING' ? 'bg-gray-100 text-gray-400' : 'bg-green-100 text-[#87be00]'}`}>
+                          {r.status}
+                        </span>
+                        {/* 🟢 BOTÓN GPS: Solo habilitado si ya hay lat_in */}
+                        <button 
+                          onClick={() => setSelectedRouteGps(r)}
+                          disabled={!r.lat_in}
+                          className={`flex items-center gap-1.5 text-[8px] font-black uppercase transition-all ${r.lat_in ? 'text-[#87be00] hover:scale-105' : 'text-gray-200 cursor-not-allowed'}`}
+                        >
+                          <FiNavigation size={12} /> {r.lat_in ? 'Ver Ubicación' : 'Sin Registro'}
+                        </button>
+                      </div>
                     </td>
                     <td className="p-6 text-right">
                       <button onClick={() => handleOpenEdit(r)} className="p-3 text-gray-300 hover:text-[#87be00] hover:bg-[#87be00]/10 rounded-xl transition-all"><FiEdit3 size={18} /></button>
@@ -221,6 +234,7 @@ const AdminRoutes = () => {
         <AdminCalendarView routes={routes} onSelectDate={handleCalendarSelect} />
       )}
 
+      {/* MODAL GESTIÓN RUTAS */}
       <ManageRoutesModal 
         isOpen={isModalOpen} 
         onClose={() => { setSelectedRoute(null); setIsModalOpen(false); }} 
@@ -228,6 +242,13 @@ const AdminRoutes = () => {
         locales={locales} 
         onCreated={fetchData} 
         initialData={selectedRoute} 
+      />
+
+      {/* 🟢 MODAL MONITOREO GPS */}
+      <RouteMapModal 
+        isOpen={!!selectedRouteGps}
+        onClose={() => setSelectedRouteGps(null)}
+        routeData={selectedRouteGps}
       />
     </div>
   );

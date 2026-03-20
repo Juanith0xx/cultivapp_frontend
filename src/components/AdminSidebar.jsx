@@ -1,5 +1,12 @@
 import { NavLink } from "react-router-dom"
-import { FiHome, FiUsers, FiMapPin, FiHelpCircle, FiCalendar } from "react-icons/fi"
+import { 
+  FiHome, 
+  FiUsers, 
+  FiMapPin, 
+  FiHelpCircle, 
+  FiCalendar, 
+  FiNavigation 
+} from "react-icons/fi"
 import { useAuth } from "../context/AuthContext"
 
 const AdminSidebar = () => {
@@ -9,10 +16,10 @@ const AdminSidebar = () => {
     "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200"
 
   const activeClasses =
-    "bg-green-50 text-green-600 shadow-sm"
+    "bg-green-50 text-[#87be00] shadow-sm font-black"
 
   const inactiveClasses =
-    "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+    "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
 
   return (
     <div className="w-64 bg-white border-r border-gray-100 flex flex-col justify-between min-h-screen p-6 shrink-0">
@@ -20,17 +27,17 @@ const AdminSidebar = () => {
       {/* TOP */}
       <div>
         {/* Logo / Brand */}
-        <div className="mb-10">
-          <h2 className="text-2xl font-black text-[#87be00] tracking-tight uppercase">
+        <div className="mb-10 px-2">
+          <h2 className="text-2xl font-black text-[#87be00] tracking-tight uppercase leading-none">
             Cultivapp
           </h2>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
+          <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.2em] mt-2">
             Panel Administrador
           </p>
         </div>
 
         {/* Navigation */}
-        <nav className="space-y-2">
+        <nav className="space-y-1.5">
           <NavLink
             to="/admin"
             end
@@ -42,7 +49,6 @@ const AdminSidebar = () => {
             Dashboard
           </NavLink>
 
-          {/* 🚩 NUEVA SECCIÓN: PLANIFICACIÓN DE RUTAS */}
           <NavLink
             to="/admin/routes"
             className={({ isActive }) =>
@@ -51,6 +57,17 @@ const AdminSidebar = () => {
           >
             <FiCalendar size={18} />
             Planificación
+          </NavLink>
+
+          {/* 🟢 NUEVA SECCIÓN: MONITOREO GPS */}
+          <NavLink
+            to="/admin/gps"
+            className={({ isActive }) =>
+              `${baseClasses} ${isActive ? activeClasses : inactiveClasses}`
+            }
+          >
+            <FiNavigation size={18} />
+            Monitoreo GPS
           </NavLink>
 
           <NavLink
@@ -87,17 +104,17 @@ const AdminSidebar = () => {
 
       {/* BOTTOM USER INFO */}
       <div className="pt-6 border-t border-gray-100">
-        <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+        <div className="bg-gray-50/50 p-4 rounded-[1.5rem] border border-gray-100/50">
+          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
             Conectado como
           </p>
-          <p className="text-sm font-black text-gray-800 truncate mt-1">
-            {user?.name || "Administrador"}
+          <p className="text-sm font-black text-gray-800 truncate mt-1 uppercase tracking-tight">
+            {user?.name || "Ignacio Muñoz"}
           </p>
-          <div className="flex items-center gap-1 mt-1">
-            <div className="w-1.5 h-1.5 rounded-full bg-[#87be00]" />
-            <p className="text-[10px] font-bold text-gray-500 uppercase truncate">
-              {user?.company_name || "Empresa Cliente"}
+          <div className="flex items-center gap-1.5 mt-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#87be00] animate-pulse" />
+            <p className="text-[9px] font-bold text-gray-400 uppercase truncate">
+              {user?.company_name || "Cultiva Strategic Partners"}
             </p>
           </div>
         </div>
