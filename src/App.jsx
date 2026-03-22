@@ -7,7 +7,7 @@ import ChangePassword from "./pages/auth/ChangePassword"
 import ForgotPassword from "./pages/auth/ForgotPassword"
 import ResetPassword from "./pages/auth/ResetPassword"
 
-// --- COMPONENTES GLOBALES ---
+// --- COMPONENTE GLOBALES ---
 import UserCredential from "./components/UserCredential" 
 import ProtectedRoute from "./components/ProtectedRoute"
 
@@ -23,8 +23,8 @@ import AdminDashboard from "./pages/admin/AdminDashboard"
 import AdminOverview from "./pages/admin/AdminOverview"
 import AdminUsers from "./pages/admin/AdminUsers"
 import AdminLocales from "./components/AdminLocales"
-import AdminRoutes from "./pages/admin/AdminRoutes" 
-import GpsMonitor from "./pages/admin/GpsMonitor" // 🟢 NUEVA IMPORTACIÓN
+import AdminRoutes from "./pages/admin/AdminRoutes" // 🚩 Componente Reutilizado
+import GpsMonitor from "./pages/admin/GpsMonitor" 
 
 /* ================= USUARIO (MERCADERISTA) ================= */
 import UserDashboard from "./pages/user/UserDashboard"
@@ -86,7 +86,11 @@ function App() {
             <Route path="companies" element={<Companies />} />
             <Route path="users" element={<Users />} />
             <Route path="locales" element={<Locales />} />
-            <Route path="gps" element={<GpsMonitor />} /> {/* 🟢 GPS para Root */}
+            
+            {/* 🚩 NUEVA RUTA: Planificación para Root */}
+            <Route path="planificacion" element={<AdminRoutes />} /> 
+            
+            <Route path="gps" element={<GpsMonitor />} /> 
             <Route path="questions" element={<QuestionsManager />} />
           </Route>
 
@@ -103,7 +107,7 @@ function App() {
             <Route path="users" element={<AdminUsers />} />
             <Route path="locales" element={<AdminLocales />} />
             <Route path="routes" element={<AdminRoutes />} />
-            <Route path="gps" element={<GpsMonitor />} /> {/* 🟢 NUEVA RUTA GPS */}
+            <Route path="gps" element={<GpsMonitor />} /> 
             <Route path="questions" element={<QuestionsManager />} />
           </Route>
 
