@@ -97,8 +97,6 @@ const LoginForm = () => {
     <div
       className="
       min-h-screen
-      bg-gradient-to-b from-white to-gray-100
-      md:bg-gray-50
       flex
       md:items-center
       md:justify-center
