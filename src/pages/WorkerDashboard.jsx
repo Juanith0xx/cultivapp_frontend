@@ -1,57 +1,63 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import WorkerCalendar from '../components/WorkerCalendar';
-import VisitFlow from '../components/VisitFlow';
+import VisitFlow from '../components/VisitFlow'; 
 import { useWorkerRoutes } from '../hooks/useWorkerRoutes'; 
 
 const WorkerDashboard = () => {
-  // Obtenemos el usuario real del storage
-  const storedUser = JSON.parse(localStorage.getItem('user'));
-  const user = storedUser || { first_name: "Usuario", id: null };
-  
-  // Obtenemos rutas y la función mutate
+  const user = JSON.parse(localStorage.getItem('user')) || { first_name: "Usuario", id: null };
   const { routes, mutate, loading } = useWorkerRoutes(user.id);
 
-  // 🚩 LÓGICA CLAVE: Buscamos si hay algo en proceso
-  const activeRoute = routes?.find(r => r.status === 'IN_PROGRESS');
+  const [showFlow, setShowFlow] = useState(false);
+  const [selectedRoute, setSelectedRoute] = useState(null);
 
-  if (loading && !routes.length) {
-    return (
-      <div className="h-screen flex items-center justify-center font-black uppercase text-gray-300 text-[10px] tracking-widest">
-        Sincronizando...
-      </div>
-    );
-  }
+  // 🚩 AUTO-DETECCIÓN: Si al cargar hay una ruta IN_PROGRESS, abrimos el flujo
+  useEffect(() => {
+    if (routes.length > 0 && !showFlow) {
+      const active = routes.find(r => r.status?.toUpperCase().trim() === 'IN_PROGRESS' || r.status?.toUpperCase().trim() === 'EN PROCESO');
+      if (active) {
+        setSelectedRoute(active);
+        setShowFlow(true);
+      }
+    }
+  }, [routes, showFlow]);
+
+  const handleOpenVisit = useCallback((route) => {
+    setSelectedRoute(route);
+    setShowFlow(true); 
+  }, []);
+
+  const handleCloseFlow = async () => {
+    setShowFlow(false);
+    setSelectedRoute(null);
+    await mutate(); 
+  };
+
+  if (loading && !routes.length) return <div className="h-screen bg-[#0f172a] flex items-center justify-center text-white font-bold">CARGANDO AGENDA...</div>;
 
   return (
     <div className="min-h-screen bg-gray-50 font-[Outfit]">
-      {activeRoute ? (
-        /* PANTALLA DE FOTOS (Se activa sola si hay IN_PROGRESS) */
-        <div className="fixed inset-0 z-[999] bg-white overflow-y-auto">
+      {showFlow && selectedRoute ? (
+        <div className="fixed inset-0 z-[99999] bg-[#0f172a] overflow-y-auto">
           <VisitFlow 
-            visitId={activeRoute.id} 
-            onBack={async () => {
-              await mutate(); // Al terminar o cancelar, refrescamos la lista
-            }} 
+            visitId={selectedRoute.id} 
+            localName={selectedRoute.cadena || "Local"} 
+            onBack={handleCloseFlow} 
           />
         </div>
       ) : (
-        /* PANTALLA DE AGENDA */
         <div className="animate-in fade-in duration-500">
-          <div className="bg-[#87be00] pt-12 pb-24 px-6 rounded-b-[4rem] shadow-2xl text-white">
-            <h1 className="text-3xl font-black italic uppercase leading-none tracking-tighter">
-              ¡Hola, {user.first_name}!
-            </h1>
-            <p className="opacity-70 mt-2 text-[10px] font-black uppercase tracking-[0.3em]">
-              Tu Agenda de Hoy
-            </p>
+          <div className="bg-[#87be00] pt-14 pb-28 px-8 rounded-b-[4rem] text-white shadow-xl">
+            <h1 className="text-4xl font-black italic uppercase leading-none tracking-tighter">¡Hola, {user.first_name}!</h1>
+            <p className="opacity-70 mt-2 text-[10px] font-black uppercase tracking-[0.3em]">Gestión de Terreno</p>
           </div>
-
-          <div className="max-w-md mx-auto -mt-12 px-4 pb-20">
-            <WorkerCalendar 
-              userId={user.id} 
-              // Pasamos mutate para que el calendario pueda avisar al dashboard
-              onOpenScanner={() => mutate()} 
-            />
+          <div className="max-w-md mx-auto -mt-14 px-4 pb-20">
+            <div className="bg-white rounded-[3rem] shadow-2xl p-2 border border-white">
+              <WorkerCalendar 
+                userId={user.id} 
+                routes={routes} 
+                onOpenScanner={handleOpenVisit} 
+              />
+            </div>
           </div>
         </div>
       )}

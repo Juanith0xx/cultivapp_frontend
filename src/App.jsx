@@ -23,14 +23,15 @@ import AdminDashboard from "./pages/admin/AdminDashboard"
 import AdminOverview from "./pages/admin/AdminOverview"
 import AdminUsers from "./pages/admin/AdminUsers"
 import AdminLocales from "./components/AdminLocales"
-import AdminRoutes from "./pages/admin/AdminRoutes" // 🚩 Componente Reutilizado
+import AdminRoutes from "./pages/admin/AdminRoutes"
 import GpsMonitor from "./pages/admin/GpsMonitor" 
 
 /* ================= USUARIO (MERCADERISTA) ================= */
 import UserDashboard from "./pages/user/UserDashboard"
 import UserHome from "./pages/user/UserHome" 
 import UserLocales from "./pages/user/UserLocales"
-import UserForm from "./pages/user/UserForm" 
+// 🚩 CAMBIO: Importamos el nuevo flujo de visita
+import VisitFlow from "./pages/user/VisitFlow" 
 
 /* ================= QUESTIONS ================= */
 import QuestionsManager from "./pages/admin/QuestionsManager"
@@ -86,10 +87,7 @@ function App() {
             <Route path="companies" element={<Companies />} />
             <Route path="users" element={<Users />} />
             <Route path="locales" element={<Locales />} />
-            
-            {/* 🚩 NUEVA RUTA: Planificación para Root */}
             <Route path="planificacion" element={<AdminRoutes />} /> 
-            
             <Route path="gps" element={<GpsMonitor />} /> 
             <Route path="questions" element={<QuestionsManager />} />
           </Route>
@@ -124,7 +122,12 @@ function App() {
             <Route path="home" element={<UserHome />} />
             <Route path="agenda" element={<UserHome />} /> 
             <Route path="locales" element={<UserLocales />} />
-            <Route path="reporte" element={<UserForm />} />
+            
+            {/* 🚩 CORRECCIÓN CLAVE: 
+                Cambiamos 'reporte' por 'reporte/:id' para recibir el ID de la ruta.
+                Cambiamos 'UserForm' por 'VisitFlow'. 
+            */}
+            <Route path="reporte/:id" element={<VisitFlow />} />
           </Route>
 
           {/* FALLBACK SEGURIDAD */}
@@ -137,4 +140,4 @@ function App() {
   )
 }
 
-export default App
+export default App;

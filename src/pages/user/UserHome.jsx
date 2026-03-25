@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom"; // 🚩 IMPORTANTE
 import { FiMapPin, FiPlay, FiClock, FiCalendar, FiSend, FiChevronLeft, FiChevronRight, FiLoader } from "react-icons/fi";
 import api from "../../api/apiClient";
 import toast from "react-hot-toast";
@@ -6,6 +7,7 @@ import { useAuth } from "../../context/AuthContext";
 
 const UserHome = () => {
   const { user } = useAuth();
+  const navigate = useNavigate(); // 🚩 Hook de navegación
   const [allTasks, setAllTasks] = useState([]); 
   const [displayTasks, setDisplayTasks] = useState([]); 
   const [loading, setLoading] = useState(true);
@@ -40,7 +42,6 @@ const UserHome = () => {
     setDisplayTasks(filtered);
   }, [selectedDate, allTasks]);
 
-  // 🟢 FUNCIÓN ACTUALIZADA: Ahora envía el ID en la URL y usa lat_in/lng_in
   const handleStartVisit = async (taskId) => {
     if (!navigator.geolocation) {
       return toast.error("Tu dispositivo no permite geolocalización");
@@ -54,14 +55,16 @@ const UserHome = () => {
         const { latitude, longitude } = position.coords;
 
         try {
-          // 🚩 CAMBIO CLAVE: La URL ahora incluye el ID y el body usa lat_in/lng_in
           await api.post(`/routes/${taskId}/check-in`, {
             lat_in: latitude,
             lng_in: longitude
           });
 
           toast.success("Visita iniciada con éxito", { id: toastId });
-          fetchData(); // Refrescamos la lista para ver el cambio de estado
+          
+          // 🚩 NAVEGACIÓN AUTOMÁTICA AL INICIAR
+          navigate(`/usuario/reporte/${taskId}`);
+          
         } catch (error) {
           const msg = error.response?.data?.message || "Error al validar posición";
           toast.error(msg, { id: toastId });
@@ -147,53 +150,70 @@ const UserHome = () => {
               <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">No hay visitas para este día</p>
             </div>
           ) : (
-            displayTasks.map((task, idx) => (
-              <div key={task.id} className="relative animate-in slide-in-from-left duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
-                <div className="absolute -left-[30px] top-1/2 -translate-y-1/2 w-6 h-6 bg-white flex items-center justify-center z-10">
-                  <div className={`w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm ${task.status === 'PENDING' ? 'bg-orange-500' : 'bg-[#87be00]'}`}></div>
-                </div>
+            displayTasks.map((task, idx) => {
+              // 🚩 NUEVA LÓGICA DE ESTADOS
+              const isPending = task.status === 'PENDING' || task.status === 'PENDIENTE';
+              const isInProgress = task.status === 'IN_PROGRESS' || task.status === 'EN_PROCESO' || task.status === 'EN_CURSO';
 
-                <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-50 flex flex-col md:flex-row items-center justify-between gap-6 hover:border-[#87be00]/30 transition-all group">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="flex items-center gap-1.5 text-[10px] font-black text-[#87be00] uppercase">
-                        <FiClock /> {task.start_time?.slice(0, 5)}
-                      </span>
-                      <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
-                        task.status === 'PENDING' ? 'bg-orange-50 text-orange-600' : 'bg-green-50 text-[#87be00]'
-                      }`}>
-                        {task.status}
-                      </span>
-                    </div>
-                    <h2 className="text-xl font-black text-gray-800 uppercase tracking-tight mb-1 group-hover:text-[#87be00] transition-colors">{task.cadena}</h2>
-                    <div className="flex items-center gap-2 text-gray-400">
-                      <FiMapPin size={12} className="text-[#87be00]" />
-                      <p className="text-[10px] font-bold uppercase tracking-tighter">{task.direccion}</p>
-                    </div>
+              return (
+                <div key={task.id} className="relative animate-in slide-in-from-left duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
+                  <div className="absolute -left-[30px] top-1/2 -translate-y-1/2 w-6 h-6 bg-white flex items-center justify-center z-10">
+                    <div className={`w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm ${
+                        isPending ? 'bg-orange-500' : isInProgress ? 'bg-blue-600 animate-pulse' : 'bg-[#87be00]'
+                    }`}></div>
                   </div>
 
-                  <div className="flex items-center gap-3 w-full md:w-auto">
-                    {task.status === 'PENDING' ? (
-                      <button 
-                        onClick={() => handleStartVisit(task.id)}
-                        disabled={actionLoading === task.id}
-                        className="flex-1 md:flex-none bg-[#87be00] text-white px-10 py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-black transition-all shadow-xl shadow-[#87be00]/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {actionLoading === task.id ? <FiLoader className="animate-spin" /> : <FiPlay size={18} />}
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em]">
-                          {actionLoading === task.id ? 'Validando...' : 'Iniciar Visita'}
+                  <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-50 flex flex-col md:flex-row items-center justify-between gap-6 hover:border-[#87be00]/30 transition-all group">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="flex items-center gap-1.5 text-[10px] font-black text-[#87be00] uppercase">
+                          <FiClock /> {task.start_time?.slice(0, 5)}
                         </span>
-                      </button>
-                    ) : (
-                      <div className="bg-green-50 text-[#87be00] px-6 py-4 rounded-2xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest border border-green-100 font-black">
-                        En Proceso
+                        <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
+                          isPending ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'
+                        }`}>
+                          {task.status}
+                        </span>
                       </div>
-                    )}
-                    <button className="bg-[#0f172a] text-white p-4 rounded-2xl hover:bg-black transition-all shadow-lg"><FiSend size={18}/></button>
+                      <h2 className="text-xl font-black text-gray-800 uppercase tracking-tight mb-1 group-hover:text-[#87be00] transition-colors">{task.cadena}</h2>
+                      <div className="flex items-center gap-2 text-gray-400">
+                        <FiMapPin size={12} className="text-[#87be00]" />
+                        <p className="text-[10px] font-bold uppercase tracking-tighter">{task.direccion}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                      {isPending ? (
+                        <button 
+                          onClick={() => handleStartVisit(task.id)}
+                          disabled={actionLoading === task.id}
+                          className="flex-1 md:flex-none bg-black text-white px-10 py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-[#87be00] transition-all shadow-xl disabled:opacity-50"
+                        >
+                          {actionLoading === task.id ? <FiLoader className="animate-spin" /> : <FiPlay size={18} />}
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Iniciar Visita</span>
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => navigate(`/usuario/reporte/${task.id}`)}
+                          className="flex-1 md:flex-none bg-blue-600 text-white px-10 py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-blue-700 transition-all shadow-xl shadow-blue-100"
+                        >
+                          <FiSend size={18} />
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Ejecutar Reporte</span>
+                        </button>
+                      )}
+                      
+                      <a 
+                        href={`https://www.google.com/maps?q=${task.lat_in || -33.6199},${task.lng_in || -70.6117}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="bg-[#87be00] text-white p-4 rounded-2xl hover:bg-black transition-all shadow-lg"
+                      >
+                        <FiSend size={18}/>
+                      </a>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

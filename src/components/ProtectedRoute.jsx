@@ -41,16 +41,12 @@ const ProtectedRoute = ({ children, role, roles }) => {
 const redirectByRole = (role) => {
 
   switch (role) {
-
     case "ROOT":
       return <Navigate to="/root" replace />
-
     case "ADMIN_CLIENTE":
       return <Navigate to="/admin" replace />
-
-    case "USER":
-      return <Navigate to="/users" replace />
-
+    case "USUARIO": // 🚩 DEBE SER "USUARIO", antes decía "USER"
+      return <Navigate to="/usuario" replace />
     default:
       return <Navigate to="/" replace />
   }

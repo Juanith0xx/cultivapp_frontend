@@ -8,11 +8,22 @@ export const useWorkerRoutes = (userId) => {
 
   const fetchRoutes = useCallback(async () => {
     if (!userId) return;
-    setLoading(true);
+    
+    // Solo ponemos loading true la primera vez para evitar parpadeos molestos
+    // si ya tenemos datos (ideal para el mutate)
+    if (routes.length === 0) setLoading(true);
+
     try {
-      // Petición al backend
-      const data = await api.get(`/api/routes/user/${userId}`);
-      setRoutes(data);
+      // 🚩 CORRECCIÓN 1: Quitamos el /api inicial porque el backend/client ya lo tienen
+      // 🚩 CORRECCIÓN 2: Usamos desestructuración { data } para obtener el array real de Axios
+      //const response = await api.get(`/routes/user/${userId}`);
+      const data = await api.get(`/routes/user/${userId}`);
+      // Validamos que lo que llegue sea un array
+      //const routesData = Array.isArray(response.data) ? response.data : (response.data.routes || []);
+      const routesData = Array.isArray(data) ? data : (data.routes || []);
+      
+      console.log("✅ Rutas actualizadas en el Hook:", routesData);
+      setRoutes(routesData);
       setError(null);
     } catch (err) {
       console.error("❌ Error cargando rutas:", err);
@@ -20,7 +31,7 @@ export const useWorkerRoutes = (userId) => {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, routes.length]); // Añadimos dependencia para control de carga
 
   useEffect(() => {
     fetchRoutes();
@@ -30,6 +41,7 @@ export const useWorkerRoutes = (userId) => {
     routes, 
     loading, 
     error, 
-    mutate: fetchRoutes // 🚩 Importante: mapeamos fetchRoutes a mutate
+    // 🚩 Forzamos a que mutate sea una función que siempre devuelva la data fresca
+    mutate: fetchRoutes 
   };
 };
