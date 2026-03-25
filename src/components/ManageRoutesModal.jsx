@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { FiUpload, FiClock, FiCalendar, FiUser, FiMapPin, FiX, FiFilter, FiTrash2, FiLoader } from "react-icons/fi";
-import * as XLSX from "xlsx";
+import { FiClock, FiCalendar, FiUser, FiX, FiFilter, FiTrash2, FiLoader, FiBriefcase } from "react-icons/fi";
 import api from "../api/apiClient";
 import toast from "react-hot-toast";
 
@@ -9,224 +8,184 @@ const DAYS_OF_WEEK = [
   { id: 4, label: "Jue" }, { id: 5, label: "Vie" }, { id: 6, label: "Sáb" }, { id: 0, label: "Dom" }
 ];
 
-const ManageRoutesModal = ({ isOpen, onClose, users, locales, onCreated, initialData = null }) => {
-  const [tab, setTab] = useState("manual");
+const ManageRoutesModal = ({ isOpen, onClose, users = [], locales = [], companies = [], onCreated, initialData = null }) => {
   const [loading, setLoading] = useState(false);
   const isEditing = !!initialData;
+  
+  // Detectar ROL
+  const userString = localStorage.getItem("user");
+  const currentUser = userString ? JSON.parse(userString) : null;
+  const isRoot = currentUser?.role?.toUpperCase() === "ROOT";
 
   const [filters, setFilters] = useState({ region: "", comuna: "", cadena: "" });
-  
   const [manualTask, setManualTask] = useState({
     user_id: "",
     local_id: "",
+    company_id: "",
     selectedDays: [], 
-    start_time: "09:00",
-    visit_date: "" 
+    start_time: "09:00"
   });
 
+  /* =========================================================
+     🔄 EFECTO DE CARGA: SIN BUCLES E INTELIGENTE
+  ========================================================= */
   useEffect(() => {
-    if (initialData && isOpen) {
-      // 🚩 MEJORA: Aseguramos que los días sean números puros para evitar fallos de comparación
-      let activeDays = [];
-      if (initialData.days_array && Array.isArray(initialData.days_array)) {
-        activeDays = initialData.days_array.map(d => parseInt(d, 10)).filter(d => !isNaN(d));
-      } else if (initialData.day_of_week !== undefined && initialData.day_of_week !== null) {
-        activeDays = [parseInt(initialData.day_of_week, 10)];
-      }
+    if (!isOpen) {
+      setManualTask({ user_id: "", local_id: "", company_id: "", selectedDays: [], start_time: "09:00" });
+      setFilters({ region: "", comuna: "", cadena: "" });
+      return;
+    }
+
+    if (initialData) {
+      const companyId = initialData.company_id?.toString() || "";
+      const userId = initialData.user_id?.toString() || "";
+      const localId = initialData.local_id?.toString() || "";
+      const startTime = initialData.start_time?.slice(0, 5) || "09:00";
+
+      let days = [];
+      if (Array.isArray(initialData.selectedDays)) days = initialData.selectedDays.map(Number);
+      else if (initialData.day_of_week !== undefined) days = [Number(initialData.day_of_week)];
 
       setManualTask({
-        user_id: initialData.user_id || "",
-        local_id: initialData.local_id || "",
-        selectedDays: activeDays,
-        start_time: initialData.start_time?.slice(0, 5) || "09:00",
-        visit_date: initialData.visit_date || ""
+        company_id: companyId,
+        user_id: userId,
+        local_id: localId,
+        selectedDays: days,
+        start_time: startTime
       });
-      setTab("manual");
-    } else if (!isOpen) {
-      setManualTask({ user_id: "", local_id: "", selectedDays: [], start_time: "09:00", visit_date: "" });
-      setFilters({ region: "", comuna: "", cadena: "" });
+
+      // Seteo de filtros para que el local sea visible
+      const foundLocal = locales.find(l => l.id === localId);
+      if (foundLocal) {
+        setFilters({
+          region: foundLocal.region || "",
+          comuna: foundLocal.comuna || "",
+          cadena: foundLocal.cadena || ""
+        });
+      }
     }
-  }, [initialData, isOpen]);
+  }, [isOpen, initialData]); // 🚩 Reducimos dependencias para evitar el Maximum Update Depth
+
+  /* =========================================================
+     🔍 FILTRADO
+  ========================================================= */
+  const filteredUsers = useMemo(() => {
+    let pool = users.filter(u => u.role?.toUpperCase() === 'USUARIO');
+    if (isRoot && manualTask.company_id) {
+      pool = pool.filter(u => u.company_id === manualTask.company_id);
+    }
+    return pool;
+  }, [users, manualTask.company_id, isRoot]);
 
   const filteredLocales = useMemo(() => {
-    return locales?.filter(l => {
-      return (!filters.region || l.region === filters.region) &&
-             (!filters.comuna || l.comuna === filters.comuna) &&
-             (!filters.cadena || l.cadena === filters.cadena);
-    });
+    return locales.filter(l => (
+      (!filters.region || l.region === filters.region) &&
+      (!filters.comuna || l.comuna === filters.comuna) &&
+      (!filters.cadena || l.cadena === filters.cadena)
+    ));
   }, [locales, filters]);
 
-  const uniqueRegions = [...new Set(locales?.map(l => l.region))].filter(Boolean).sort();
-  const uniqueComunas = [...new Set(locales?.filter(l => !filters.region || l.region === filters.region).map(l => l.comuna))].filter(Boolean).sort();
-  const uniqueCadenas = [...new Set(locales?.map(l => l.cadena))].filter(Boolean).sort();
+  const uniqueRegions = useMemo(() => [...new Set(locales.map(l => l.region))].filter(Boolean).sort(), [locales]);
+  const uniqueComunas = useMemo(() => [...new Set(locales.filter(l => !filters.region || l.region === filters.region).map(l => l.comuna))].filter(Boolean).sort(), [locales, filters.region]);
+  const uniqueCadenas = useMemo(() => [...new Set(locales.map(l => l.cadena))].filter(Boolean).sort(), [locales]);
 
   const toggleDay = (dayId) => {
-    // 🚩 Forzamos que el ID sea numérico
-    const numericId = parseInt(dayId, 10);
     setManualTask(prev => ({
       ...prev,
-      selectedDays: prev.selectedDays.includes(numericId) 
-        ? prev.selectedDays.filter(d => d !== numericId)
-        : [...prev.selectedDays, numericId]
+      selectedDays: prev.selectedDays.includes(dayId) ? prev.selectedDays.filter(d => d !== dayId) : [...prev.selectedDays, dayId]
     }));
   };
 
   const handleManualSubmit = async (e) => {
     e.preventDefault();
-    
-    // 🚩 LIMPIEZA DE DATOS: Evita el error "NaN" en PostgreSQL
-    const finalDays = manualTask.selectedDays.map(Number).filter(d => !isNaN(d));
-
-    if (!manualTask.user_id || !manualTask.local_id || finalDays.length === 0) {
-      return toast.error("Completa todos los campos, incluyendo al menos un día");
-    }
-
     try {
       setLoading(true);
-      
-      const payload = {
-        user_id: manualTask.user_id,
-        local_id: manualTask.local_id,
-        start_time: manualTask.start_time,
-        selectedDays: finalDays,
-        is_recurring: true,
-        visit_date: null // Seteamos null en recurrente para evitar conflictos de fecha
-      };
-
-      if (isEditing) {
-        // Usamos el ID de la planificación para el PUT
-        await api.put(`/routes/${initialData.id}`, payload);
-        toast.success("Planificación actualizada");
-      } else {
-        await api.post("/routes", payload); 
-        toast.success("Rutas programadas con éxito");
-      }
-      
+      const data = { ...manualTask, is_recurring: true };
+      await (isEditing ? api.put(`/routes/${initialData.id}`, data) : api.post("/routes", data));
+      toast.success(isEditing ? "Actualizado" : "Creado");
       onCreated();
       onClose();
-    } catch (error) {
-      console.error("❌ Error API:", error.response?.data);
-      toast.error(error.response?.data?.message || "Error al procesar la solicitud");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (window.confirm("¿Estás seguro de eliminar esta planificación completa?")) {
-      try {
-        setLoading(true);
-        await api.delete(`/routes/${initialData.id}`);
-        toast.success("Planificación eliminada");
-        onCreated();
-        onClose();
-      } catch (error) {
-        toast.error("Error al eliminar");
-      } finally {
-        setLoading(false);
-      }
-    }
+    } catch (error) { toast.error("Error al guardar"); }
+    finally { setLoading(false); }
   };
 
   if (!isOpen) return null;
-  const filteredUsers = users?.filter(u => u.role?.toUpperCase() === 'USUARIO') || [];
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 font-[Outfit]">
-      <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-gray-100 animate-in zoom-in duration-300">
-        
-        {!isEditing && (
-          <div className="flex border-b border-gray-50 bg-gray-50/50">
-            <button onClick={() => setTab("manual")} className={`flex-1 py-5 text-[10px] font-black uppercase tracking-[0.2em] transition-all ${tab === 'manual' ? 'text-[#87be00] border-b-2 border-[#87be00] bg-white' : 'text-gray-400'}`}>Individual / Recurrente</button>
-            <button onClick={() => setTab("massive")} className={`flex-1 py-5 text-[10px] font-black uppercase tracking-[0.2em] transition-all ${tab === 'massive' ? 'text-[#87be00] border-b-2 border-[#87be00] bg-white' : 'text-gray-400'}`}>Masivo (Excel)</button>
-          </div>
-        )}
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[150] p-4 font-[Outfit]">
+      <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden border border-gray-100">
+        <div className="p-10 relative">
+          <button onClick={onClose} className="absolute top-6 right-8 text-gray-300 hover:text-gray-600"><FiX size={24} /></button>
+          <h2 className="text-sm font-black uppercase tracking-[0.2em] text-gray-800 mb-8 italic">{isEditing ? "Editar Planificación" : "Nueva Planificación"}</h2>
 
-        <div className="p-8 relative">
-          <button onClick={onClose} className="absolute top-4 right-6 text-gray-300 hover:text-gray-600 transition-colors"><FiX size={20} /></button>
-
-          <h2 className="text-sm font-black uppercase tracking-[0.2em] text-gray-800 mb-6 flex items-center gap-2">
-            {isEditing ? "Editar Planificación Semanal" : "Nuevo Agendamiento"}
-          </h2>
-
-          {tab === "manual" ? (
-            <form onSubmit={handleManualSubmit} className="space-y-5">
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2"><FiUser className="text-[#87be00]" /> Reponedor</label>
-                  <select required className="w-full bg-gray-50 rounded-2xl px-4 py-3 text-sm font-bold outline-none border-2 border-transparent focus:border-[#87be00]/20" value={manualTask.user_id} onChange={(e) => setManualTask({...manualTask, user_id: e.target.value})}>
-                    <option value="">Seleccionar...</option>
-                    {filteredUsers.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2"><FiClock className="text-[#87be00]" /> Hora</label>
-                  <input type="time" required className="w-full bg-gray-50 rounded-2xl px-4 py-3 text-sm font-bold outline-none" value={manualTask.start_time} onChange={(e) => setManualTask({...manualTask, start_time: e.target.value})} />
-                </div>
-              </div>
-
-              <div className="bg-gray-50/80 p-5 rounded-[2rem] space-y-4 border border-gray-100">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2"><FiFilter className="text-[#87be00]" /> Ubicación</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <select className="bg-white rounded-xl px-3 py-2 text-[10px] font-bold border border-gray-200" value={filters.region} onChange={(e) => setFilters({...filters, region: e.target.value, comuna: ""})}>
-                    <option value="">Región</option>
-                    {uniqueRegions.map(r => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                  <select className="bg-white rounded-xl px-3 py-2 text-[10px] font-bold border border-gray-200" value={filters.comuna} onChange={(e) => setFilters({...filters, comuna: e.target.value})}>
-                    <option value="">Comuna</option>
-                    {uniqueComunas.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                  <select className="bg-white rounded-xl px-3 py-2 text-[10px] font-bold border border-gray-200" value={filters.cadena} onChange={(e) => setFilters({...filters, cadena: e.target.value})}>
-                    <option value="">Cadena</option>
-                    {uniqueCadenas.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                
-                <select required className="w-full bg-white rounded-2xl px-5 py-4 text-sm font-bold border-2 border-[#87be00]/20" value={manualTask.local_id} onChange={(e) => setManualTask({...manualTask, local_id: e.target.value})}>
-                  <option value="">Seleccionar Punto de Venta...</option>
-                  {filteredLocales.map(l => (
-                    <option key={l.id} value={l.id}>{l.cadena} - {l.nombre || l.direccion}</option>
+          <form onSubmit={handleManualSubmit} className="space-y-6">
+            
+            {/* 🟢 SELECTOR DE EMPRESA (PARA ROOT) */}
+            {isRoot && (
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-[#87be00] uppercase tracking-widest ml-1 flex items-center gap-2"><FiBriefcase /> Empresa Cliente</label>
+                <select 
+                  required 
+                  className="w-full bg-green-50/40 rounded-2xl px-5 py-4 text-sm font-bold border-2 border-transparent focus:border-[#87be00]/20 outline-none" 
+                  value={manualTask.company_id} 
+                  onChange={(e) => setManualTask({...manualTask, company_id: e.target.value, user_id: ""})}
+                >
+                  <option value="">Seleccionar Empresa...</option>
+                  {companies.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
               </div>
+            )}
 
-              <div className="space-y-3">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2"><FiCalendar className="text-[#87be00]" /> Días de Visita</label>
-                <div className="flex justify-between gap-1.5">
-                  {DAYS_OF_WEEK.map((day) => (
-                    <button
-                      key={day.id}
-                      type="button"
-                      onClick={() => toggleDay(day.id)}
-                      className={`flex-1 py-3 rounded-xl text-[10px] font-black transition-all ${manualTask.selectedDays.includes(day.id) ? 'bg-[#87be00] text-white shadow-lg shadow-[#87be00]/20' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
-                    >
-                      {day.label}
-                    </button>
-                  ))}
-                </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2"><FiUser /> Reponedor</label>
+                <select required className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold outline-none" value={manualTask.user_id} onChange={(e) => setManualTask({...manualTask, user_id: e.target.value})} disabled={isRoot && !manualTask.company_id}>
+                  <option value="">Seleccionar...</option>
+                  {filteredUsers.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>)}
+                </select>
               </div>
-
-              <div className="flex flex-col gap-3 pt-4">
-                <button type="submit" disabled={loading} className="w-full bg-gray-900 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl hover:bg-black transition-all">
-                  {loading ? <div className="flex items-center gap-2"><FiLoader className="animate-spin" /> Procesando...</div> : isEditing ? "Guardar Cambios" : "Confirmar Agendamiento"}
-                </button>
-
-                {isEditing && (
-                  <button type="button" onClick={handleDelete} className="w-full bg-red-50 text-red-500 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-100 transition-colors flex items-center justify-center gap-2">
-                    <FiTrash2 /> Eliminar Planificación Completa
-                  </button>
-                )}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2"><FiClock /> Hora</label>
+                <input type="time" required className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold outline-none" value={manualTask.start_time} onChange={(e) => setManualTask({...manualTask, start_time: e.target.value})} />
               </div>
-            </form>
-          ) : (
-            <div className="text-center py-10 border-2 border-dashed border-gray-100 rounded-[2rem]">
-               <FiUpload size={40} className="mx-auto text-gray-300 mb-4" />
-               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Módulo de carga masiva próximamente</p>
             </div>
-          )}
-          
-          <button onClick={onClose} type="button" className="w-full text-center mt-6 text-[10px] font-black text-gray-300 uppercase tracking-[0.3em] hover:text-red-400 transition-colors">Cancelar operación</button>
+
+            {/* SECCIÓN FILTROS Y LOCAL */}
+            <div className="bg-gray-50/80 p-6 rounded-[2.5rem] border border-gray-100 space-y-4">
+              <div className="grid grid-cols-3 gap-2">
+                <select className="bg-white rounded-xl p-3 text-[10px] font-black" value={filters.region} onChange={(e) => setFilters({...filters, region: e.target.value, comuna: ""})}>
+                  <option value="">Región</option>
+                  {uniqueRegions.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+                <select className="bg-white rounded-xl p-3 text-[10px] font-black" value={filters.comuna} onChange={(e) => setFilters({...filters, comuna: e.target.value})}>
+                  <option value="">Comuna</option>
+                  {uniqueComunas.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select className="bg-white rounded-xl p-3 text-[10px] font-black" value={filters.cadena} onChange={(e) => setFilters({...filters, cadena: e.target.value})}>
+                  <option value="">Cadena</option>
+                  {uniqueCadenas.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <select required className="w-full bg-white rounded-2xl px-6 py-5 text-sm font-bold border-2 border-[#87be00]/20 shadow-sm" value={manualTask.local_id} onChange={(e) => setManualTask({...manualTask, local_id: e.target.value})}>
+                <option value="">Seleccionar Local...</option>
+                {filteredLocales.map(l => <option key={l.id} value={l.id}>{l.cadena} - {l.direccion}</option>)}
+              </select>
+            </div>
+
+            <div className="flex justify-between gap-1.5">
+              {DAYS_OF_WEEK.map((day) => (
+                <button key={day.id} type="button" onClick={() => toggleDay(day.id)} className={`flex-1 py-4 rounded-xl text-[10px] font-black transition-all ${manualTask.selectedDays.includes(day.id) ? 'bg-[#87be00] text-white' : 'bg-gray-100 text-gray-400'}`}>
+                  {day.label}
+                </button>
+              ))}
+            </div>
+
+            <button type="submit" disabled={loading} className="w-full bg-black text-white py-6 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl active:scale-95 transition-all">
+              {loading ? "Procesando..." : isEditing ? "Guardar Cambios" : "Confirmar Agendamiento"}
+            </button>
+          </form>
         </div>
       </div>
     </div>
