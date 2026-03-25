@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import api from '../api/apiClient'; // Ajusta la ruta según tu carpeta
+import api from '../api/apiClient';
 
 export const useWorkerRoutes = (userId) => {
   const [routes, setRoutes] = useState([]);
@@ -10,8 +10,8 @@ export const useWorkerRoutes = (userId) => {
     if (!userId) return;
     setLoading(true);
     try {
-      // Endpoint que configuramos en el backend de Linux
-      const data = await api.get(`/routes/user/${userId}`);
+      // Petición al backend
+      const data = await api.get(`/api/routes/user/${userId}`);
       setRoutes(data);
       setError(null);
     } catch (err) {
@@ -26,5 +26,10 @@ export const useWorkerRoutes = (userId) => {
     fetchRoutes();
   }, [fetchRoutes]);
 
-  return { routes, loading, error, refetch: fetchRoutes };
+  return { 
+    routes, 
+    loading, 
+    error, 
+    mutate: fetchRoutes // 🚩 Importante: mapeamos fetchRoutes a mutate
+  };
 };
