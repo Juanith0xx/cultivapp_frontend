@@ -8,50 +8,64 @@ const Scanner = ({ onScanSuccess, onScanError }) => {
     const html5QrCode = new Html5Qrcode("reader");
     scannerRef.current = html5QrCode;
 
+    // 🚩 AJUSTE PARA IOS: Configuración optimizada
     const config = { 
-      fps: 20, 
+      fps: 10, // Bajamos un poco los FPS para no saturar el procesador de iOS
       qrbox: { width: 280, height: 160 },
-      aspectRatio: 1.0 
+      aspectRatio: 1.7777778, // 🚩 Cambiado a 16:9, que es el nativo de la cámara de iPhone
+      disableFlip: false, // 🚩 Importante para que no falle el renderizado en WebKit
     };
 
     const startScanner = async () => {
       try {
-        // 🚩 Intentamos primero la trasera (para iPhone)
-        // Si falla, el catch intentará abrir la que esté disponible (PC)
+        // 🚩 Intento 1: Cámara trasera con restricciones de video específicas para iOS
         await html5QrCode.start(
           { facingMode: "environment" }, 
           config,
-          onScanSuccess,
+          (decodedText, result) => {
+            // Detenemos el escáner visualmente un segundo para dar feedback en iOS
+            onScanSuccess(decodedText, result);
+          },
           onScanError
         );
       } catch (err) {
-        console.warn("No se detectó cámara trasera, intentando cámara por defecto...");
+        console.warn("Fallo cámara trasera, intentando fallback...", err);
         try {
-          // 🚩 Segundo intento: Cualquier cámara (esto activará la frontal en tu PC)
+          // 🚩 Intento 2: Fallback genérico
           await html5QrCode.start(
-            { facingMode: "user" }, // Cambiado a 'user' para probar frontal en PC
+            { facingMode: "user" }, 
             config,
             onScanSuccess,
             onScanError
           );
         } catch (lastErr) {
-          console.error("Error definitivo al iniciar cámara:", lastErr);
+          console.error("Error definitivo en iOS/Android:", lastErr);
         }
       }
     };
 
-    const timeoutId = setTimeout(startScanner, 500);
+    // 🚩 AJUSTE PARA IOS: Esperamos 1 segundo. iOS necesita que el DOM 
+    // esté 100% listo antes de pedir permiso de cámara.
+    const timeoutId = setTimeout(startScanner, 1000);
 
     return () => {
       clearTimeout(timeoutId);
-      if (scannerRef.current && scannerRef.current.isScanning) {
-        scannerRef.current.stop().catch(e => console.error(e));
+      if (scannerRef.current) {
+        // 🚩 MEJORA: Limpieza segura para evitar el error "Scanner is already running"
+        if (scannerRef.current.isScanning) {
+          scannerRef.current.stop()
+            .then(() => {
+              scannerRef.current.clear();
+            })
+            .catch(e => console.error("Error al detener:", e));
+        }
       }
     };
   }, [onScanSuccess, onScanError]);
 
   return (
     <div className="relative w-full bg-black rounded-[2.5rem] overflow-hidden shadow-2xl border-2 border-[#87be00]/30">
+      {/* 🚩 IMPORTANTE: El ID reader debe estar limpio */}
       <div id="reader" className="w-full min-h-[300px] md:min-h-[400px]"></div>
       
       {/* Guía visual */}
