@@ -9,6 +9,9 @@ const VisitFlow = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+  
+  // 🚩 REFERENCIA DE BLOQUEO: Evita ejecuciones múltiples instantáneas
+  const isProcessingScan = useRef(false);
 
   const [step, setStep] = useState(1); 
   const [loading, setLoading] = useState(false);
@@ -23,7 +26,6 @@ const VisitFlow = () => {
     5: { key: "finalizar", title: "Finalizar Visita", sub: "Resumen y cierre de jornada" }
   };
 
-  // 📸 MANEJO DE CAPTURA DE IMÁGENES
   const handleCapture = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -48,19 +50,38 @@ const VisitFlow = () => {
     }
   };
 
-  // 🔍 MANEJO DE ESCANEO EXITOSO
+  // 🔍 MANEJO DE ESCANEO OPTIMIZADO
   const handleScanSuccess = async (decodedText) => {
-    // Evitar procesar el mismo código varias veces seguidas si se queda apuntando
-    if (scannedCodes.includes(decodedText)) return;
+    // 1. Validar si ya estamos procesando un escaneo (Bloqueo activo)
+    if (isProcessingScan.current) return;
 
+    // 2. Validar si el código ya fue escaneado en esta sesión (Evitar duplicados)
+    if (scannedCodes.includes(decodedText)) {
+      toast.error("Este producto ya fue registrado", { id: "duplicate-toast" });
+      return;
+    }
+
+    // 🚩 ACTIVAR BLOQUEO
+    isProcessingScan.current = true;
     const toastId = toast.loading(`Registrando EAN: ${decodedText}`);
+
     try {
       await api.post(`/routes/${id}/scans`, { barcode: decodedText });
       
-      setScannedCodes(prev => [decodedText, ...prev]); // El más nuevo arriba
+      setScannedCodes(prev => [decodedText, ...prev]);
       toast.success("Producto registrado", { id: toastId });
+
+      // 🚩 ESPERAR 5 SEGUNDOS ANTES DE PERMITIR OTRO ESCANEO
+      setTimeout(() => {
+        isProcessingScan.current = false;
+        toast.dismiss("cooldown-info");
+      }, 5000);
+
     } catch (err) {
+      console.error(err);
       toast.error("Error al registrar código", { id: toastId });
+      // Si hay error, liberamos el bloqueo de inmediato para reintentar
+      isProcessingScan.current = false; 
     }
   };
 
@@ -80,7 +101,6 @@ const VisitFlow = () => {
   return (
     <div className="min-h-screen bg-gray-50 font-[Outfit] p-4 pb-24 flex flex-col items-center">
       
-      {/* 🟢 BARRA DE PROGRESO SUPERIOR */}
       <div className="w-full max-w-md flex justify-between mb-8 sticky top-4 z-20 bg-gray-50/80 backdrop-blur-sm py-2">
         {[1, 2, 3, 4, 5].map(i => (
           <div key={i} className={`h-1.5 flex-1 mx-1 rounded-full transition-all duration-700 ${step >= i ? 'bg-[#87be00]' : 'bg-gray-200'}`} />
@@ -89,7 +109,6 @@ const VisitFlow = () => {
 
       <div className="w-full max-w-md bg-white p-6 rounded-[2.5rem] shadow-xl text-center space-y-6 border border-gray-100">
         
-        {/* ENCABEZADO DE PASO */}
         <div className="space-y-1">
             <h2 className="text-xl font-black uppercase text-gray-900 tracking-tighter leading-none">
               {stepsInfo[step].title}
@@ -99,7 +118,6 @@ const VisitFlow = () => {
             </p>
         </div>
 
-        {/* 📷 INTERFAZ DE CÁMARA (Pasos 1, 2, 4) */}
         {(step === 1 || step === 2 || step === 4) && (
           <div 
             onClick={() => !capturing && fileInputRef.current.click()}
@@ -123,26 +141,24 @@ const VisitFlow = () => {
           </div>
         )}
 
-        {/* 🛒 INTERFAZ DE ESCÁNER (Paso 3) */}
         {step === 3 && (
           <div className="space-y-4 animate-in fade-in zoom-in duration-300">
             <div className="rounded-[2rem] overflow-hidden border-2 border-[#87be00] shadow-inner">
               <Scanner 
                 onScanSuccess={handleScanSuccess} 
-                onScanError={(err) => console.log("Buscando...")} 
+                onScanError={(err) => {}} 
               />
             </div>
             
-            {/* Visualización de productos escaneados */}
             {scannedCodes.length > 0 && (
               <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
                 <p className="text-[8px] font-black text-gray-400 uppercase mb-2 text-left px-1">
-                  Últimos escaneos ({scannedCodes.length})
+                  Productos en esta visita ({scannedCodes.length})
                 </p>
                 <div className="flex flex-wrap gap-2 justify-start">
-                  {scannedCodes.slice(0, 4).map((c, i) => (
+                  {scannedCodes.slice(0, 6).map((c, i) => (
                     <span key={i} className="bg-white text-[9px] font-bold px-2 py-1 rounded-lg border border-gray-200 shadow-sm animate-in slide-in-from-top-1">
-                      ...{c.slice(-6)}
+                      {c}
                     </span>
                   ))}
                 </div>
@@ -158,7 +174,6 @@ const VisitFlow = () => {
           </div>
         )}
 
-        {/* ✅ INTERFAZ DE CIERRE (Paso 5) */}
         {step === 5 && (
           <div className="space-y-6 py-6 animate-in slide-in-from-bottom-4 duration-500">
             <div className="w-24 h-24 bg-[#87be00]/10 rounded-full flex items-center justify-center mx-auto shadow-inner">
@@ -180,13 +195,11 @@ const VisitFlow = () => {
           </div>
         )}
 
-        {/* FOOTER - INFO DE RUTA */}
         <div className="pt-4 border-t border-gray-50 flex items-center justify-center gap-2 text-gray-400 text-[8px] font-bold uppercase tracking-widest">
             <FiMapPin className="text-[#87be00]" /> LOCAL ID: {id?.slice(0,8).toUpperCase()}
         </div>
       </div>
       
-      {/* INPUT OCULTO DE CÁMARA NATIVA */}
       <input 
         type="file" 
         accept="image/*" 
