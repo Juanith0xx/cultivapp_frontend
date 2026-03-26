@@ -1,13 +1,13 @@
 import { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom"; // 🚩 IMPORTANTE
-import { FiMapPin, FiPlay, FiClock, FiCalendar, FiSend, FiChevronLeft, FiChevronRight, FiLoader } from "react-icons/fi";
+import { useNavigate, useLocation } from "react-router-dom"; 
+import { FiMapPin, FiPlay, FiClock, FiCalendar, FiSend, FiChevronLeft, FiChevronRight, FiLoader, FiCheckCircle } from "react-icons/fi";
 import api from "../../api/apiClient";
 import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext";
 
 const UserHome = () => {
   const { user } = useAuth();
-  const navigate = useNavigate(); // 🚩 Hook de navegación
+  const navigate = useNavigate();
   const [allTasks, setAllTasks] = useState([]); 
   const [displayTasks, setDisplayTasks] = useState([]); 
   const [loading, setLoading] = useState(true);
@@ -17,15 +17,13 @@ const UserHome = () => {
   const fetchData = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token || !user) return;
-
     try {
       setLoading(true);
       const dateStr = selectedDate.toLocaleDateString('en-CA');
       const data = await api.get(`/routes/my-tasks?date=${dateStr}`);
       setAllTasks(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error("Error al sincronizar agenda:", error);
-      if (error.status !== 401) toast.error("No se pudo cargar la agenda");
+      if (error.status !== 401) toast.error("Error al cargar agenda");
     } finally {
       setLoading(false);
     }
@@ -43,39 +41,23 @@ const UserHome = () => {
   }, [selectedDate, allTasks]);
 
   const handleStartVisit = async (taskId) => {
-    if (!navigator.geolocation) {
-      return toast.error("Tu dispositivo no permite geolocalización");
-    }
-
+    if (!navigator.geolocation) return toast.error("GPS no disponible");
     setActionLoading(taskId); 
-    const toastId = toast.loading("Validando posición GPS...");
-
+    const toastId = toast.loading("Validando GPS...");
     navigator.geolocation.getCurrentPosition(
       async (position) => {
-        const { latitude, longitude } = position.coords;
-
         try {
           await api.post(`/routes/${taskId}/check-in`, {
-            lat_in: latitude,
-            lng_in: longitude
+            lat_in: position.coords.latitude,
+            lng_in: position.coords.longitude
           });
-
-          toast.success("Visita iniciada con éxito", { id: toastId });
-          
-          // 🚩 NAVEGACIÓN AUTOMÁTICA AL INICIAR
+          toast.success("Visita iniciada", { id: toastId });
           navigate(`/usuario/reporte/${taskId}`);
-          
         } catch (error) {
-          const msg = error.response?.data?.message || "Error al validar posición";
-          toast.error(msg, { id: toastId });
-        } finally {
-          setActionLoading(null);
-        }
+          toast.error(error.response?.data?.message || "Error al iniciar", { id: toastId });
+        } finally { setActionLoading(null); }
       },
-      (error) => {
-        toast.error("Debes activar el GPS para iniciar la visita", { id: toastId });
-        setActionLoading(null);
-      },
+      () => { toast.error("Activa el GPS", { id: toastId }); setActionLoading(null); },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
@@ -96,127 +78,93 @@ const UserHome = () => {
 
   if (!user || (loading && allTasks.length === 0)) {
     return (
-      <div className="flex flex-col items-center justify-center h-[60vh] animate-pulse">
-        <div className="w-12 h-12 border-4 border-gray-100 border-t-[#87be00] rounded-full animate-spin mb-4"></div>
-        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Sincronizando Hoja de Ruta...</p>
+      <div className="flex flex-col items-center justify-center h-screen bg-white">
+        <div className="w-10 h-10 border-4 border-gray-100 border-t-[#87be00] rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 font-[Outfit] p-2 animate-in fade-in duration-700">
-      
-      {/* CALENDARIO SEMANAL */}
-      <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100">
-        <div className="flex items-center justify-between mb-6 px-4">
-          <h2 className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">
-            {selectedDate.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })}
-          </h2>
-          <div className="flex gap-2">
-            <button onClick={() => setSelectedDate(new Date(selectedDate.setDate(selectedDate.getDate() - 7)))} className="p-2 bg-gray-50 rounded-xl hover:text-[#87be00] transition-colors"><FiChevronLeft size={18}/></button>
-            <button onClick={() => setSelectedDate(new Date(selectedDate.setDate(selectedDate.getDate() + 7)))} className="p-2 bg-gray-50 rounded-xl hover:text-[#87be00] transition-colors"><FiChevronRight size={18}/></button>
+    <div className="min-h-screen bg-[#F8F9FA] pb-24 font-[Outfit]">
+      {/* HEADER MÓVIL */}
+      <header className="bg-white px-5 pt-10 pb-5 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
+        <div>
+          <p className="text-[10px] font-black text-[#87be00] uppercase tracking-widest">Cultiva</p>
+          <h1 className="text-xl font-black text-gray-900 leading-none">Mi Agenda</h1>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] font-bold text-gray-400 uppercase">{selectedDate.toLocaleDateString('es-CL', { month: 'short' })}</p>
+          <p className="text-lg font-black text-gray-800 leading-none">{selectedDate.getFullYear()}</p>
+        </div>
+      </header>
+
+      <main className="p-4 space-y-6 max-w-md mx-auto">
+        {/* CALENDARIO 7 DÍAS */}
+        <section className="bg-white p-3 rounded-3xl shadow-sm border border-gray-50">
+          <div className="grid grid-cols-7 gap-1">
+            {getWeekDays().map((date, idx) => {
+              const isSelected = date.toLocaleDateString() === selectedDate.toLocaleDateString();
+              return (
+                <button key={idx} onClick={() => setSelectedDate(date)} className={`flex flex-col items-center py-3 rounded-2xl transition-all ${isSelected ? 'bg-black text-white shadow-lg' : 'bg-transparent text-gray-400'}`}>
+                  <span className="text-[8px] font-bold uppercase mb-1">{date.toLocaleDateString('es-CL', { weekday: 'short' }).substring(0,2)}</span>
+                  <span className="text-sm font-black">{date.getDate()}</span>
+                </button>
+              );
+            })}
           </div>
-        </div>
+        </section>
 
-        <div className="flex justify-between gap-2 overflow-x-auto pb-2 scrollbar-hide">
-          {getWeekDays().map((date, idx) => {
-            const isSelected = date.toLocaleDateString() === selectedDate.toLocaleDateString();
-            const isToday = date.toLocaleDateString() === new Date().toLocaleDateString();
-            return (
-              <button
-                key={idx}
-                onClick={() => setSelectedDate(date)}
-                className={`flex flex-col items-center min-w-[60px] p-4 rounded-[2rem] transition-all duration-300 ${
-                  isSelected ? 'bg-gray-900 text-white shadow-xl scale-105' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
-                }`}
-              >
-                <span className="text-[9px] font-black uppercase mb-1">{date.toLocaleDateString('es-CL', { weekday: 'short' }).replace('.','')}</span>
-                <span className="text-sm font-black">{date.getDate()}</span>
-                {isToday && !isSelected && <div className="w-1 h-1 bg-[#87be00] rounded-full mt-1"></div>}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* TIMELINE DE VISITAS */}
-      <div className="relative pl-10">
-        <div className="absolute left-[11px] top-0 bottom-0 w-0.5 border-l-2 border-dashed border-gray-100"></div>
-
-        <div className="space-y-8">
+        {/* LISTADO DE VISITAS */}
+        <section className="space-y-4">
           {displayTasks.length === 0 ? (
-            <div className="bg-gray-50/50 p-16 rounded-[2.5rem] text-center border-2 border-dashed border-gray-100">
-              <FiCalendar className="mx-auto text-gray-200 mb-4" size={32} />
-              <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">No hay visitas para este día</p>
-            </div>
+            <div className="text-center py-20 text-gray-300 uppercase text-[10px] font-bold tracking-widest">No hay visitas</div>
           ) : (
-            displayTasks.map((task, idx) => {
-              // 🚩 NUEVA LÓGICA DE ESTADOS
+            displayTasks.map((task) => {
               const isPending = task.status === 'PENDING' || task.status === 'PENDIENTE';
-              const isInProgress = task.status === 'IN_PROGRESS' || task.status === 'EN_PROCESO' || task.status === 'EN_CURSO';
+              const isInProgress = task.status === 'IN_PROGRESS' || task.status === 'EN_PROCESO';
+              const isCompleted = task.status === 'COMPLETED' || task.status === 'FINALIZADO';
 
               return (
-                <div key={task.id} className="relative animate-in slide-in-from-left duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
-                  <div className="absolute -left-[30px] top-1/2 -translate-y-1/2 w-6 h-6 bg-white flex items-center justify-center z-10">
-                    <div className={`w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm ${
-                        isPending ? 'bg-orange-500' : isInProgress ? 'bg-blue-600 animate-pulse' : 'bg-[#87be00]'
-                    }`}></div>
+                <div key={task.id} className={`bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100 ${isCompleted ? 'opacity-70' : ''}`}>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="max-w-[70%]">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] font-black text-[#87be00] flex items-center gap-1">
+                           <FiClock size={12}/> {task.start_time?.slice(0, 5)}
+                        </span>
+                        {isCompleted && <span className="text-[8px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-bold uppercase">Completado</span>}
+                      </div>
+                      <h2 className="text-lg font-black text-gray-800 uppercase leading-none truncate">{task.cadena}</h2>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase mt-2 truncate">{task.direccion}</p>
+                    </div>
+                    <div className={`w-3 h-3 rounded-full ${isPending ? 'bg-orange-400' : isInProgress ? 'bg-blue-500 animate-pulse' : 'bg-[#87be00]'}`}></div>
                   </div>
 
-                  <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-50 flex flex-col md:flex-row items-center justify-between gap-6 hover:border-[#87be00]/30 transition-all group">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="flex items-center gap-1.5 text-[10px] font-black text-[#87be00] uppercase">
-                          <FiClock /> {task.start_time?.slice(0, 5)}
-                        </span>
-                        <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
-                          isPending ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'
-                        }`}>
-                          {task.status}
-                        </span>
+                  <div className="flex gap-2">
+                    {isCompleted ? (
+                      <div className="flex-1 bg-gray-50 text-gray-400 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 border border-gray-100">
+                        <FiCheckCircle size={16}/> Reporte Finalizado
                       </div>
-                      <h2 className="text-xl font-black text-gray-800 uppercase tracking-tight mb-1 group-hover:text-[#87be00] transition-colors">{task.cadena}</h2>
-                      <div className="flex items-center gap-2 text-gray-400">
-                        <FiMapPin size={12} className="text-[#87be00]" />
-                        <p className="text-[10px] font-bold uppercase tracking-tighter">{task.direccion}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 w-full md:w-auto">
-                      {isPending ? (
-                        <button 
-                          onClick={() => handleStartVisit(task.id)}
-                          disabled={actionLoading === task.id}
-                          className="flex-1 md:flex-none bg-black text-white px-10 py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-[#87be00] transition-all shadow-xl disabled:opacity-50"
-                        >
-                          {actionLoading === task.id ? <FiLoader className="animate-spin" /> : <FiPlay size={18} />}
-                          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Iniciar Visita</span>
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={() => navigate(`/usuario/reporte/${task.id}`)}
-                          className="flex-1 md:flex-none bg-blue-600 text-white px-10 py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-blue-700 transition-all shadow-xl shadow-blue-100"
-                        >
-                          <FiSend size={18} />
-                          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Ejecutar Reporte</span>
-                        </button>
-                      )}
-                      
-                      <a 
-                        href={`https://www.google.com/maps?q=${task.lat_in || -33.6199},${task.lng_in || -70.6117}`}
-                        target="_blank" rel="noopener noreferrer"
-                        className="bg-[#87be00] text-white p-4 rounded-2xl hover:bg-black transition-all shadow-lg"
-                      >
-                        <FiSend size={18}/>
-                      </a>
-                    </div>
+                    ) : isPending ? (
+                      <button onClick={() => handleStartVisit(task.id)} className="flex-1 bg-black text-white py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 active:bg-[#87be00]">
+                        <FiPlay size={16}/> Iniciar
+                      </button>
+                    ) : (
+                      <button onClick={() => navigate(`/usuario/reporte/${task.id}`)} className="flex-1 bg-blue-600 text-white py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2">
+                        <FiSend size={16}/> Continuar
+                      </button>
+                    )}
+                    
+                    <a href={`https://www.google.com/maps/search/?api=1&query=${task.direccion}`} target="_blank" rel="noopener noreferrer" className="bg-gray-100 text-gray-900 p-4 rounded-2xl active:bg-black active:text-white">
+                      <FiMapPin size={18}/>
+                    </a>
                   </div>
                 </div>
               );
             })
           )}
-        </div>
-      </div>
+        </section>
+      </main>
     </div>
   );
 };
