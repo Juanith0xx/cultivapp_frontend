@@ -48,7 +48,7 @@ const EditAdminUserModal = ({ isOpen, onClose, onUpdated, user, stats }) => {
     if (!stats) return false
     const counts = stats.counts || {}
     const limits = stats.limits || {}
-    if (role === user.role) return false // No bloquear el rol actual del usuario
+    if (role === user.role) return false
 
     if (role === "SUPERVISOR") return counts.SUPERVISOR >= limits.max_supervisors
     if (role === "USUARIO") return counts.USUARIO >= limits.max_users
@@ -63,18 +63,24 @@ const EditAdminUserModal = ({ isOpen, onClose, onUpdated, user, stats }) => {
 
     try {
       const formData = new FormData()
+      
+      // 1. Campos básicos del formulario
       Object.keys(form).forEach(key => formData.append(key, form[key]))
       
+      // 🚩 2. Campo clave para la estructura de carpetas en el Backend
+      // Esto permite que el middleware cree la carpeta /doc_achs/nombre_apellido/
+      formData.append("user_full_name", `${form.first_name} ${form.last_name}`)
+
+      // 3. Adjuntar archivos
       if (foto) formData.append("foto", foto)
       if (documentoAchs) formData.append("documento_achs", documentoAchs)
 
-      // Usamos PUT o PATCH según tu backend
       await api.put(`/users/${user.id}`, formData)
 
       onUpdated()
       onClose()
     } catch (err) {
-      setError(err.message)
+      setError(err.response?.data?.message || err.message)
     } finally {
       setLoading(false)
     }
@@ -112,7 +118,10 @@ const EditAdminUserModal = ({ isOpen, onClose, onUpdated, user, stats }) => {
                     <FiCamera size={18} />
                     <input type="file" className="hidden" accept="image/*" onChange={(e) => {
                       const file = e.target.files[0]
-                      if(file){ setFoto(file); setPreview(URL.createObjectURL(file)); }
+                      if(file){ 
+                        setFoto(file)
+                        setPreview(URL.createObjectURL(file))
+                      }
                     }} />
                   </label>
                 </div>

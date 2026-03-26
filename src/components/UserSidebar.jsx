@@ -17,7 +17,7 @@ const UserSidebar = () => {
     <aside className="hidden md:flex w-64 bg-white border-r border-gray-100 flex-col justify-between min-h-screen p-6 sticky top-0">
       <div>
         <div className="mb-10 px-2">
-          <h2 className="text-2xl font-black text-[#87be00] tracking-tighter">SMARTFORGE</h2>
+          <h2 className="text-2xl font-black text-[#87be00] tracking-tighter">Cultiva</h2>
           <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Panel Administrativo</p>
         </div>
 

@@ -10,6 +10,17 @@ const UserCredential = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // 🚩 FUNCIÓN AUXILIAR PARA CONSTRUIR URLS INFALIBLES
+  const getFullUrl = (path) => {
+    if (!path) return null;
+    if (path.startsWith('http')) return path;
+    
+    const baseUrl = "http://localhost:5000";
+    // Aseguramos que el path empiece con / pero que no se duplique
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `${baseUrl}${cleanPath}`;
+  };
+
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -24,6 +35,33 @@ const UserCredential = () => {
     };
     if (id) fetchUser();
   }, [id]);
+
+  const handleDownload = async (e) => {
+    e.preventDefault();
+    if (!user?.achs_url) return;
+
+    try {
+      const fileUrl = getFullUrl(user.achs_url);
+
+      const response = await fetch(fileUrl);
+      if (!response.ok) throw new Error("Error al descargar el archivo");
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      link.setAttribute('download', `ACHS_${user.last_name || 'Documento'}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Error en la descarga:", err);
+      window.open(getFullUrl(user.achs_url), '_blank');
+    }
+  };
 
   const getVigenciaStatus = () => {
     if (!user?.fecha_contrato) return { valid: true, color: 'bg-[#87be00]', label: 'Vigente', alert: false };
@@ -66,26 +104,22 @@ const UserCredential = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-4 font-[Outfit]">
-      
       <div className="max-w-sm w-full bg-white rounded-[2.5rem] shadow-[0_30px_60px_-12px_rgba(0,0,0,0.12)] overflow-hidden border border-gray-100 relative">
         
         {/* CABECERA */}
         <div className={`${status.color} px-8 pt-6 pb-16 flex flex-col items-center relative transition-colors duration-500`}>
           <img src={logoEmpresa} alt="Cultiva" className="h-16 w-auto object-contain mb-4" />
-          
           <div className="bg-white/20 backdrop-blur-md px-5 py-1.5 rounded-full border border-white/30 flex items-center gap-2.5">
             <div className={`h-2.5 w-2.5 rounded-full bg-white ${status.alert ? 'animate-ping' : 'animate-pulse'}`} />
-            <span className="text-white text-[11px] font-black tracking-[0.2em] uppercase">
-              {status.label}
-            </span>
+            <span className="text-white text-[11px] font-black tracking-[0.2em] uppercase">{status.label}</span>
           </div>
         </div>
 
-        {/* FOTO */}
+        {/* FOTO - CORREGIDA */}
         <div className="flex justify-center -mt-10 relative z-10">
           <div className="p-1.5 bg-white rounded-[2.2rem] shadow-2xl">
             <img 
-              src={user.foto_url || "https://via.placeholder.com/150"} 
+              src={getFullUrl(user.foto_url) || "https://via.placeholder.com/150"} 
               alt="Perfil" 
               className="w-32 h-32 rounded-[2rem] object-cover"
             />
@@ -104,7 +138,6 @@ const UserCredential = () => {
           <p className="text-[#87be00] font-extrabold text-[11px] uppercase tracking-[0.2em] mt-2 mb-6">{user.position}</p>
           
           <div className="space-y-3 text-left">
-            {/* Servicio */}
             <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 flex items-center gap-4">
               <div className="bg-white p-2.5 rounded-xl shadow-sm text-[#87be00]"><FiBriefcase size={18} /></div>
               <div>
@@ -113,7 +146,6 @@ const UserCredential = () => {
               </div>
             </div>
 
-            {/* Grid Contrato y RUT */}
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-gray-50/80 rounded-2xl p-3 border border-gray-100">
                 <p className="text-[8px] text-gray-400 font-bold uppercase mb-1">Contrato</p>
@@ -125,7 +157,6 @@ const UserCredential = () => {
               </div>
             </div>
 
-            {/* Vigencia */}
             <div className="bg-gray-50/80 rounded-2xl p-3 border border-gray-100 text-center">
                 <p className="text-[8px] text-gray-400 font-bold uppercase mb-1 tracking-widest">Vencimiento del Documento</p>
                 <p className="text-sm font-bold text-gray-700">
@@ -133,22 +164,20 @@ const UserCredential = () => {
                 </p>
             </div>
 
-            <a 
-                href={user.achs_url || "#"} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="group flex items-center justify-between px-6 py-4 bg-[#eff6ff] hover:bg-blue-600 text-blue-600 hover:text-white rounded-2xl font-bold text-xs transition-all duration-300 border border-blue-100 mt-2"
+            <button 
+                onClick={handleDownload}
+                className="w-full group flex items-center justify-between px-6 py-4 bg-[#eff6ff] hover:bg-blue-600 text-blue-600 hover:text-white rounded-2xl font-bold text-xs transition-all duration-300 border border-blue-100 mt-2 shadow-sm"
             >
                 <div className="flex items-center gap-3">
-                    <FiDownload size={18} />
-                    <span>Certificado ACHS</span>
+                    <FiDownload size={18} className="group-hover:animate-bounce" />
+                    <span>Descargar Certificado ACHS</span>
                 </div>
                 <FiExternalLink className="opacity-40 group-hover:opacity-100" />
-            </a>
+            </button>
           </div>
         </div>
 
-        {/* --- SECCIÓN DE SUPERVISOR ACTUALIZADA --- */}
+        {/* SECCIÓN DE SUPERVISOR */}
         <div className="px-6 pb-8">
             <div className="flex items-center justify-between bg-gray-50 border border-gray-100 p-4 rounded-3xl shadow-sm">
               <div className="flex items-center gap-3">
@@ -157,19 +186,15 @@ const UserCredential = () => {
                 </div>
                 <div>
                   <p className="text-sm font-bold text-gray-800 leading-none">{user.supervisor_nombre || "Ignacio Muñoz"}</p>
-                  {/* Aquí mostramos el número directamente para que sea visible */}
                   <p className="text-[10px] text-[#87be00] font-bold mt-1 tracking-wider">
                     {user.supervisor_telefono || "Sin teléfono"}
                   </p>
                   <p className="text-[9px] text-gray-400 font-medium italic">Contacto Supervisor</p>
                 </div>
               </div>
-              
-              {/* Al presionar este botón, el móvil llamará directamente al número */}
               <a 
                 href={`tel:${user.supervisor_telefono}`} 
                 className="bg-[#87be00] h-11 w-11 rounded-2xl flex items-center justify-center text-white shadow-lg active:scale-90 transition-transform"
-                title="Llamar ahora"
               >
                 <FiPhone size={18} />
               </a>

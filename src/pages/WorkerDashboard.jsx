@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import WorkerCalendar from '../components/WorkerCalendar';
-import VisitFlow from '../components/VisitFlow'; 
+import VisitFlow from './user/VisitFlow'; 
 import { useWorkerRoutes } from '../hooks/useWorkerRoutes'; 
 
 const WorkerDashboard = () => {
