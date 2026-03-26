@@ -1,29 +1,31 @@
+import { addToSyncQueue } from "../utils/db"; // 🚩 Importamos nuestra DB local
+
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-// Si la URL ya trae /api, la dejamos, si no, la agregamos asegurando un solo slash
 const API_URL = BASE_URL.replace(/\/+$/, "") + (BASE_URL.includes("/api") ? "" : "/api");
 
 const getToken = () => {
   const token = localStorage.getItem("token");
   if (!token) return null;
-  // Normalización: Si el token ya tiene "Bearer ", lo devolvemos tal cual. 
-  // Si no, lo devolvemos limpio para que el request le ponga el prefijo.
   return token.startsWith("Bearer ") ? token.split(" ")[1] : token;
+};
+
+// 🚩 Función para identificar el RouteID desde el endpoint (ej: /routes/123/photo)
+const extractRouteId = (endpoint) => {
+  const match = endpoint.match(/\/routes\/([^/]+)/);
+  return match ? match[1] : null;
 };
 
 const request = async (endpoint, options = {}) => {
   const token = getToken();
-  
-  // Limpiamos el endpoint para que no tenga slashes duplicados
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   const finalUrl = `${API_URL}${cleanEndpoint}`;
-
   const isFormData = options.body instanceof FormData;
 
   const config = {
     ...options,
     headers: {
       ...(!isFormData && { "Content-Type": "application/json" }),
-      ...(token && { Authorization: `Bearer ${token}` }), // Siempre enviamos un solo "Bearer "
+      ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
     },
   };
@@ -31,37 +33,52 @@ const request = async (endpoint, options = {}) => {
   try {
     const response = await fetch(finalUrl, config);
     
-    // 🚩 Manejo de 401: Token inválido o expirado
     if (response.status === 401) {
-      console.error("⚠️ No autorizado: Limpiando sesión...");
       localStorage.removeItem("token");
       localStorage.removeItem("user");
-      
-      if (window.location.pathname !== "/") {
-        window.location.href = "/?expired=true";
-      }
-      throw new Error("Sesión expirada. Por favor, inicia sesión nuevamente.");
+      if (window.location.pathname !== "/") window.location.href = "/?expired=true";
+      throw new Error("Sesión expirada.");
     }
 
     const contentType = response.headers.get("content-type");
     let data = null;
-
     if (contentType && contentType.includes("application/json")) {
       data = await response.json();
     }
 
-    if (!response.ok) {
-      const errorMsg = data?.message || `Error ${response.status}: ${response.statusText}`;
-      throw new Error(errorMsg);
+    if (!response.ok) throw new Error(data?.message || `Error ${response.status}`);
+    return data;
+
+  } catch (error) {
+    // 🚩 INTERCEPTOR OFFLINE 🚩
+    const isNetworkError = error.name === 'TypeError' || error.message.includes('Failed to fetch');
+    const isPostMethod = options.method === "POST" || options.method === "PUT";
+
+    // Si es un error de red y el usuario intenta enviar datos (Check-in, Fotos, Reporte)
+    if (isNetworkError && isPostMethod) {
+      console.warn("🌐 Sin conexión. Guardando en cola de sincronización...");
+      
+      const routeId = extractRouteId(endpoint);
+      let type = "OTHER";
+
+      // Mapeamos el tipo de acción según el endpoint
+      if (endpoint.includes("/photo")) type = "PHOTO";
+      if (endpoint.includes("/scans")) type = "SCAN";
+      if (endpoint.includes("/finish")) type = "FINISH";
+      if (endpoint.includes("/check-in")) type = "CHECK_IN";
+
+      // Guardamos en Dexie
+      await addToSyncQueue(type, routeId, options.body);
+
+      // DEVOLVEMOS UN "EXITO" SIMULADO
+      // Esto permite que el componente (VisitFlow) siga al siguiente paso sin errores
+      return { 
+        offline: true, 
+        message: "Guardado localmente", 
+        id: "offline_" + Date.now() 
+      };
     }
 
-    return data;
-  } catch (error) {
-    if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
-      console.error("❌ Error de red: El servidor podría estar apagado.");
-      throw new Error("No se pudo conectar con el servidor.");
-    }
-    
     console.error("❌ API Error:", error.message);
     throw error;
   }
@@ -76,29 +93,12 @@ const api = {
     }
     return request(url, { method: "GET" });
   },
-
-  post: (endpoint, body) =>
-    request(endpoint, {
-      method: "POST",
-      body: isFormData(body) ? body : JSON.stringify(body),
-    }),
-
-  patch: (endpoint, body) =>
-    request(endpoint, {
-      method: "PATCH",
-      body: isFormData(body) ? body : (body ? JSON.stringify(body) : undefined),
-    }),
-
-  put: (endpoint, body) =>
-    request(endpoint, {
-      method: "PUT",
-      body: isFormData(body) ? body : (body ? JSON.stringify(body) : undefined),
-    }),
-
+  post: (endpoint, body) => request(endpoint, { method: "POST", body: isFormData(body) ? body : JSON.stringify(body) }),
+  patch: (endpoint, body) => request(endpoint, { method: "PATCH", body: isFormData(body) ? body : JSON.stringify(body) }),
+  put: (endpoint, body) => request(endpoint, { method: "PUT", body: isFormData(body) ? body : JSON.stringify(body) }),
   delete: (endpoint) => request(endpoint, { method: "DELETE" }),
 };
 
-// Función auxiliar para detectar FormData
 const isFormData = (val) => val instanceof FormData;
 
 export default api;

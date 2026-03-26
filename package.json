@@ -12,6 +12,7 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.2.0",
     "@zxing/library": "^0.21.3",
+    "dexie": "^4.4.1",
     "framer-motion": "^12.34.4",
     "html5-qrcode": "^2.3.8",
     "lucide-react": "^0.577.0",

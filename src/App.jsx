@@ -2,6 +2,10 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { AuthProvider } from "./context/AuthContext"
 import { Toaster } from "react-hot-toast"
 
+// 🚩 IMPORTAMOS EL HOOK DE SINCRONIZACIÓN
+import { useOfflineSync } from "./hooks/useOfflineSync"
+import { FiCloudOff, FiRefreshCw } from "react-icons/fi"
+
 import Login from "./pages/Login"
 import ChangePassword from "./pages/auth/ChangePassword"
 import ForgotPassword from "./pages/auth/ForgotPassword"
@@ -30,7 +34,6 @@ import GpsMonitor from "./pages/admin/GpsMonitor"
 import UserDashboard from "./pages/user/UserDashboard"
 import UserHome from "./pages/user/UserHome" 
 import UserLocales from "./pages/user/UserLocales"
-// 🚩 CAMBIO: Importamos el nuevo flujo de visita
 import VisitFlow from "./pages/user/VisitFlow" 
 
 /* ================= QUESTIONS ================= */
@@ -38,10 +41,37 @@ import QuestionsManager from "./pages/admin/QuestionsManager"
 
 import "./App.css"
 
+// 🚩 COMPONENTE DE MONITOREO OFFLINE
+const OfflineMonitor = () => {
+  const { isOnline, syncing } = useOfflineSync();
+
+  return (
+    <>
+      {/* Banner de aviso cuando no hay internet */}
+      {!isOnline && (
+        <div className="fixed top-0 left-0 w-full bg-orange-500 text-white text-[10px] font-black py-1.5 flex items-center justify-center gap-2 z-[9999] shadow-lg uppercase tracking-widest animate-pulse">
+          <FiCloudOff size={14} /> Modo Offline: Los datos se guardarán localmente
+        </div>
+      )}
+
+      {/* Indicador de que se están subiendo datos pendientes */}
+      {syncing && (
+        <div className="fixed bottom-6 right-6 bg-black text-white px-4 py-3 rounded-2xl shadow-2xl z-[9999] flex items-center gap-3 border border-white/10 animate-bounce">
+          <FiRefreshCw size={18} className="animate-spin text-[#87be00]" />
+          <span className="text-[10px] font-black uppercase tracking-tighter">Sincronizando Cultivapp...</span>
+        </div>
+      )}
+    </>
+  );
+};
+
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        
+        {/* 🚩 AGREGAMOS EL MONITOR AQUÍ */}
+        <OfflineMonitor />
 
         <Toaster
           position="top-right"
@@ -57,7 +87,6 @@ function App() {
         />
 
         <Routes>
-
           {/* ================= RUTAS PÚBLICAS ================= */}
           <Route path="/" element={<Login />} />
           <Route path="/verify/:id" element={<UserCredential />} />
@@ -122,17 +151,10 @@ function App() {
             <Route path="home" element={<UserHome />} />
             <Route path="agenda" element={<UserHome />} /> 
             <Route path="locales" element={<UserLocales />} />
-            
-            {/* 🚩 CORRECCIÓN CLAVE: 
-                Cambiamos 'reporte' por 'reporte/:id' para recibir el ID de la ruta.
-                Cambiamos 'UserForm' por 'VisitFlow'. 
-            */}
             <Route path="reporte/:id" element={<VisitFlow />} />
           </Route>
 
-          {/* FALLBACK SEGURIDAD */}
           <Route path="*" element={<Navigate to="/" />} />
-
         </Routes>
 
       </BrowserRouter>
