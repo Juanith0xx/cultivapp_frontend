@@ -19,6 +19,29 @@ const request = async (endpoint, options = {}) => {
   const token = getToken();
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   const finalUrl = `${API_URL}${cleanEndpoint}`;
+  const isPostMethod = options.method === "POST" || options.method === "PUT";
+
+  // --- 🚩 MEJORA PREVENTIVA OFFLINE 🚩 ---
+  // Si el navegador reporta estar offline antes de disparar el fetch
+  if (!navigator.onLine && isPostMethod) {
+    console.warn("🌐 Navegador Offline detectado preventivamente. Guardando en Dexie...");
+    const routeId = extractRouteId(endpoint);
+    let type = "OTHER";
+
+    if (endpoint.includes("/photo")) type = "PHOTO";
+    if (endpoint.includes("/scans")) type = "SCAN";
+    if (endpoint.includes("/finish")) type = "FINISH";
+    if (endpoint.includes("/check-in")) type = "CHECK_IN";
+
+    await addToSyncQueue(type, routeId, options.body);
+
+    return { 
+      offline: true, 
+      message: "Guardado localmente (Preventivo)", 
+      id: "offline_" + Date.now() 
+    };
+  }
+
   const isFormData = options.body instanceof FormData;
 
   const config = {
@@ -50,31 +73,25 @@ const request = async (endpoint, options = {}) => {
     return data;
 
   } catch (error) {
-    // 🚩 INTERCEPTOR OFFLINE 🚩
-    const isNetworkError = error.name === 'TypeError' || error.message.includes('Failed to fetch');
-    const isPostMethod = options.method === "POST" || options.method === "PUT";
+    // --- 🚩 INTERCEPTOR DE ERROR DE RED 🚩 ---
+    const isNetworkError = error.name === 'TypeError' || error.message.includes('fetch');
 
-    // Si es un error de red y el usuario intenta enviar datos (Check-in, Fotos, Reporte)
     if (isNetworkError && isPostMethod) {
-      console.warn("🌐 Sin conexión. Guardando en cola de sincronización...");
+      console.warn("🌐 Error de red detectado. Guardando en cola de sincronización...");
       
       const routeId = extractRouteId(endpoint);
       let type = "OTHER";
 
-      // Mapeamos el tipo de acción según el endpoint
       if (endpoint.includes("/photo")) type = "PHOTO";
       if (endpoint.includes("/scans")) type = "SCAN";
       if (endpoint.includes("/finish")) type = "FINISH";
       if (endpoint.includes("/check-in")) type = "CHECK_IN";
 
-      // Guardamos en Dexie
       await addToSyncQueue(type, routeId, options.body);
 
-      // DEVOLVEMOS UN "EXITO" SIMULADO
-      // Esto permite que el componente (VisitFlow) siga al siguiente paso sin errores
       return { 
         offline: true, 
-        message: "Guardado localmente", 
+        message: "Guardado localmente (Fallback)", 
         id: "offline_" + Date.now() 
       };
     }
