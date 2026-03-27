@@ -1,6 +1,5 @@
 import Dexie from 'dexie';
 
-// 1. Configuración de la Base de Datos Local
 export const db = new Dexie('CultivappDB');
 
 db.version(2).stores({
@@ -9,13 +8,13 @@ db.version(2).stores({
   syncQueue: '++id, type, routeId, endpoint, method, status, createdAt'
 });
 
-// 🔥 SERIALIZADOR DEFENSIVO (NUNCA PASA FORMData)
+// 🔥 SERIALIZADOR SEGURO
 const serializeIfNeeded = (payload) => {
   if (payload instanceof FormData) {
     const serialized = {};
 
     for (let [key, value] of payload.entries()) {
-      serialized[key] = value; // File / Blob OK
+      serialized[key] = value;
     }
 
     return {
@@ -27,14 +26,9 @@ const serializeIfNeeded = (payload) => {
   return payload;
 };
 
-/**
- * 🚩 AGREGAR A LA COLA DE SINCRONIZACIÓN
- */
 export const addToSyncQueue = async (item) => {
   try {
     const safePayload = serializeIfNeeded(item.payload);
-
-    console.log("📦 Guardando en Dexie:", safePayload);
 
     const id = await db.syncQueue.add({
       ...item,
@@ -42,28 +36,19 @@ export const addToSyncQueue = async (item) => {
       status: 'pending',
     });
 
-    console.log(`📍 Acción [${item.type}] guardada en cola local. ID: ${id}`);
+    console.log(`📍 Guardado en cola ID: ${id}`);
     return id;
 
   } catch (error) {
-    console.error("❌ Error al guardar en IndexedDB:", error);
+    console.error("❌ Dexie error:", error);
     throw error;
   }
 };
 
-/**
- * 🚩 OBTENER TODA LA COLA PENDIENTE
- */
 export const getPendingSync = async () => {
-  return await db.syncQueue
-    .where('status')
-    .equals('pending')
-    .toArray();
+  return await db.syncQueue.where('status').equals('pending').toArray();
 };
 
-/**
- * 🚩 ELIMINAR ACCIÓN PROCESADA
- */
 export const removeFromSyncQueue = async (id) => {
   return await db.syncQueue.delete(id);
 };

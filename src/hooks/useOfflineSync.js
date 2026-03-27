@@ -1,12 +1,8 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { getPendingSync, removeFromSyncQueue } from "../utils/db";
 import api from "../api/apiClient";
 import toast from "react-hot-toast";
 
-// 🔥 FLAG GLOBAL (evita múltiples sync simultáneos)
-let isSyncingGlobal = false;
-
-// 🔥 RECONSTRUIR BODY
 const rebuildBody = (payload) => {
   if (payload?.__type === "FormData") {
     const formData = new FormData();
@@ -25,22 +21,16 @@ export const useOfflineSync = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [syncing, setSyncing] = useState(false);
 
-  // 🔥 evita múltiples listeners duplicados
-  const initializedRef = useRef(false);
-
   useEffect(() => {
-    if (initializedRef.current) return;
-    initializedRef.current = true;
-
     const handleOnline = () => {
-      console.log("🌐 Evento ONLINE detectado");
+      console.log("🌐 ONLINE");
       setIsOnline(true);
       toast.success("Conexión restablecida. Sincronizando...");
       startSync();
     };
 
     const handleOffline = () => {
-      console.log("📴 Evento OFFLINE detectado");
+      console.log("📴 OFFLINE");
       setIsOnline(false);
       toast.error("Modo Offline activado");
     };
@@ -55,51 +45,66 @@ export const useOfflineSync = () => {
   }, []);
 
   const startSync = async () => {
-    // 🔥 PROTECCIÓN GLOBAL
-    if (isSyncingGlobal) {
-      console.log("⛔ Sync ya en proceso, evitando duplicado");
+    const pending = await getPendingSync();
+
+    console.log("📦 Pendientes:", pending.map(p => p.id));
+
+    if (!pending.length) return;
+
+    setSyncing(true);
+
+    for (const item of pending) {
+      try {
+        console.log("🔄 Sync item", item.id);
+
+        const body = rebuildBody(item.payload);
+
+        // 🧠 FIX CRÍTICO
+        if (item.method && item.endpoint) {
+          console.log("🟢 Nuevo formato");
+          await api[item.method.toLowerCase()](item.endpoint, body);
+        } else {
+          console.log("🟡 Formato antiguo");
+          await processOldItem(item, body);
+        }
+
+        await removeFromSyncQueue(item.id);
+        console.log(`✅ Item ${item.id} sincronizado`);
+
+      } catch (error) {
+        console.error(`❌ Error en item ${item.id}`, error);
+        break;
+      }
+    }
+
+    setSyncing(false);
+    console.log("🏁 Sync finalizado");
+  };
+
+  // 🔥 SOPORTE FORMATO ANTIGUO (ESTE ES EL FIX REAL)
+  const processOldItem = async (item, body) => {
+    const { type, routeId } = item;
+
+    if (!type || !routeId) {
+      console.warn("⚠️ Item inválido:", item);
       return;
     }
 
-    isSyncingGlobal = true;
-    setSyncing(true);
+    switch (type) {
+      case "PHOTO":
+        return await api.post(`/routes/${routeId}/photo`, body);
 
-    try {
-      const pending = await getPendingSync();
+      case "SCAN":
+        return await api.post(`/routes/${routeId}/scans`, body);
 
-      console.log("📦 Pendientes:", pending.map((p) => p.id));
+      case "FINISH":
+        return await api.post(`/routes/${routeId}/finish`, body);
 
-      if (!pending.length) {
-        console.log("✅ No hay pendientes");
-        return;
-      }
+      case "CHECK_IN":
+        return await api.post(`/routes/${routeId}/check-in`, body);
 
-      for (const item of pending) {
-        try {
-          console.log(`🔄 Sync item ${item.id} (${item.type})`);
-
-          const body = rebuildBody(item.payload);
-
-          await api[item.method.toLowerCase()](item.endpoint, body);
-
-          await removeFromSyncQueue(item.id);
-
-          console.log(`✅ Item ${item.id} eliminado`);
-
-        } catch (error) {
-          console.error(`❌ Error en item ${item.id}`, error);
-
-          // 🔥 IMPORTANTE: detenemos para evitar spam si backend falla
-          break;
-        }
-      }
-
-    } catch (error) {
-      console.error("❌ Error general en sync:", error);
-    } finally {
-      isSyncingGlobal = false;
-      setSyncing(false);
-      console.log("🏁 Sync finalizado");
+      default:
+        console.warn("⚠️ Tipo no reconocido:", type);
     }
   };
 

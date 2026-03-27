@@ -53,43 +53,53 @@ const VisitFlow = () => {
 
   // 🔍 MANEJO DE CAPTURA DE FOTOS OPTIMIZADO
   const handleCapture = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setCapturing(true);
-    const toastId = toast.loading("Subiendo foto...");
-    const formData = new FormData();
-    
-    // Si estamos en el paso 6, usamos un tipo específico
-    const tipoEvidencia = step === 6 ? "comentario_final" : stepsInfo[step].key;
-    formData.append("tipo_evidencia", tipoEvidencia); 
-    formData.append("foto", file);
+  const file = e.target.files[0];
+  if (!file) return;
 
-    try {
-      // 🚩 MEJORA: Obtenemos la URL de la foto subida
-      const response = await api.post(`/routes/${id}/photo`, formData, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
-      
-      toast.success(`${stepsInfo[step].title} guardada`, { id: toastId });
+  setCapturing(true);
+  const toastId = toast.loading("Subiendo foto...");
 
-      // LÓGICA POR PASO
+  const formData = new FormData();
+
+  const tipoEvidencia = step === 6 ? "comentario_final" : stepsInfo[step].key;
+  formData.append("tipo_evidencia", tipoEvidencia);
+  formData.append("foto", file);
+
+  try {
+    const response = await api.post(`/routes/${id}/photo`, formData);
+
+    // 🚀 SI ESTÁ OFFLINE
+    if (response?.offline) {
+      toast.success("📴 Guardado offline", { id: toastId });
+
+      // 👉 Creamos preview local
+      const localUrl = URL.createObjectURL(file);
+
       if (step === 6) {
-        // 🚩 En el paso 6, guardamos la URL y NO avanzamos el paso
-        // Asumiendo que tu backend devuelve la URL como { url: '...' }
-        if (response.url) setCommentPhoto(response.url); 
+        setCommentPhoto(localUrl);
       } else {
-        // Pasos 1, 2 y 4 avanzan
         setStep(prev => prev + 1);
       }
 
-    } catch (err) {
-      toast.error("Error al subir imagen. Reintenta.", { id: toastId });
-    } finally {
-      setCapturing(false);
-      // Limpiamos el input file para permitir capturar la misma foto si se borra
-      e.target.value = ""; 
+      return;
     }
-  };
+
+    // 🚀 SI ESTÁ ONLINE
+    toast.success(`${stepsInfo[step].title} guardada`, { id: toastId });
+
+    if (step === 6) {
+      if (response.url) setCommentPhoto(response.url);
+    } else {
+      setStep(prev => prev + 1);
+    }
+
+  } catch (err) {
+    toast.error("Error al subir imagen. Reintenta.", { id: toastId });
+  } finally {
+    setCapturing(false);
+    e.target.value = "";
+  }
+};
 
   const handleScanSuccess = async (decodedText) => {
     if (isProcessingScan.current) return;
@@ -111,21 +121,31 @@ const VisitFlow = () => {
   };
 
   const finalizarTodo = async () => {
-    setLoading(true);
-    try {
-      await api.post(`/routes/${id}/finish`, {
-        responses: answers,
-        comment: comment,
-        comment_photo_url: commentPhoto // Enviamos la URL de la foto capturada en este paso
-      }); 
-      toast.success("¡Visita Cultivapp cerrada!");
+  setLoading(true);
+  try {
+    const response = await api.post(`/routes/${id}/finish`, {
+      responses: answers,
+      comment: comment,
+      comment_photo_url: commentPhoto
+    });
+
+    // 🚀 OFFLINE
+    if (response?.offline) {
+      toast.success("📴 Guardado offline. Se sincronizará luego");
       navigate("/usuario/home");
-    } catch (err) {
-      toast.error("Error al finalizar el reporte");
-    } finally {
-      setLoading(false);
+      return;
     }
-  };
+
+    // 🚀 ONLINE
+    toast.success("¡Visita Cultivapp cerrada!");
+    navigate("/usuario/home");
+
+  } catch (err) {
+    toast.error("Error al finalizar el reporte");
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Función auxiliar para forzar la apertura de la cámara en el paso 6
   const triggerCommentPhoto = () => {

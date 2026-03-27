@@ -14,22 +14,24 @@ const extractRouteId = (endpoint) => {
   return match ? match[1] : null;
 };
 
-// 🔥 SERIALIZADOR
+// 🔥 SERIALIZAR BODY
 const serializeBody = (body) => {
   if (body instanceof FormData) {
     const serialized = {};
-
     for (let [key, value] of body.entries()) {
       serialized[key] = value;
     }
-
-    return {
-      __type: "FormData",
-      data: serialized,
-    };
+    return { __type: "FormData", data: serialized };
   }
 
   return body;
+};
+
+// 🔥 PREPARAR BODY (FIX JSON DOBLE)
+const prepareBody = (body) => {
+  if (body instanceof FormData) return body;
+  if (typeof body === "string") return body;
+  return JSON.stringify(body);
 };
 
 const isFormData = (val) => val instanceof FormData;
@@ -53,10 +55,7 @@ const request = async (endpoint, options = {}) => {
     const response = await fetch(finalUrl, config);
 
     if (response.status === 401) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      if (window.location.pathname !== "/") window.location.href = "/?expired=true";
-      throw new Error("Sesión expirada.");
+      throw new Error("Sesión expirada");
     }
 
     const contentType = response.headers.get("content-type");
@@ -75,34 +74,30 @@ const request = async (endpoint, options = {}) => {
       error.name === "TypeError" || error.message.includes("Failed to fetch");
 
     const isMutation =
-      options.method === "POST" ||
-      options.method === "PUT" ||
-      options.method === "PATCH";
+      ["POST", "PUT", "PATCH"].includes(options.method);
 
     if (isNetworkError && isMutation) {
-      console.warn("🌐 Sin conexión. Guardando en cola...");
+      console.warn("🌐 Offline → guardando en cola");
 
       const routeId = extractRouteId(endpoint);
 
       let type = "OTHER";
       if (endpoint.includes("/photo")) type = "PHOTO";
-      if (endpoint.includes("/scans")) type = "SCAN";
       if (endpoint.includes("/finish")) type = "FINISH";
-      if (endpoint.includes("/check-in")) type = "CHECK_IN";
+      if (endpoint.includes("/scans")) type = "SCAN";
 
       await addToSyncQueue({
         type,
         endpoint: cleanEndpoint,
         method: options.method,
         routeId,
-        payload: serializeBody(options.body), // 🔥 FIX
+        payload: serializeBody(options.body),
         createdAt: new Date().toISOString(),
       });
 
       return {
         offline: true,
         message: "Guardado localmente",
-        id: "offline_" + Date.now(),
       };
     }
 
@@ -124,19 +119,19 @@ const api = {
   post: (endpoint, body) =>
     request(endpoint, {
       method: "POST",
-      body: isFormData(body) ? body : JSON.stringify(body),
-    }),
-
-  patch: (endpoint, body) =>
-    request(endpoint, {
-      method: "PATCH",
-      body: isFormData(body) ? body : JSON.stringify(body),
+      body: prepareBody(body),
     }),
 
   put: (endpoint, body) =>
     request(endpoint, {
       method: "PUT",
-      body: isFormData(body) ? body : JSON.stringify(body),
+      body: prepareBody(body),
+    }),
+
+  patch: (endpoint, body) =>
+    request(endpoint, {
+      method: "PATCH",
+      body: prepareBody(body),
     }),
 
   delete: (endpoint) => request(endpoint, { method: "DELETE" }),
