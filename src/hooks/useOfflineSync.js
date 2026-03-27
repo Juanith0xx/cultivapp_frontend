@@ -1,79 +1,105 @@
-import { useEffect, useState } from 'react';
-import { db, getPendingSync, removeFromSyncQueue } from '../utils/db';
-import api from '../api/apiClient';
-import toast from 'react-hot-toast';
+import { useEffect, useState, useRef } from "react";
+import { getPendingSync, removeFromSyncQueue } from "../utils/db";
+import api from "../api/apiClient";
+import toast from "react-hot-toast";
+
+// 🔥 FLAG GLOBAL (evita múltiples sync simultáneos)
+let isSyncingGlobal = false;
+
+// 🔥 RECONSTRUIR BODY
+const rebuildBody = (payload) => {
+  if (payload?.__type === "FormData") {
+    const formData = new FormData();
+
+    Object.entries(payload.data).forEach(([key, value]) => {
+      formData.append(key, value);
+    });
+
+    return formData;
+  }
+
+  return payload;
+};
 
 export const useOfflineSync = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [syncing, setSyncing] = useState(false);
 
-  // 1. Escuchar cambios de conexión
+  // 🔥 evita múltiples listeners duplicados
+  const initializedRef = useRef(false);
+
   useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
     const handleOnline = () => {
+      console.log("🌐 Evento ONLINE detectado");
       setIsOnline(true);
       toast.success("Conexión restablecida. Sincronizando...");
-      startSync(); // Disparar sincronización automáticamente
+      startSync();
     };
+
     const handleOffline = () => {
+      console.log("📴 Evento OFFLINE detectado");
       setIsOnline(false);
       toast.error("Modo Offline activado");
     };
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
   }, []);
 
-  // 2. Motor de Sincronización
   const startSync = async () => {
-    const pending = await getPendingSync();
-    if (pending.length === 0) return;
-
-    setSyncing(true);
-    
-    for (const item of pending) {
-      try {
-        console.log(`🔄 Sincronizando item tipo: ${item.type}`);
-        
-        // Ejecutar la petición según el tipo guardado
-        await processSyncItem(item);
-
-        // Si el backend responde 200 OK, borramos de la cola local
-        await removeFromSyncQueue(item.id);
-        console.log(`✅ Item ${item.id} sincronizado y borrado.`);
-        
-      } catch (error) {
-        console.error(`❌ Error al sincronizar item ${item.id}:`, error);
-        // Si hay error, no lo borramos de la cola para reintentar luego
-        break; // Detenemos el loop para no saturar si el server sigue caído
-      }
+    // 🔥 PROTECCIÓN GLOBAL
+    if (isSyncingGlobal) {
+      console.log("⛔ Sync ya en proceso, evitando duplicado");
+      return;
     }
-    setSyncing(false);
-  };
 
-  // 3. Lógica de envío por tipo de acción
-  const processSyncItem = async (item) => {
-    const { type, routeId, payload } = item;
+    isSyncingGlobal = true;
+    setSyncing(true);
 
-    switch (type) {
-      case 'PHOTO':
-        const formData = new FormData();
-        formData.append('tipo_evidencia', payload.step);
-        formData.append('foto', payload.file); // Dexie guardó el Blob/File
-        return await api.post(`/routes/${routeId}/photo`, formData);
+    try {
+      const pending = await getPendingSync();
 
-      case 'SCAN':
-        return await api.post(`/routes/${routeId}/scans`, { barcode: payload.barcode });
+      console.log("📦 Pendientes:", pending.map((p) => p.id));
 
-      case 'FINISH':
-        return await api.post(`/routes/${routeId}/finish`, payload);
+      if (!pending.length) {
+        console.log("✅ No hay pendientes");
+        return;
+      }
 
-      default:
-        console.warn("Tipo de sincronización no reconocido:", type);
+      for (const item of pending) {
+        try {
+          console.log(`🔄 Sync item ${item.id} (${item.type})`);
+
+          const body = rebuildBody(item.payload);
+
+          await api[item.method.toLowerCase()](item.endpoint, body);
+
+          await removeFromSyncQueue(item.id);
+
+          console.log(`✅ Item ${item.id} eliminado`);
+
+        } catch (error) {
+          console.error(`❌ Error en item ${item.id}`, error);
+
+          // 🔥 IMPORTANTE: detenemos para evitar spam si backend falla
+          break;
+        }
+      }
+
+    } catch (error) {
+      console.error("❌ Error general en sync:", error);
+    } finally {
+      isSyncingGlobal = false;
+      setSyncing(false);
+      console.log("🏁 Sync finalizado");
     }
   };
 
