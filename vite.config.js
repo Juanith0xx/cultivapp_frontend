@@ -9,13 +9,13 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate', // Actualiza la app automáticamente cuando subas cambios a Vercel
+      registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-back-icon.svg'],
       manifest: {
         name: 'Cultivapp SaaS',
         short_name: 'Cultivapp',
         description: 'Plataforma de gestión de mercaderistas y puntos de venta',
-        theme_color: '#87be00', // El verde corporativo de Cultiva
+        theme_color: '#87be00',
         icons: [
           {
             src: 'pwa-192x192.png',
@@ -36,14 +36,14 @@ export default defineConfig({
         ]
       },
       workbox: {
-        // 🚩 IMPORTANTE: Esto asegura que las peticiones a la API 
-        // NO sean interceptadas por el caché del Service Worker, 
-        // permitiendo que nuestro apiClient.js maneje el offline.
+        // ✅ SOLUCIÓN: Subimos el límite a 5MB para que acepte tu archivo de 3.14MB
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, 
+        
         navigateFallbackDenylist: [/^\/api/], 
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/api'),
-            handler: 'NetworkOnly', // La API siempre debe intentar ir a la red primero
+            handler: 'NetworkOnly',
           }
         ]
       }
