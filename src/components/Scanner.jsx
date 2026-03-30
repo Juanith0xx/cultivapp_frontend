@@ -1,126 +1,109 @@
-import { useEffect, useRef, useState } from 'react';
-import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
-import { FiLoader, FiAlertTriangle } from 'react-icons/fi';
+import { useEffect, useRef } from 'react';
+import { Html5Qrcode } from 'html5-qrcode';
 
-const Scanner = ({ onScanSuccess }) => {
-  const videoRef = useRef(null);
-  const codeReaderRef = useRef(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const Scanner = ({ onScanSuccess, onScanError }) => {
+  const scannerRef = useRef(null);
 
   useEffect(() => {
-    // 1. Configuración de Lectura
-    const hints = new Map();
-    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-      BarcodeFormat.EAN_13,
-      BarcodeFormat.EAN_8,
-      BarcodeFormat.CODE_128,
-      BarcodeFormat.UPC_A
-    ]);
-    hints.set(DecodeHintType.TRY_HARDER, true);
+    const html5QrCode = new Html5Qrcode("reader");
+    scannerRef.current = html5QrCode;
 
-    const codeReader = new BrowserMultiFormatReader(hints);
-    codeReaderRef.current = codeReader;
-
-    const constraints = {
-      video: {
-        facingMode: { ideal: "environment" },
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        focusMode: "continuous"
-      }
+    // 🚩 CONFIGURACIÓN DE ALTO RENDIMIENTO PARA CULTIVAPP
+    const config = { 
+      fps: 15, 
+      // Reducimos un poco el cuadro para que el usuario aleje el móvil
+      // Esto ayuda al lente del iPhone a encontrar el foco (Macro natural)
+      qrbox: { width: 250, height: 150 },
+      aspectRatio: 1.7777778, // Ratio 16:9 nativo de iPhone
+      disableFlip: false,
     };
 
     const startScanner = async () => {
       try {
-        setLoading(true);
-        setError(null);
-
-        if (!navigator.mediaDevices) {
-          throw new Error("No se detectó acceso a dispositivos multimedia (Revisa HTTPS).");
-        }
-
-        // 2. Iniciar escaneo directamente desde el lector (Más estable)
-        await codeReader.decodeFromConstraints(
-          constraints,
-          videoRef.current,
-          (result, err) => {
-            if (result) {
-              onScanSuccess(result.getText());
-              if (navigator.vibrate) navigator.vibrate(100);
+        // 🚩 INTENTO 1: Trasera con Focus Mode Continuo
+        await html5QrCode.start(
+          { facingMode: "environment" }, 
+          {
+            ...config,
+            // Constraints avanzadas para hardware moderno
+            videoConstraints: {
+              facingMode: "environment",
+              focusMode: "continuous",
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
             }
-            // NotFoundException ocurre en cada frame donde no hay código, lo ignoramos.
-          }
+          },
+          onScanSuccess,
+          onScanError
         );
-
-        setLoading(false);
       } catch (err) {
-        console.error("Scanner Error:", err);
-        setError(err.name === 'NotAllowedError' ? "Permiso denegado." : err.message);
-        setLoading(false);
+        console.warn("Fallo enfoque avanzado, intentando modo estándar...");
+        try {
+          // 🚩 INTENTO 2: Fallback (Cualquier cámara disponible)
+          await html5QrCode.start(
+            { facingMode: "user" }, 
+            config,
+            onScanSuccess,
+            onScanError
+          );
+        } catch (lastErr) {
+          console.error("Error definitivo al iniciar cámara:", lastErr);
+        }
       }
     };
 
-    // Delay para iPhone Safari
-    const timeoutId = setTimeout(startScanner, 500);
+    // iOS requiere un tiempo extra para inicializar el driver de video
+    const timeoutId = setTimeout(startScanner, 1000);
 
     return () => {
       clearTimeout(timeoutId);
-      if (codeReaderRef.current) {
-        codeReaderRef.current.reset();
+      if (scannerRef.current) {
+        if (scannerRef.current.isScanning) {
+          scannerRef.current.stop()
+            .then(() => {
+              scannerRef.current.clear();
+            })
+            .catch(e => console.error("Error al limpiar cámara:", e));
+        }
       }
     };
-  }, [onScanSuccess]);
+  }, [onScanSuccess, onScanError]);
 
   return (
-    <div className="relative w-full max-w-md mx-auto aspect-[3/4] bg-black rounded-[2.5rem] overflow-hidden shadow-2xl border-2 border-[#87be00]/20">
+    <div className="relative w-full bg-black rounded-[2.5rem] overflow-hidden shadow-2xl border-2 border-[#87be00]/30">
+      <div id="reader" className="w-full min-h-[300px] md:min-h-[400px]"></div>
       
-      {/* 🚩 VIDEO: playsInline y muted son vitales en iPhone */}
-      <video 
-        ref={videoRef} 
-        className="w-full h-full object-cover" 
-        playsInline 
-        muted 
-      />
-
-      {/* OVERLAY VISUAL (Todo con pointer-events-none) */}
-      <div className="absolute inset-0 pointer-events-none z-10 flex flex-col items-center justify-center p-8">
+      {/* CAPA DE GUÍA VISUAL "CULTIVAPP STYLE" */}
+      <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
         
-        {/* Recuadro de Enfoque */}
-        <div className="relative w-64 h-48 border-2 border-white/30 rounded-3xl shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
-          
-          {/* Esquinas Brillantes */}
-          <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-[#87be00] rounded-tl-xl"></div>
-          <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-[#87be00] rounded-tr-xl"></div>
-          <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-[#87be00] rounded-bl-xl"></div>
-          <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-[#87be00] rounded-br-xl"></div>
-
-          {/* Línea de Escaneo Sutil (No obstruye el centro) */}
-          <div className="absolute top-1/2 left-0 w-full h-[1px] bg-[#87be00] opacity-50 shadow-[0_0_8px_#87be00] animate-pulse"></div>
+        {/* RECUADRO DE ENFOQUE */}
+        <div className="w-[250px] h-[150px] border-2 border-[#87be00]/60 rounded-2xl relative overflow-hidden shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+          {/* Línea de escaneo animada */}
+          <div className="absolute top-0 left-0 w-full h-[2px] bg-[#87be00] shadow-[0_0_15px_#87be00] animate-scan"></div>
         </div>
 
-        <p className="mt-8 text-white text-[10px] font-black uppercase tracking-widest text-center bg-black/40 px-4 py-2 rounded-full backdrop-blur-md border border-white/10">
-          Escaneando Código EAN
-        </p>
+        <div className="mt-6 flex flex-col items-center gap-2">
+          <div className="px-5 py-2 bg-[#87be00] text-black text-[10px] font-black uppercase rounded-full shadow-lg">
+            Escáner de Productos
+          </div>
+          <p className="text-white/60 text-[9px] font-bold uppercase tracking-widest">
+            Centra el código y mantén la distancia
+          </p>
+        </div>
       </div>
 
-      {/* Pantallas de Carga/Error */}
-      {loading && !error && (
-        <div className="absolute inset-0 bg-neutral-900 z-20 flex flex-col items-center justify-center gap-4">
-          <FiLoader className="text-[#87be00] animate-spin" size={40} />
-          <span className="text-[10px] text-white font-black uppercase tracking-widest">Iniciando Lente...</span>
-        </div>
-      )}
-
-      {error && (
-        <div className="absolute inset-0 bg-neutral-950 z-30 flex flex-col items-center justify-center p-6 text-center gap-4">
-          <FiAlertTriangle className="text-orange-500" size={40} />
-          <p className="text-white text-xs font-bold leading-relaxed">{error}</p>
-          <button onClick={() => window.location.reload()} className="px-6 py-2 bg-[#87be00] text-black text-[10px] font-black rounded-full uppercase">
-            Reintentar
-          </button>
-        </div>
-      )}
+      {/* Estilos para la animación de escaneo */}
+      <style>{`
+        @keyframes scan {
+          0% { top: 0%; opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { top: 100%; opacity: 0; }
+        }
+        .animate-scan {
+          animation: scan 2s linear infinite;
+        }
+      `}</style>
     </div>
   );
 };
