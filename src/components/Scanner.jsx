@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
-import { FiLoader, FiAlertTriangle } from 'react-icons/fi';
+import { FiLoader, FiAlertTriangle, FiMaximize, FiZap } from 'react-icons/fi';
 
 const Scanner = ({ onScanSuccess }) => {
   const videoRef = useRef(null);
@@ -9,159 +9,153 @@ const Scanner = ({ onScanSuccess }) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // 1. Configurar el lector de ZXing
     const hints = new Map();
-    // Especificamos que solo busque códigos de barras (EAN_13, EAN_8, UPC, etc.)
-    // Esto hace el escaneo mucho más rápido que buscar QR + Barcodes.
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [
       BarcodeFormat.EAN_13,
       BarcodeFormat.EAN_8,
       BarcodeFormat.UPC_A,
-      BarcodeFormat.UPC_E,
       BarcodeFormat.CODE_128
     ]);
-    
-    // 🚩 CLAVE PARA IPHONE: Habilitar el intento de "tryHarder" para enfoque difícil
     hints.set(DecodeHintType.TRY_HARDER, true);
 
     const reader = new BrowserMultiFormatReader(hints);
     readerRef.current = reader;
-
-    // 2. Definir las restricciones de video para iPhone 12
-    const constraints = {
-      video: {
-        facingMode: "environment", // Cámara trasera
-        width: { ideal: 1280 }, // Resolución HD es suficiente y rápida
-        height: { ideal: 720 },
-        // 🚩 CLAVE PARA IPHONE: Forzar autoenfoque continuo en WebKit
-        focusMode: "continuous", 
-        pointsOfInterest: { ideal: { x: 0.5, y: 0.5 } } // Enfocar al centro
-      },
-      audio: false
-    };
 
     const startScanner = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        // Pedir permisos y obtener el stream
+        // Configuración refinada para máxima compatibilidad
+        const constraints = {
+          video: {
+            facingMode: { ideal: "environment" },
+            // En PC usamos 1280x720, en móvil Safari prefiere 1080p si está disponible
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            frameRate: { ideal: 30 }
+          }
+        };
+
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         
-        // Asignar el stream al elemento video
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          //PlaysInline es obligatorio en iOS
-          videoRef.current.setAttribute("playsinline", true); 
+          // 🚩 ESENCIAL PARA IPHONE
+          videoRef.current.setAttribute("playsinline", "true");
+          videoRef.current.setAttribute("muted", "true");
           
-          // Intentar forzar el enfoque continuo de hardware si está disponible
-          const videoTrack = stream.getVideoTracks()[0];
-          const capabilities = videoTrack.getCapabilities?.();
-          
+          // Intentar autoenfoque avanzado
+          const track = stream.getVideoTracks()[0];
+          const capabilities = track.getCapabilities?.();
           if (capabilities?.focusMode?.includes('continuous')) {
-            await videoTrack.applyConstraints({
-              advanced: [{ focusMode: 'continuous' }]
-            });
-            console.log("✅ Autoenfoque continuo activado por hardware");
+            await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
           }
         }
 
-        // Iniciar la decodificación continua
-        reader.decodeFromVideoElement(videoRef.current, (result, err) => {
+        // Iniciar escaneo
+        reader.decodeFromVideoElement(videoRef.current, (result) => {
           if (result) {
-            // ¡ÉXITO! Código decodificado
             onScanSuccess(result.getText());
-            
-            // Feedback visual/auditivo rápido (opcional)
-            if (navigator.vibrate) navigator.vibrate(100);
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
           }
-          // Ignoramos los errores de 'NotFoundException' (son normales entre frames)
         });
 
         setLoading(false);
       } catch (err) {
-        console.error("Error iniciando escáner:", err);
-        setError("No se pudo acceder a la cámara trasera. Verifica los permisos.");
+        console.error("Error cámara:", err);
+        setError("Permiso denegado o cámara no encontrada.");
         setLoading(false);
       }
     };
 
-    // Esperamos un segundo para que iOS inicialice el DOM
-    const timeoutId = setTimeout(startScanner, 1000);
+    const timeoutId = setTimeout(startScanner, 800);
 
-    // 3. Limpieza al desmontar el componente
     return () => {
       clearTimeout(timeoutId);
-      if (readerRef.current) {
-        readerRef.current.reset(); // Detiene la decodificación
-      }
-      // Detener el stream de video manualmente
-      if (videoRef.current && videoRef.current.srcObject) {
-        videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+      if (readerRef.current) readerRef.current.reset();
+      if (videoRef.current?.srcObject) {
+        videoRef.current.srcObject.getTracks().forEach(t => t.stop());
       }
     };
   }, [onScanSuccess]);
 
   return (
-    <div className="relative w-full bg-black rounded-[2.5rem] overflow-hidden shadow-2xl border-2 border-[#87be00]/30 aspect-[4/3] flex items-center justify-center">
+    <div className="relative w-full max-w-md mx-auto aspect-[3/4] md:aspect-video bg-black rounded-[2.5rem] overflow-hidden shadow-2xl border-2 border-[#87be00]/20 group">
       
-      {/* Elemento Video Nativo */}
+      {/* Video - Con object-cover para que siempre llene el contenedor sin deformar */}
       <video 
         ref={videoRef} 
-        className="w-full h-full object-cover" 
+        className="w-full h-full object-cover transition-opacity duration-700" 
         playsInline 
         muted 
         autoPlay
+        style={{ opacity: loading ? 0 : 1 }}
       />
 
-      {/* ESTADOS: Cargando o Error */}
+      {/* Pantallas de Estado */}
       {(loading || error) && (
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4 p-6 z-10">
-          {loading && (
-            <>
-              <FiLoader className="text-[#87be00] animate-spin" size={40} />
-              <p className="text-[10px] font-black text-white uppercase tracking-widest">Iniciando Cámara...</p>
-            </>
-          )}
-          {error && (
-            <>
-              <FiAlertTriangle className="text-red-500" size={40} />
-              <p className="text-xs font-bold text-white text-center">{error}</p>
-              <p className="text-[9px] text-gray-400 uppercase font-medium">Asegúrate de usar HTTPS en local</p>
-            </>
+        <div className="absolute inset-0 bg-neutral-900 flex flex-col items-center justify-center p-8 z-50">
+          {loading ? (
+            <div className="flex flex-col items-center gap-4">
+              <div className="relative">
+                <FiLoader className="text-[#87be00] animate-spin" size={48} />
+                <div className="absolute inset-0 blur-lg bg-[#87be00]/20 animate-pulse"></div>
+              </div>
+              <p className="text-[10px] font-black text-white uppercase tracking-[0.3em]">Calibrando Óptica...</p>
+            </div>
+          ) : (
+            <div className="text-center space-y-3">
+              <FiAlertTriangle className="text-orange-500 mx-auto" size={40} />
+              <p className="text-xs font-bold text-white uppercase tracking-tight">{error}</p>
+              <button onClick={() => window.location.reload()} className="text-[10px] text-[#87be00] font-black underline uppercase">Reintentar</button>
+            </div>
           )}
         </div>
       )}
 
-      {/* CAPA DE GUÍA VISUAL "CULTIVAPP STYLE" ( pointer-events-none para no bloquear el toque ) */}
-      <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center z-20">
-        
-        {/* RECUADRO DE ENFOQUE (Más pequeño para forzar distancia focal) */}
-        <div className="w-[240px] h-[140px] border-2 border-[#87be00]/60 rounded-2xl relative overflow-hidden shadow-[0_0_0_9999px_rgba(0,0,0,0.6)]">
-          {/* Línea de escaneo animada */}
-          <div className="absolute top-0 left-0 w-full h-[2px] bg-[#87be00] shadow-[0_0_15px_#87be00] animate-scan"></div>
-        </div>
+      {/* OVERLAY CULTIVAPP UI */}
+      {!loading && !error && (
+        <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-between p-8 z-20">
+          
+          {/* Esquinas decorativas */}
+          <div className="absolute top-10 left-10 w-8 h-8 border-t-4 border-l-4 border-[#87be00] rounded-tl-xl opacity-50"></div>
+          <div className="absolute top-10 right-10 w-8 h-8 border-t-4 border-r-4 border-[#87be00] rounded-tr-xl opacity-50"></div>
+          <div className="absolute bottom-10 left-10 w-8 h-8 border-b-4 border-l-4 border-[#87be00] rounded-bl-xl opacity-50"></div>
+          <div className="absolute bottom-10 right-10 w-8 h-8 border-b-4 border-r-4 border-[#87be00] rounded-br-xl opacity-50"></div>
 
-        <div className="mt-6 flex flex-col items-center gap-2">
-          <div className="px-5 py-2 bg-[#87be00] text-black text-[10px] font-black uppercase rounded-full shadow-lg">
-            Escáner Cultivapp
+          <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10">
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+            <span className="text-[9px] font-black text-white uppercase tracking-widest">Scanner Live</span>
           </div>
-          <p className="text-white/70 text-[9px] font-bold uppercase tracking-widest">
-            Centra el código y aleja un poco el móvil
-          </p>
-        </div>
-      </div>
 
-      {/* Estilos para la animación de escaneo */}
+          {/* Area de Enfoque Dinámica */}
+          <div className="relative w-64 h-40 border border-white/20 rounded-3xl overflow-hidden shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+            <div className="absolute inset-0 bg-gradient-to-b from-[#87be00]/5 to-transparent"></div>
+            <div className="absolute top-0 left-0 w-full h-[3px] bg-[#87be00] shadow-[0_0_20px_#87be00] animate-scanning"></div>
+          </div>
+
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-white text-[10px] font-bold uppercase tracking-wider text-center max-w-[200px] leading-relaxed drop-shadow-md">
+              Alinea el código de barras dentro del recuadro
+            </p>
+            <div className="flex gap-4">
+               <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-white/50"><FiZap size={18}/></div>
+               <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-white/50"><FiMaximize size={18}/></div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
-        @keyframes scan {
-          0% { top: 0%; opacity: 0; }
-          10% { opacity: 1; }
-          90% { opacity: 1; }
-          100% { top: 100%; opacity: 0; }
+        @keyframes scanning {
+          0% { transform: translateY(0); opacity: 0; }
+          20% { opacity: 1; }
+          80% { opacity: 1; }
+          100% { transform: translateY(160px); opacity: 0; }
         }
-        .animate-scan {
-          animation: scan 1.5s linear infinite;
+        .animate-scanning {
+          animation: scanning 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
         }
       `}</style>
     </div>
