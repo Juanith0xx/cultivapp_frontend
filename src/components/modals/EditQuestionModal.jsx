@@ -52,7 +52,7 @@ const EditQuestionModal = ({
 
     try {
 
-      await api.put(`/api/questions/${question.id}`, form)
+      await api.put(`/questions/${question.id}`, form)
 
       onUpdated()
       onClose()

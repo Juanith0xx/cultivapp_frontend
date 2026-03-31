@@ -38,7 +38,7 @@ const CreateQuestionModal = ({
 
     try {
 
-      await api.post("/api/questions", form)
+      await api.post("/questions", form)
 
       onCreated()
       onClose()
