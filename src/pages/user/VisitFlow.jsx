@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { FiCamera, FiLoader, FiMapPin, FiArrowRight, FiMessageSquare, FiSend, FiX, FiCheckCircle, FiWifiOff, FiWifi } from "react-icons/fi";
+import { FiCamera, FiLoader, FiMapPin, FiArrowRight, FiMessageSquare, FiSend, FiX, FiCheckCircle, FiWifiOff, FiWifi, FiTrash2 } from "react-icons/fi";
 import api from "../../api/apiClient";
 import toast from "react-hot-toast";
 import Scanner from "../../components/Scanner"; 
@@ -11,9 +11,7 @@ const VisitFlow = () => {
   const fileInputRef = useRef(null);
   const isProcessingScan = useRef(false);
 
-  // --- ESTADO DE RED ---
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  
   const [step, setStep] = useState(1); 
   const [loading, setLoading] = useState(false);
   const [capturing, setCapturing] = useState(false);
@@ -32,22 +30,13 @@ const VisitFlow = () => {
     6: { key: "comentarios", title: "Cierre de Visita", sub: "Evidencia final y observaciones" }
   };
 
-  // Escuchar cambios de conexión
   useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      toast.success("Conexión restablecida", { icon: <FiWifi className="text-green-500"/> });
-    };
-    const handleOffline = () => {
-      setIsOnline(false);
-      toast.error("Modo Offline activado", { icon: <FiWifiOff className="text-orange-500"/> });
-    };
-
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
+    const handleStatus = () => setIsOnline(navigator.onLine);
+    window.addEventListener("online", handleStatus);
+    window.addEventListener("offline", handleStatus);
     return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleStatus);
+      window.removeEventListener("offline", handleStatus);
     };
   }, []);
 
@@ -57,9 +46,7 @@ const VisitFlow = () => {
         try {
           const data = await api.get("/questions");
           setQuestions(data);
-        } catch (err) {
-          toast.error("Error al cargar preguntas");
-        }
+        } catch (err) { toast.error("Error al cargar preguntas"); }
       };
       loadQuestions();
     }
@@ -68,193 +55,153 @@ const VisitFlow = () => {
   const handleCapture = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     setCapturing(true);
-    // Notificación de proceso según el estado
-    const toastId = toast.loading(isOnline ? "Subiendo foto a la nube..." : "Guardando foto localmente...");
+    const toastId = toast.loading(isOnline ? "Enviando a la nube..." : "Guardando en memoria...");
 
     const formData = new FormData();
-    const tipoEvidencia = step === 6 ? "comentario_final" : stepsInfo[step].key;
-    formData.append("tipo_evidencia", tipoEvidencia);
+    formData.append("tipo_evidencia", step === 6 ? "comentario_final" : stepsInfo[step].key);
     formData.append("foto", file);
 
     try {
       const response = await api.post(`/routes/${id}/photo`, formData);
-      
-      // ✅ CASO OFFLINE (Lógica del interceptor de axios)
       if (response?.offline) {
-        toast.success("📴 Guardado offline. Se enviará al detectar red.", { id: toastId, duration: 4000 });
-        const localUrl = URL.createObjectURL(file);
-        if (step === 6) setCommentPhoto(localUrl);
+        toast.success("📴 Foto guardada offline", { id: toastId });
+        if (step === 6) setCommentPhoto(URL.createObjectURL(file));
         else setStep(prev => prev + 1);
         return;
       }
-
-      // ✅ CASO ONLINE
-      toast.success(`${stepsInfo[step].title} sincronizada`, { id: toastId });
-      if (step === 6) {
-        if (response.url) setCommentPhoto(response.url);
-      } else {
-        setStep(prev => prev + 1);
-      }
-    } catch (err) {
-      toast.error("Error en la captura. Intenta de nuevo.", { id: toastId });
-    } finally {
-      setCapturing(false);
-      e.target.value = "";
-    }
+      toast.success("Foto sincronizada", { id: toastId });
+      if (step === 6) setCommentPhoto(response.url);
+      else setStep(prev => prev + 1);
+    } catch (err) { toast.error("Error al subir", { id: toastId }); }
+    finally { setCapturing(false); e.target.value = ""; }
   };
 
   const handleScanSuccess = async (decodedText) => {
-    if (isProcessingScan.current || scannedCodes.includes(decodedText)) return;
+    if (scannedCodes.includes(decodedText)) return; // No duplicar
+    if (isProcessingScan.current) return;
     isProcessingScan.current = true;
 
     try {
       const response = await api.post(`/routes/${id}/scans`, { barcode: decodedText });
       setScannedCodes(prev => [decodedText, ...prev]);
       
-      if (response?.offline) {
-        toast.success(`EAN ${decodedText.slice(-4)} registrado (Offline)`, { duration: 1500 });
-      } else {
-        toast.success(`EAN ${decodedText.slice(-4)} registrado en servidor`, { duration: 1000 });
-      }
+      const mode = response?.offline ? "📴 Local" : "☁️ Nube";
+      toast.success(`${decodedText} ${mode}`, { duration: 800, id: 'scan' });
+      
+      setTimeout(() => { isProcessingScan.current = false; }, 500);
+    } catch (err) { isProcessingScan.current = false; }
+  };
 
-      setTimeout(() => { isProcessingScan.current = false; }, 1500);
-    } catch (err) {
-      toast.error("Error al registrar código");
-      isProcessingScan.current = false; 
-    }
+  const removeCode = (code) => {
+    setScannedCodes(prev => prev.filter(c => c !== code));
+    toast.success("Eliminado de la lista");
   };
 
   const finalizarTodo = async () => {
     setLoading(true);
-    const toastId = toast.loading(isOnline ? "Cerrando visita en el servidor..." : "Preparando cierre offline...");
-    
     try {
-      const response = await api.post(`/routes/${id}/finish`, {
-        responses: answers,
-        comment: comment,
-        comment_photo_url: commentPhoto
-      });
-
-      if (response?.offline) {
-        toast.success("📴 Visita guardada localmente. ¡Buen trabajo!", { id: toastId, duration: 5000 });
-      } else {
-        toast.success("¡Visita cerrada y sincronizada exitosamente!", { id: toastId });
-      }
-      
+      await api.post(`/routes/${id}/finish`, { responses: answers, comment, comment_photo_url: commentPhoto });
+      toast.success(isOnline ? "Visita finalizada" : "Guardado offline exitoso");
       navigate("/usuario/home");
-    } catch (err) {
-      toast.error("Error al finalizar reporte", { id: toastId });
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { toast.error("Error al cerrar"); }
+    finally { setLoading(false); }
   };
 
   return (
-    <div className={`min-h-screen font-[Outfit] p-4 pb-24 flex flex-col items-center transition-colors duration-500 ${isOnline ? 'bg-gray-50' : 'bg-orange-50/30'}`}>
+    <div className={`min-h-screen font-[Outfit] p-4 pb-24 flex flex-col items-center transition-colors duration-500 ${isOnline ? 'bg-gray-50' : 'bg-orange-50/20'}`}>
       
-      {/* BANNER OFFLINE VISUAL */}
       {!isOnline && (
-        <div className="fixed top-0 left-0 w-full bg-orange-500 text-white text-[10px] font-black uppercase py-1 text-center z-[60] flex items-center justify-center gap-2">
-          <FiWifiOff /> Trabajando en Modo Offline
+        <div className="fixed top-0 left-0 w-full bg-orange-500 text-white text-[10px] font-black py-1 text-center z-50 flex items-center justify-center gap-2">
+          <FiWifiOff /> MODO OFFLINE ACTIVO
         </div>
       )}
 
-      {/* INDICADOR DE PASOS */}
-      <div className="w-full max-w-md flex justify-between mb-8 sticky top-6 z-20 py-2">
+      <div className="w-full max-w-md flex justify-between mb-8 sticky top-6 z-20">
         {[1, 2, 3, 4, 5, 6].map(i => (
           <div key={i} className={`h-1.5 flex-1 mx-1 rounded-full transition-all duration-700 ${step >= i ? (isOnline ? 'bg-[#87be00]' : 'bg-orange-500') : 'bg-gray-200'}`} />
         ))}
       </div>
 
       <div className="w-full max-w-md bg-white p-6 rounded-[2.5rem] shadow-xl text-center space-y-6 border border-gray-100 relative">
-        
-        {/* Marcador visual de conexión en la tarjeta */}
-        <div className="absolute top-6 right-6">
-          {isOnline ? (
-            <div className="flex items-center gap-1 text-[8px] font-black text-[#87be00] uppercase tracking-widest">
-              <span className="w-1.5 h-1.5 bg-[#87be00] rounded-full animate-pulse"></span> Online
-            </div>
-          ) : (
-            <div className="flex items-center gap-1 text-[8px] font-black text-orange-500 uppercase tracking-widest">
-              <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse"></span> Offline
-            </div>
-          )}
+        <div className="absolute top-6 right-6 flex items-center gap-1.5">
+           <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-[#87be00]' : 'bg-orange-500'} animate-pulse`} />
+           <span className="text-[8px] font-black uppercase tracking-widest text-gray-400">{isOnline ? 'Online' : 'Offline'}</span>
         </div>
 
-        <div className="space-y-1">
+        <div className="space-y-1 pt-2">
             <h2 className="text-xl font-black uppercase text-gray-900 tracking-tighter leading-none">{stepsInfo[step].title}</h2>
-            <p className={`text-[9px] font-black uppercase tracking-[0.2em] ${isOnline ? 'text-[#87be00]' : 'text-orange-400'}`}>{stepsInfo[step].sub}</p>
+            <p className={`text-[9px] font-black uppercase tracking-[0.2em] ${isOnline ? 'text-[#87be00]' : 'text-orange-500'}`}>{stepsInfo[step].sub}</p>
         </div>
 
-        {/* ... Resto del JSX (Scanner, Captura, Preguntas) se mantiene igual ... */}
-        {/* Asegúrate de pasar el color dinámico a los botones según isOnline */}
-        
         {step === 3 && (
           <div className="space-y-4 animate-in zoom-in duration-300">
-            <div className={`rounded-[2.5rem] overflow-hidden border-2 shadow-2xl transition-colors ${isOnline ? 'border-gray-100' : 'border-orange-200'}`}>
+            <div className={`rounded-[2.5rem] overflow-hidden border-2 shadow-2xl ${isOnline ? 'border-gray-50' : 'border-orange-100'}`}>
               <Scanner onScanSuccess={handleScanSuccess} />
             </div>
             
-            <div className="flex flex-col gap-2 max-h-32 overflow-y-auto px-1">
-              {scannedCodes.length > 0 ? scannedCodes.slice(0,3).map((code, idx) => (
-                <div key={idx} className="flex items-center justify-between bg-gray-50 p-3 rounded-2xl">
-                  <span className="text-[10px] font-bold text-gray-500">EAN: {code}</span>
-                  <FiCheckCircle className={isOnline ? 'text-[#87be00]' : 'text-orange-500'} size={14}/>
-                </div>
-              )) : (
-                <p className="text-[10px] text-gray-300 font-bold uppercase py-4">Esperando escaneo...</p>
-              )}
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-between items-center px-2">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Reposición</span>
+                <span className={`px-3 py-1 rounded-full text-[10px] font-black text-white ${isOnline ? 'bg-[#87be00]' : 'bg-orange-500'}`}>{scannedCodes.length} Items</span>
+              </div>
+
+              <div className="flex flex-col gap-2 max-h-48 overflow-y-auto px-1 custom-scrollbar">
+                {scannedCodes.map((code, idx) => (
+                  <div key={idx} className="flex items-center justify-between bg-gray-50 p-3 rounded-2xl border border-gray-100 animate-in slide-in-from-left">
+                    <div className="flex items-center gap-3">
+                      <FiCheckCircle className={isOnline ? 'text-[#87be00]' : 'text-orange-500'} size={14}/>
+                      <span className="text-[10px] font-bold text-gray-700">{code}</span>
+                    </div>
+                    <button onClick={() => removeCode(code)} className="text-gray-300 hover:text-red-500 transition-colors"><FiTrash2 size={14}/></button>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <button onClick={() => setStep(4)} className="w-full bg-black text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-transform">
+            <button onClick={() => setStep(4)} disabled={scannedCodes.length === 0} className="w-full bg-black text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-3 active:scale-95 disabled:opacity-20 transition-all">
               Siguiente Paso <FiArrowRight size={16} className={isOnline ? 'text-[#87be00]' : 'text-orange-500'}/>
             </button>
           </div>
         )}
 
-        {/* MODIFICACIÓN EN LOS BOTONES DE FOTO */}
+        {/* ... Resto de los pasos simplificados para brevedad ... */}
         {(step === 1 || step === 2 || step === 4) && (
-          <div onClick={() => !capturing && fileInputRef.current.click()} className="w-full aspect-square bg-gray-50 border-4 border-dashed border-gray-200 rounded-[2.5rem] flex flex-col items-center justify-center active:scale-95 transition-all cursor-pointer overflow-hidden relative group">
-            {capturing ? (
-                <div className="flex flex-col items-center gap-2">
-                  <FiLoader className={`${isOnline ? 'text-[#87be00]' : 'text-orange-500'} animate-spin`} size={40} />
-                  <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">
-                    {isOnline ? 'Sincronizando...' : 'Cifrando en Local...'}
-                  </p>
-                </div>
-            ) : (
-                <>
-                    <div className="bg-white p-6 rounded-full shadow-sm mb-4 group-hover:scale-110 transition-transform">
-                      <FiCamera size={40} className={isOnline ? 'text-[#87be00]' : 'text-orange-500'} />
-                    </div>
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-6">Toca para capturar</span>
-                </>
-            )}
+          <div onClick={() => !capturing && fileInputRef.current.click()} className="w-full aspect-square bg-gray-50 border-4 border-dashed border-gray-200 rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer relative group transition-all active:scale-95">
+             {capturing ? <FiLoader className={`${isOnline ? 'text-[#87be00]' : 'text-orange-500'} animate-spin`} size={40} /> : <FiCamera size={40} className="text-gray-200 group-hover:text-[#87be00] transition-colors" />}
+             <span className="mt-4 text-[10px] font-black text-gray-300 uppercase tracking-widest">Capturar Evidencia</span>
           </div>
         )}
 
-        {/* PASO FINAL: COLOR DEL BOTÓN FINALIZAR */}
-        {step === 6 && (
-            <div className="space-y-5 animate-in slide-in-from-bottom-4 duration-500">
-               {/* ... (Imagen y comentarios igual) ... */}
-               <button 
-                onClick={finalizarTodo} 
-                disabled={loading} 
-                className={`w-full ${isOnline ? 'bg-[#87be00]' : 'bg-orange-600'} text-white py-5 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-2 active:bg-black disabled:opacity-50 transition-colors`}
-                >
-                    {loading ? <FiLoader className="animate-spin" /> : <><FiSend/> {isOnline ? 'Finalizar y Enviar' : 'Finalizar Offline'}</>}
-                </button>
-            </div>
+        {step === 5 && (
+           <div className="space-y-4 animate-in slide-in-from-right duration-300">
+             <div className="bg-gray-50 p-2 rounded-[2rem] space-y-1">
+               {questions.map((q) => (
+                 <button key={q.id} onClick={() => setAnswers({...answers, [q.id]: q.question})} className={`w-full flex items-center justify-between p-4 rounded-[1.5rem] transition-all ${answers[q.id] ? 'bg-white shadow-sm' : ''}`}>
+                   <span className={`text-[10px] font-bold text-left leading-tight pr-2 ${answers[q.id] ? (isOnline ? 'text-[#87be00]' : 'text-orange-500') : 'text-gray-500'}`}>{q.question}</span>
+                   <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${answers[q.id] ? (isOnline ? 'border-[#87be00] bg-[#87be00]' : 'border-orange-500 bg-orange-500') : 'border-gray-200'}`}>{answers[q.id] && <div className="w-1.5 h-1.5 bg-white rounded-full" />}</div>
+                 </button>
+               ))}
+             </div>
+             <button onClick={() => setStep(6)} className="w-full bg-black text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-3">Continuar <FiArrowRight size={16}/></button>
+           </div>
         )}
 
-        <div className="pt-4 border-t border-gray-50 flex items-center justify-center gap-2 text-gray-400 text-[8px] font-bold uppercase tracking-widest">
-            <FiMapPin className={isOnline ? 'text-[#87be00]' : 'text-orange-500'} /> LOCAL ID: {id?.slice(0,8).toUpperCase()}
+        {step === 6 && (
+           <div className="space-y-5 animate-in slide-in-from-bottom-4">
+              <textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Observaciones finales..." className="w-full h-32 p-5 bg-gray-50 rounded-[1.8rem] border-none text-sm outline-none resize-none" />
+              <button onClick={finalizarTodo} disabled={loading} className={`w-full ${isOnline ? 'bg-[#87be00]' : 'bg-orange-600'} text-white py-5 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-2 transition-colors`}>
+                 {loading ? <FiLoader className="animate-spin" /> : <><FiSend/> {isOnline ? 'Finalizar Reporte' : 'Guardar Offline'}</>}
+              </button>
+           </div>
+        )}
+
+        <div className="pt-4 border-t border-gray-50 flex items-center justify-center gap-2 text-gray-300 text-[8px] font-bold uppercase tracking-widest">
+            <FiMapPin className={isOnline ? 'text-[#87be00]' : 'text-orange-500'} /> ID: {id?.slice(0,8).toUpperCase()}
         </div>
       </div>
-      
       <input type="file" accept="image/*" capture="environment" ref={fileInputRef} onChange={handleCapture} className="hidden" />
+      <style>{`.custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #eee; border-radius: 10px; }`}</style>
     </div>
   );
 };
