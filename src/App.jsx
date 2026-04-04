@@ -30,6 +30,9 @@ import AdminLocales from "./components/AdminLocales"
 import AdminRoutes from "./pages/admin/AdminRoutes"
 import GpsMonitor from "./pages/admin/GpsMonitor" 
 
+/* ================= NUEVO: AUDITORÍA FOTOGRÁFICA ================= */
+import PhotoAuditDashboard from "./components/PhotoAuditDashboard" //
+
 /* ================= USUARIO (MERCADERISTA) ================= */
 import UserDashboard from "./pages/user/UserDashboard"
 import UserHome from "./pages/user/UserHome" 
@@ -119,6 +122,8 @@ function App() {
             <Route path="planificacion" element={<AdminRoutes />} /> 
             <Route path="gps" element={<GpsMonitor />} /> 
             <Route path="questions" element={<QuestionsManager />} />
+            {/* 📸 NUEVA RUTA ROOT */}
+            <Route path="auditoria-fotos" element={<PhotoAuditDashboard />} />
           </Route>
 
           {/* ================= SECCIÓN ADMIN CLIENTE ================= */}
@@ -136,6 +141,8 @@ function App() {
             <Route path="routes" element={<AdminRoutes />} />
             <Route path="gps" element={<GpsMonitor />} /> 
             <Route path="questions" element={<QuestionsManager />} />
+            {/* 📸 NUEVA RUTA ADMIN CLIENTE */}
+            <Route path="auditoria-fotos" element={<PhotoAuditDashboard />} />
           </Route>
 
           {/* ================= SECCIÓN USUARIO (MERCADERISTA) ================= */}

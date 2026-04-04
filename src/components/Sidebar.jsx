@@ -5,8 +5,9 @@ import {
   FiBriefcase,
   FiHome,
   FiHelpCircle,
-  FiCalendar, // Icono para Planificación
-  FiMapPin      // Icono para rutas
+  FiCalendar, 
+  FiCamera, // 📸 Nuevo icono para Auditoría
+  FiMapPin      
 } from "react-icons/fi"
 
 const Sidebar = () => {
@@ -50,8 +51,18 @@ const Sidebar = () => {
           Dashboard
         </NavLink>
 
+        {/* 📸 NUEVA RUTA DE AUDITORÍA FOTOGRÁFICA */}
+        <NavLink
+          to="/root/auditoria-fotos"
+          className={({ isActive }) =>
+            `${linkBase} ${isActive ? linkActive : linkInactive}`
+          }
+        >
+          <FiCamera size={18} />
+          Auditoría Fotos
+        </NavLink>
+
         <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] mt-6 mb-2 ml-4">Logística</p>
-        {/* 🚩 NUEVA RUTA DE PLANIFICACIÓN */}
         <NavLink
           to="/root/planificacion"
           className={({ isActive }) =>
@@ -66,7 +77,7 @@ const Sidebar = () => {
         <NavLink
           to="/root/companies"
           className={({ isActive }) =>
-            `${linkBase} ${isActive ? linkActive : linkInactive}`
+            `${linkBase} ? linkActive : linkInactive`
           }
         >
           <FiBriefcase size={18} />
