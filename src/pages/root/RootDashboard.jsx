@@ -5,10 +5,15 @@ import Sidebar from "../../components/Sidebar"
 import LocalesMap from "../../components/LocalesMap"
 import api from "../../api/apiClient"
 
+// 🔔 IMPORTACIONES PARA NOTIFICACIONES
+import Notifications from "../../components/Notifications"
+import { useAuth } from "../../context/AuthContext"
+
 import { Building2, Store, Users, MapPin } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 
 const RootDashboard = () => {
+  const { user } = useAuth() // 🔔 Obtenemos el usuario root
   const [locales, setLocales] = useState([])
   const [companies, setCompanies] = useState([])
   const [users, setUsers] = useState([])
@@ -16,26 +21,29 @@ const RootDashboard = () => {
   const [selectedLocalId, setSelectedLocalId] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  // 🔔 ESTADO PARA NOTIFICACIONES
+  const [notifications, setNotifications] = useState([])
+
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Detectamos si estamos en la raíz de analytics o locales para mostrar el filtro global
   const isDashboard = location.pathname.includes("/root/analytics")
   const isLocales = location.pathname.includes("/root/locales")
 
   const fetchData = async () => {
     try {
       setLoading(true)
-      // ✅ MEJORA: Eliminamos "/api" manual para evitar el error 404 (/api/api/...)
-      const [localesData, companiesData, usersData] = await Promise.all([
+      const [localesData, companiesData, usersData, notifsData] = await Promise.all([
         api.get("/locales"),
         api.get("/companies"),
-        api.get("/users")
+        api.get("/users"),
+        api.get("/notifications") // 🔔 Cargamos el historial de notificaciones
       ])
       
       setLocales(localesData || [])
       setCompanies(companiesData || [])
       setUsers(usersData || [])
+      setNotifications(notifsData || []) // 🔔 Seteamos notificaciones
     } catch (error) {
       console.error("❌ Error cargando datos del dashboard:", error.message)
     } finally {
@@ -47,7 +55,23 @@ const RootDashboard = () => {
     fetchData()
   }, [])
 
-  // Memorizamos filtros para optimizar rendimiento en móviles
+  // 🔔 FUNCIÓN PARA MARCAR COMO LEÍDA
+  const handleMarkAsRead = async (id) => {
+    try {
+      await api.put(`/notifications/${id}/read`)
+      setNotifications(prev => 
+        prev.map(n => n.id === id ? { ...n, is_read: true } : n)
+      )
+    } catch (err) {
+      console.error("Error al marcar como leída", err)
+    }
+  }
+
+  const unreadCount = useMemo(() => 
+    notifications.filter(n => !n.is_read).length, 
+  [notifications])
+
+  // ... (Toda tu lógica de useMemo para filtros se mantiene igual)
   const filteredLocales = useMemo(() => {
     return selectedCompany
       ? locales.filter(l => String(l.company_id) === String(selectedCompany))
@@ -63,10 +87,6 @@ const RootDashboard = () => {
   const selectedLocal = useMemo(() => {
     return filteredLocales.find(l => l.id === selectedLocalId)
   }, [selectedLocalId, filteredLocales])
-
-  useEffect(() => {
-    setSelectedLocalId(null)
-  }, [selectedCompany])
 
   const handleLogout = () => {
     localStorage.removeItem("token")
@@ -117,17 +137,38 @@ const RootDashboard = () => {
       </div>
 
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        {/* TOPBAR */}
+        {/* TOPBAR ACTUALIZADA */}
         <div className="bg-white border-b border-gray-100 px-8 py-5 flex items-center justify-between shrink-0">
-          <button className="md:hidden text-gray-600"><FiMenu size={22}/></button>
-          <div className="flex flex-col">
-            <h1 className="text-lg font-black text-gray-800 uppercase tracking-tighter">Panel Central</h1>
-            <span className="text-[10px] font-bold text-[#87be00] uppercase tracking-widest">Acceso Root / Nivel Sistema</span>
+          <div className="flex items-center gap-4">
+            <button className="md:hidden text-gray-600"><FiMenu size={22}/></button>
+            <div className="flex flex-col">
+              <h1 className="text-lg font-black text-gray-800 uppercase tracking-tighter">Panel Central</h1>
+              <span className="text-[10px] font-bold text-[#87be00] uppercase tracking-widest">Acceso Root / Nivel Sistema</span>
+            </div>
+          </div>
+
+          {/* 🔔 SECCIÓN DE NOTIFICACIONES Y PERFIL */}
+          <div className="flex items-center gap-6">
+            <Notifications 
+              notifications={notifications} 
+              unreadCount={unreadCount} 
+              onMarkAsRead={handleMarkAsRead} 
+            />
+            
+            <div className="hidden md:flex items-center gap-3 pl-6 border-l border-gray-100">
+              <div className="text-right">
+                <p className="text-xs font-black text-gray-800 uppercase tracking-tighter">{user?.name || 'Root User'}</p>
+                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Super Administrador</p>
+              </div>
+              <div className="h-10 w-10 rounded-2xl bg-[#87be00]/10 flex items-center justify-center text-[#87be00] font-black text-xs border border-[#87be00]/20">
+                RT
+              </div>
+            </div>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto bg-[#F8FAFC] custom-scrollbar">
-          {/* FILTRO GLOBAL (Solo en Dashboard o Locales) */}
+          {/* ... (Resto del componente: Filtros, Stats, Charts y Mapa se mantienen igual) ... */}
           {(isDashboard || isLocales) && (
             <div className="px-8 pt-8">
               <div className="bg-white border border-gray-100 rounded-[2rem] p-5 flex items-center gap-6 shadow-sm">
@@ -163,8 +204,6 @@ const RootDashboard = () => {
 
               {/* CHART & MAP SECTION */}
               <div className="px-8 space-y-8 pb-12">
-                
-                {/* GRÁFICO */}
                 <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
                   <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-6">Distribución Geográfica</h3>
                   <ResponsiveContainer width="100%" height={220}>
@@ -180,12 +219,9 @@ const RootDashboard = () => {
                   </ResponsiveContainer>
                 </div>
 
-                {/* MAPA INTERACTIVO */}
                 <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
                   <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-6">Monitor de Cobertura</h3>
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    
-                    {/* LISTA DE LOCALES */}
                     <div className="lg:col-span-4 max-h-[500px] overflow-y-auto pr-4 custom-scrollbar space-y-3">
                       {filteredLocales.length > 0 ? (
                         filteredLocales.map(local => (
@@ -223,7 +259,6 @@ const RootDashboard = () => {
                       )}
                     </div>
 
-                    {/* MAPA */}
                     <div className="lg:col-span-8 min-h-[500px] rounded-[2rem] overflow-hidden border border-gray-100 shadow-inner bg-gray-50">
                       <LocalesMap locales={filteredLocales} selectedLocal={selectedLocal} />
                     </div>
@@ -233,7 +268,6 @@ const RootDashboard = () => {
             </>
           )}
 
-          {/* VISTAS HIJAS (Outlet) */}
           <div className="p-8">
             <Outlet />
           </div>

@@ -1,11 +1,13 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
-import { AuthProvider } from "./context/AuthContext"
+import { AuthProvider, useAuth } from "./context/AuthContext"
 import { Toaster } from "react-hot-toast"
 
-// 🚩 IMPORTAMOS EL HOOK DE SINCRONIZACIÓN
+// --- HOOKS ---
 import { useOfflineSync } from "./hooks/useOfflineSync"
+import { useNotifications } from "./hooks/useNotifications" // 🔔 Hook de Realtime
 import { FiCloudOff, FiRefreshCw } from "react-icons/fi"
 
+// --- AUTH PAGES ---
 import Login from "./pages/Login"
 import ChangePassword from "./pages/auth/ChangePassword"
 import ForgotPassword from "./pages/auth/ForgotPassword"
@@ -21,6 +23,7 @@ import Analytics from "./pages/root/Analytics"
 import Companies from "./pages/root/Companies"
 import Users from "./pages/root/Users"
 import Locales from "./pages/root/Locales"
+import NotificationManager from "./pages/root/NotificationManager" // 🔔 Nuevo: Gestor de envíos
 
 /* ================= ADMIN CLIENTE ================= */
 import AdminDashboard from "./pages/admin/AdminDashboard"
@@ -30,8 +33,8 @@ import AdminLocales from "./components/AdminLocales"
 import AdminRoutes from "./pages/admin/AdminRoutes"
 import GpsMonitor from "./pages/admin/GpsMonitor" 
 
-/* ================= NUEVO: AUDITORÍA FOTOGRÁFICA ================= */
-import PhotoAuditDashboard from "./components/PhotoAuditDashboard" //
+/* ================= AUDITORÍA FOTOGRÁFICA ================= */
+import PhotoAuditDashboard from "./components/PhotoAuditDashboard"
 
 /* ================= USUARIO (MERCADERISTA) ================= */
 import UserDashboard from "./pages/user/UserDashboard"
@@ -50,14 +53,12 @@ const OfflineMonitor = () => {
 
   return (
     <>
-      {/* Banner de aviso cuando no hay internet */}
       {!isOnline && (
         <div className="fixed top-0 left-0 w-full bg-orange-500 text-white text-[10px] font-black py-1.5 flex items-center justify-center gap-2 z-[9999] shadow-lg uppercase tracking-widest animate-pulse">
           <FiCloudOff size={14} /> Modo Offline: Los datos se guardarán localmente
         </div>
       )}
 
-      {/* Indicador de que se están subiendo datos pendientes */}
       {syncing && (
         <div className="fixed bottom-6 right-6 bg-black text-white px-4 py-3 rounded-2xl shadow-2xl z-[9999] flex items-center gap-3 border border-white/10 animate-bounce">
           <FiRefreshCw size={18} className="animate-spin text-[#87be00]" />
@@ -68,23 +69,40 @@ const OfflineMonitor = () => {
   );
 };
 
+// 🔔 COMPONENTE DE ESCUCHA DE NOTIFICACIONES (REALTIME)
+const NotificationListener = () => {
+  const { user } = useAuth(); 
+  
+  // Activa la escucha de Supabase para mostrar Toasts instantáneos
+  useNotifications(user);
+
+  return null; 
+};
+
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         
-        {/* 🚩 AGREGAMOS EL MONITOR AQUÍ */}
         <OfflineMonitor />
+        <NotificationListener />
 
         <Toaster
           position="top-right"
           toastOptions={{
-            duration: 4000,
+            duration: 5000,
             style: {
               borderRadius: "12px",
               background: "#111",
               color: "#fff",
-              fontSize: "14px"
+              fontSize: "14px",
+              border: "1px solid #333"
+            },
+            success: {
+                iconTheme: {
+                  primary: '#87be00',
+                  secondary: '#fff',
+                },
             }
           }}
         />
@@ -122,8 +140,10 @@ function App() {
             <Route path="planificacion" element={<AdminRoutes />} /> 
             <Route path="gps" element={<GpsMonitor />} /> 
             <Route path="questions" element={<QuestionsManager />} />
-            {/* 📸 NUEVA RUTA ROOT */}
             <Route path="auditoria-fotos" element={<PhotoAuditDashboard />} />
+            
+            {/* 🔔 NUEVA RUTA DE NOTIFICACIONES PARA ROOT */}
+            <Route path="notifications" element={<NotificationManager />} />
           </Route>
 
           {/* ================= SECCIÓN ADMIN CLIENTE ================= */}
@@ -141,8 +161,10 @@ function App() {
             <Route path="routes" element={<AdminRoutes />} />
             <Route path="gps" element={<GpsMonitor />} /> 
             <Route path="questions" element={<QuestionsManager />} />
-            {/* 📸 NUEVA RUTA ADMIN CLIENTE */}
             <Route path="auditoria-fotos" element={<PhotoAuditDashboard />} />
+            
+            {/* 🔔 OPCIONAL: Puedes habilitar el manager también para el Admin Cliente */}
+            <Route path="notifications" element={<NotificationManager />} />
           </Route>
 
           {/* ================= SECCIÓN USUARIO (MERCADERISTA) ================= */}
