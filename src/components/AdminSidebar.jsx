@@ -5,7 +5,8 @@ import {
   FiMapPin, 
   FiHelpCircle, 
   FiCalendar, 
-  FiNavigation 
+  FiNavigation,
+  FiBell // 🔔 Importamos el icono de campana
 } from "react-icons/fi"
 import { useAuth } from "../context/AuthContext"
 
@@ -59,7 +60,6 @@ const AdminSidebar = () => {
             Planificación
           </NavLink>
 
-          {/* 🟢 NUEVA SECCIÓN: MONITOREO GPS */}
           <NavLink
             to="/admin/gps"
             className={({ isActive }) =>
@@ -90,6 +90,17 @@ const AdminSidebar = () => {
             Locales
           </NavLink>
 
+          {/* 🔔 NUEVA SECCIÓN: GENERADOR DE ALERTAS */}
+          <NavLink
+            to="/admin/notifications"
+            className={({ isActive }) =>
+              `${baseClasses} ${isActive ? activeClasses : inactiveClasses}`
+            }
+          >
+            <FiBell size={18} />
+            Notificaciones
+          </NavLink>
+
           <NavLink
             to="/admin/questions"
             className={({ isActive }) =>
@@ -109,7 +120,7 @@ const AdminSidebar = () => {
             Conectado como
           </p>
           <p className="text-sm font-black text-gray-800 truncate mt-1 uppercase tracking-tight">
-            {user?.name || "Ignacio Muñoz"}
+            {user?.first_name} {user?.last_name}
           </p>
           <div className="flex items-center gap-1.5 mt-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-[#87be00] animate-pulse" />
