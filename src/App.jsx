@@ -16,6 +16,8 @@ import ResetPassword from "./pages/auth/ResetPassword"
 // --- COMPONENTE GLOBALES ---
 import UserCredential from "./components/UserCredential" 
 import ProtectedRoute from "./components/ProtectedRoute"
+// 🔔 NUEVO: Importación del Layout de Notificaciones
+import NotificationsLayout from "./components/NotificationsLayout" 
 
 /* ================= ROOT ================= */
 import RootDashboard from "./pages/root/RootDashboard"
@@ -142,8 +144,10 @@ function App() {
             <Route path="questions" element={<QuestionsManager />} />
             <Route path="auditoria-fotos" element={<PhotoAuditDashboard />} />
             
-            {/* 🔔 NUEVA RUTA DE NOTIFICACIONES PARA ROOT */}
-            <Route path="notifications" element={<NotificationManager />} />
+            {/* 🔔 Gestor de envíos */}
+            <Route path="notification-manager" element={<NotificationManager />} />
+            {/* 🔔 NUEVO: Vista de centro de alertas para ROOT */}
+            <Route path="notifications" element={<NotificationsLayout userRole="ROOT" />} />
           </Route>
 
           {/* ================= SECCIÓN ADMIN CLIENTE ================= */}
@@ -163,8 +167,9 @@ function App() {
             <Route path="questions" element={<QuestionsManager />} />
             <Route path="auditoria-fotos" element={<PhotoAuditDashboard />} />
             
-            {/* 🔔 OPCIONAL: Puedes habilitar el manager también para el Admin Cliente */}
-            <Route path="notifications" element={<NotificationManager />} />
+            <Route path="notification-manager" element={<NotificationManager />} />
+            {/* 🔔 NUEVO: Vista de centro de alertas para ADMIN */}
+            <Route path="notifications" element={<NotificationsLayout userRole="ADMIN" />} />
           </Route>
 
           {/* ================= SECCIÓN USUARIO (MERCADERISTA) ================= */}
@@ -181,6 +186,9 @@ function App() {
             <Route path="agenda" element={<UserHome />} /> 
             <Route path="locales" element={<UserLocales />} />
             <Route path="reporte/:id" element={<VisitFlow />} />
+            
+            {/* 🔔 NUEVO: Vista de centro de alertas para MERCADERISTA */}
+            <Route path="notifications" element={<NotificationsLayout userRole="MERCADERISTA" />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" />} />

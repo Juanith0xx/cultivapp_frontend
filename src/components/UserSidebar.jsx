@@ -18,7 +18,7 @@ const UserSidebar = () => {
       <div>
         <div className="mb-10 px-2">
           <h2 className="text-2xl font-black text-[#87be00] tracking-tighter">Cultiva</h2>
-          <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Panel Administrativo</p>
+          <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Panel Mercaderista</p>
         </div>
 
         <nav className="space-y-1">
