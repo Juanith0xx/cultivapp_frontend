@@ -1,11 +1,13 @@
 import { addToSyncQueue } from "../utils/db";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+// Aseguramos que la URL termine en /api sin duplicados
 const API_URL = BASE_URL.replace(/\/+$/, "") + (BASE_URL.includes("/api") ? "" : "/api");
 
 const getToken = () => {
   const token = localStorage.getItem("token");
   if (!token) return null;
+  // Limpieza estricta del token
   return token.startsWith("Bearer ") ? token.split(" ")[1] : token;
 };
 
@@ -14,8 +16,9 @@ const extractRouteId = (endpoint) => {
   return match ? match[1] : null;
 };
 
-// 🔥 SERIALIZAR BODY
+// 🔥 SERIALIZAR PARA COLA OFFLINE
 const serializeBody = (body) => {
+  if (!body) return null;
   if (body instanceof FormData) {
     const serialized = {};
     for (let [key, value] of body.entries()) {
@@ -23,26 +26,19 @@ const serializeBody = (body) => {
     }
     return { __type: "FormData", data: serialized };
   }
-
-  return body;
+  return typeof body === "string" ? JSON.parse(body) : body;
 };
-
-// 🔥 PREPARAR BODY (FIX JSON DOBLE)
-const prepareBody = (body) => {
-  if (body instanceof FormData) return body;
-  if (typeof body === "string") return body;
-  return JSON.stringify(body);
-};
-
-const isFormData = (val) => val instanceof FormData;
 
 const request = async (endpoint, options = {}) => {
   const token = getToken();
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   const finalUrl = `${API_URL}${cleanEndpoint}`;
-  const isFD = isFormData(options.body);
+  
+  // Detectar si es FormData para no poner Content-Type manual (Fetch lo hace solo con el boundary)
+  const isFD = options.body instanceof FormData;
 
   const config = {
+    method: options.method || "GET",
     ...options,
     headers: {
       ...(!isFD && { "Content-Type": "application/json" }),
@@ -55,6 +51,8 @@ const request = async (endpoint, options = {}) => {
     const response = await fetch(finalUrl, config);
 
     if (response.status === 401) {
+      // Opcional: Redirigir al login si falla la sesión
+      // window.location.href = "/";
       throw new Error("Sesión expirada");
     }
 
@@ -63,24 +61,35 @@ const request = async (endpoint, options = {}) => {
 
     if (contentType && contentType.includes("application/json")) {
       data = await response.json();
+    } else {
+      data = await response.text();
     }
 
-    if (!response.ok) throw new Error(data?.message || `Error ${response.status}`);
+    if (!response.ok) {
+      // 🚩 LOG DETALLADO PARA EL ERROR 400
+      console.error(`❌ Server Error ${response.status}:`, data);
+      throw {
+        status: response.status,
+        message: data?.message || data || `Error ${response.status}`,
+        fullError: data
+      };
+    }
 
     return data;
 
   } catch (error) {
-    const isNetworkError =
-      error.name === "TypeError" || error.message.includes("Failed to fetch");
+    // Manejo de errores de Red / Offline
+    const isNetworkError = 
+      error.name === "TypeError" || 
+      error.message?.includes("Failed to fetch") ||
+      error.message?.includes("NetworkError");
 
-    const isMutation =
-      ["POST", "PUT", "PATCH"].includes(options.method);
+    const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(options.method);
 
     if (isNetworkError && isMutation) {
-      console.warn("🌐 Offline → guardando en cola");
+      console.warn("🌐 Dispositivo Offline → Guardando en cola de sincronización");
 
       const routeId = extractRouteId(endpoint);
-
       let type = "OTHER";
       if (endpoint.includes("/photo")) type = "PHOTO";
       if (endpoint.includes("/finish")) type = "FINISH";
@@ -95,13 +104,9 @@ const request = async (endpoint, options = {}) => {
         createdAt: new Date().toISOString(),
       });
 
-      return {
-        offline: true,
-        message: "Guardado localmente",
-      };
+      return { offline: true, message: "Operación guardada localmente" };
     }
 
-    console.error("❌ API Error:", error.message);
     throw error;
   }
 };
@@ -116,22 +121,22 @@ const api = {
     return request(url, { method: "GET" });
   },
 
-  post: (endpoint, body) =>
+  post: (endpoint, body) => 
     request(endpoint, {
       method: "POST",
-      body: prepareBody(body),
+      body: body instanceof FormData ? body : JSON.stringify(body),
     }),
 
-  put: (endpoint, body) =>
+  put: (endpoint, body) => 
     request(endpoint, {
       method: "PUT",
-      body: prepareBody(body),
+      body: body instanceof FormData ? body : JSON.stringify(body),
     }),
 
-  patch: (endpoint, body) =>
+  patch: (endpoint, body) => 
     request(endpoint, {
       method: "PATCH",
-      body: prepareBody(body),
+      body: body instanceof FormData ? body : JSON.stringify(body),
     }),
 
   delete: (endpoint) => request(endpoint, { method: "DELETE" }),
