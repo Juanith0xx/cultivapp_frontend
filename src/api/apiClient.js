@@ -1,13 +1,15 @@
 import { addToSyncQueue } from "../utils/db";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-// Aseguramos que la URL termine en /api sin duplicados
 const API_URL = BASE_URL.replace(/\/+$/, "") + (BASE_URL.includes("/api") ? "" : "/api");
 
+/**
+ * 🛡️ OBTENCIÓN SEGURA DEL TOKEN
+ */
 const getToken = () => {
   const token = localStorage.getItem("token");
   if (!token) return null;
-  // Limpieza estricta del token
+  // Limpieza: Si por error se guardó con "Bearer ", lo limpiamos para no duplicar
   return token.startsWith("Bearer ") ? token.split(" ")[1] : token;
 };
 
@@ -16,7 +18,9 @@ const extractRouteId = (endpoint) => {
   return match ? match[1] : null;
 };
 
-// 🔥 SERIALIZAR PARA COLA OFFLINE
+/**
+ * 🔥 SERIALIZAR PARA COLA OFFLINE
+ */
 const serializeBody = (body) => {
   if (!body) return null;
   if (body instanceof FormData) {
@@ -29,12 +33,14 @@ const serializeBody = (body) => {
   return typeof body === "string" ? JSON.parse(body) : body;
 };
 
+/**
+ * 🚀 FUNCIÓN MAESTRA DE PETICIÓN
+ */
 const request = async (endpoint, options = {}) => {
   const token = getToken();
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   const finalUrl = `${API_URL}${cleanEndpoint}`;
   
-  // Detectar si es FormData para no poner Content-Type manual (Fetch lo hace solo con el boundary)
   const isFD = options.body instanceof FormData;
 
   const config = {
@@ -42,7 +48,7 @@ const request = async (endpoint, options = {}) => {
     ...options,
     headers: {
       ...(!isFD && { "Content-Type": "application/json" }),
-      ...(token && { Authorization: `Bearer ${token}` }),
+      ...(token && { Authorization: `Bearer ${token}` }), // Solo agrega si existe
       ...options.headers,
     },
   };
@@ -50,10 +56,10 @@ const request = async (endpoint, options = {}) => {
   try {
     const response = await fetch(finalUrl, config);
 
+    // 🚩 MANEJO DE SESIÓN EXPIRADA O INEXISTENTE
     if (response.status === 401) {
-      // Opcional: Redirigir al login si falla la sesión
-      // window.location.href = "/";
-      throw new Error("Sesión expirada");
+      // No lanzamos un alert molesto, solo el error para que el Context lo maneje
+      throw { status: 401, message: "Sesión expirada o no autorizada" };
     }
 
     const contentType = response.headers.get("content-type");
@@ -66,8 +72,8 @@ const request = async (endpoint, options = {}) => {
     }
 
     if (!response.ok) {
-      // 🚩 LOG DETALLADO PARA EL ERROR 400
-      console.error(`❌ Server Error ${response.status}:`, data);
+      // Log detallado para desarrollo
+      console.error(`❌ Server Error ${response.status} en [${endpoint}]:`, data);
       throw {
         status: response.status,
         message: data?.message || data || `Error ${response.status}`,
@@ -78,7 +84,7 @@ const request = async (endpoint, options = {}) => {
     return data;
 
   } catch (error) {
-    // Manejo de errores de Red / Offline
+    // 🌐 MANEJO DE OFFLINE
     const isNetworkError = 
       error.name === "TypeError" || 
       error.message?.includes("Failed to fetch") ||
@@ -87,7 +93,7 @@ const request = async (endpoint, options = {}) => {
     const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(options.method);
 
     if (isNetworkError && isMutation) {
-      console.warn("🌐 Dispositivo Offline → Guardando en cola de sincronización");
+      console.warn("🌐 Cultivapp Offline → Guardando en cola:", endpoint);
 
       const routeId = extractRouteId(endpoint);
       let type = "OTHER";

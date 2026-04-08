@@ -2,25 +2,25 @@ import api from '../api/apiClient';
 
 /**
  * SERVICIO DE NOTIFICACIONES - CULTIVAPP
- * Centraliza las peticiones para que los componentes reciban la data limpia.
+ * Quitamos el .data porque el apiClient ya entrega el JSON directamente.
  */
 
-// 🔔 Obtener historial (El backend filtra por empresa/usuario automáticamente)
+// 🔔 Obtener historial
 export const getMyNotifications = () => 
-  api.get('/notifications').then(res => res.data);
+  api.get('/notifications'); 
 
 // ✅ Marcar una alerta específica como leída
 export const markAsRead = (id) => 
-  api.put(`/notifications/${id}/read`).then(res => res.data);
+  api.put(`/notifications/${id}/read`);
 
-// 🗑️ Eliminar notificación (Solo permitido para ROOT / ADMIN)
+// 🗑️ Eliminar notificación
 export const deleteNotification = (id) => 
-  api.delete(`/notifications/${id}`).then(res => res.data);
+  api.delete(`/notifications/${id}`);
 
-// 🚀 Envío Masivo desde el NotificationManager
+// 🚀 Envío Masivo
 export const sendBulk = (data) => 
-  api.post('/notifications/send-bulk', data).then(res => res.data);
+  api.post('/notifications/send-bulk', data);
 
-// 📌 Opcional: Marcar todas como leídas
+// 📌 Marcar todas como leídas
 export const markAllAsRead = () => 
-  api.put('/notifications/read-all').then(res => res.data);
+  api.put('/notifications/read-all');

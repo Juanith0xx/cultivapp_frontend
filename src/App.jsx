@@ -70,13 +70,11 @@ const OfflineMonitor = () => {
   );
 };
 
-// 💡 NOTA: Se eliminó NotificationListener. 
-// La escucha Realtime ahora es gestionada internamente por NotificationProvider.
-
 function App() {
   return (
+    /* 🛡️ 1. AuthProvider primero: Garantiza que el usuario esté cargado */
     <AuthProvider>
-      {/* 🔔 NotificationProvider envuelve las rutas para que el estado sea global */}
+      {/* 🔔 2. NotificationProvider segundo: Escucha a Supabase usando los datos de Auth */}
       <NotificationProvider> 
         <BrowserRouter>
           
@@ -87,11 +85,13 @@ function App() {
             toastOptions={{
               duration: 5000,
               style: {
-                borderRadius: "12px",
+                borderRadius: "16px",
                 background: "#111",
                 color: "#fff",
-                fontSize: "14px",
-                border: "1px solid #333"
+                fontSize: "12px",
+                fontFamily: 'Outfit, sans-serif',
+                border: "1px solid rgba(255,255,255,0.1)",
+                padding: '16px'
               },
               success: {
                 iconTheme: {
@@ -118,7 +118,7 @@ function App() {
               }
             />
 
-            {/* ================= SECCIÓN ROOT ================= */}
+            {/* ================= SECCIÓN ROOT (ACCESO TOTAL) ================= */}
             <Route
               path="/root"
               element={
@@ -136,6 +136,8 @@ function App() {
               <Route path="gps" element={<GpsMonitor />} /> 
               <Route path="questions" element={<QuestionsManager />} />
               <Route path="auditoria-fotos" element={<PhotoAuditDashboard />} />
+              
+              {/* 🚀 Rutas de Comunicación Root */}
               <Route path="notification-manager" element={<NotificationManager />} />
               <Route path="notifications" element={<NotificationsLayout userRole="ROOT" />} />
             </Route>
@@ -156,6 +158,8 @@ function App() {
               <Route path="gps" element={<GpsMonitor />} /> 
               <Route path="questions" element={<QuestionsManager />} />
               <Route path="auditoria-fotos" element={<PhotoAuditDashboard />} />
+              
+              {/* 🚀 Rutas de Comunicación Admin */}
               <Route path="notification-manager" element={<NotificationManager />} />
               <Route path="notifications" element={<NotificationsLayout userRole="ADMIN" />} />
             </Route>
@@ -174,7 +178,9 @@ function App() {
               <Route path="agenda" element={<UserHome />} /> 
               <Route path="locales" element={<UserLocales />} />
               <Route path="reporte/:id" element={<VisitFlow />} />
-              <Route path="notifications" element={<NotificationsLayout userRole="USUARIO" />} />
+              
+              {/* 🚀 El usuario solo ve su bandeja de entrada */}
+              <Route path="notifications" element={<NotificationsLayout userRole="MERCADERISTA" />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" />} />

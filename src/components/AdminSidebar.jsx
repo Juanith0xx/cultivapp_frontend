@@ -6,12 +6,15 @@ import {
   FiHelpCircle, 
   FiCalendar, 
   FiNavigation,
-  FiBell 
+  FiSend, // ✈️ Icono para emitir
+  FiBell  // 🔔 Icono para la bandeja
 } from "react-icons/fi"
 import { useAuth } from "../context/AuthContext"
+import { useNotificationContext } from "../context/NotificationContext" 
 
 const AdminSidebar = () => {
   const { user } = useAuth()
+  const { unreadCount } = useNotificationContext() 
 
   const linkBase =
     "flex items-center gap-3 px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-300"
@@ -25,7 +28,7 @@ const AdminSidebar = () => {
   return (
     <div className="h-full flex flex-col justify-between font-[Outfit]">
       
-      <div>
+      <div className="overflow-y-auto pr-2 custom-scrollbar">
         {/* NAVIGATION */}
         <nav className="flex flex-col gap-1.5">
           
@@ -64,16 +67,36 @@ const AdminSidebar = () => {
             Monitoreo GPS
           </NavLink>
 
-          {/* COMUNICACIÓN */}
+          {/* 🔔 COMUNICACIÓN */}
           <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] mt-6 mb-2 ml-4">Comunicación</p>
+          
+          {/* EMITIR ALERTAS (Ahora con estilo de link normal) */}
+          <NavLink
+            to="/admin/notification-manager"
+            className={({ isActive }) =>
+              `${linkBase} ${isActive ? linkActive : linkInactive}`
+            }
+          >
+            <FiSend size={18} />
+            Emitir Alertas
+          </NavLink>
+
+          {/* MI BANDEJA */}
           <NavLink
             to="/admin/notifications"
             className={({ isActive }) =>
               `${linkBase} ${isActive ? linkActive : linkInactive}`
             }
           >
-            <FiBell size={18} />
-            Centro de Alertas
+            <div className="relative">
+              <FiBell size={18} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[8px] font-black text-white ring-2 ring-white">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </div>
+            Mi Bandeja
           </NavLink>
 
           {/* ESTRUCTURA */}
@@ -112,11 +135,11 @@ const AdminSidebar = () => {
         </nav>
       </div>
 
-      {/* INFO DEL USUARIO (Opcional, pero ayuda a llenar el espacio inferior) */}
-      <div className="pt-6 border-t border-gray-50 mt-10">
+      {/* INFO DEL USUARIO */}
+      <div className="pt-6 border-t border-gray-100 mt-10">
         <div className="px-4">
-          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Empresa</p>
-          <p className="text-[10px] font-black text-gray-800 uppercase truncate italic">
+          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">Empresa Cliente</p>
+          <p className="text-[10px] font-black text-[#87be00] uppercase truncate italic">
             {user?.company_name || "Admin Panel"}
           </p>
         </div>
