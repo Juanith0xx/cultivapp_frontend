@@ -1,10 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
-import { AuthProvider, useAuth } from "./context/AuthContext"
+import { AuthProvider } from "./context/AuthContext"
+import { NotificationProvider } from "./context/NotificationContext" // 🔔 Proveedor SaaS Centralizado
 import { Toaster } from "react-hot-toast"
 
 // --- HOOKS ---
 import { useOfflineSync } from "./hooks/useOfflineSync"
-import { useNotifications } from "./hooks/useNotifications" // 🔔 Hook de Realtime
 import { FiCloudOff, FiRefreshCw } from "react-icons/fi"
 
 // --- AUTH PAGES ---
@@ -13,10 +13,9 @@ import ChangePassword from "./pages/auth/ChangePassword"
 import ForgotPassword from "./pages/auth/ForgotPassword"
 import ResetPassword from "./pages/auth/ResetPassword"
 
-// --- COMPONENTE GLOBALES ---
+// --- COMPONENTES GLOBALES ---
 import UserCredential from "./components/UserCredential" 
 import ProtectedRoute from "./components/ProtectedRoute"
-// 🔔 NUEVO: Importación del Layout de Notificaciones
 import NotificationsLayout from "./components/NotificationsLayout" 
 
 /* ================= ROOT ================= */
@@ -25,7 +24,7 @@ import Analytics from "./pages/root/Analytics"
 import Companies from "./pages/root/Companies"
 import Users from "./pages/root/Users"
 import Locales from "./pages/root/Locales"
-import NotificationManager from "./pages/root/NotificationManager" // 🔔 Nuevo: Gestor de envíos
+import NotificationManager from "./pages/root/NotificationManager"
 
 /* ================= ADMIN CLIENTE ================= */
 import AdminDashboard from "./pages/admin/AdminDashboard"
@@ -71,130 +70,118 @@ const OfflineMonitor = () => {
   );
 };
 
-// 🔔 COMPONENTE DE ESCUCHA DE NOTIFICACIONES (REALTIME)
-const NotificationListener = () => {
-  const { user } = useAuth(); 
-  
-  // Activa la escucha de Supabase para mostrar Toasts instantáneos
-  useNotifications(user);
-
-  return null; 
-};
+// 💡 NOTA: Se eliminó NotificationListener. 
+// La escucha Realtime ahora es gestionada internamente por NotificationProvider.
 
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        
-        <OfflineMonitor />
-        <NotificationListener />
+      {/* 🔔 NotificationProvider envuelve las rutas para que el estado sea global */}
+      <NotificationProvider> 
+        <BrowserRouter>
+          
+          <OfflineMonitor />
 
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 5000,
-            style: {
-              borderRadius: "12px",
-              background: "#111",
-              color: "#fff",
-              fontSize: "14px",
-              border: "1px solid #333"
-            },
-            success: {
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 5000,
+              style: {
+                borderRadius: "12px",
+                background: "#111",
+                color: "#fff",
+                fontSize: "14px",
+                border: "1px solid #333"
+              },
+              success: {
                 iconTheme: {
                   primary: '#87be00',
                   secondary: '#fff',
                 },
-            }
-          }}
-        />
-
-        <Routes>
-          {/* ================= RUTAS PÚBLICAS ================= */}
-          <Route path="/" element={<Login />} />
-          <Route path="/verify/:id" element={<UserCredential />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-
-          <Route
-            path="/change-password"
-            element={
-              <ProtectedRoute>
-                <ChangePassword />
-              </ProtectedRoute>
-            }
+              }
+            }}
           />
 
-          {/* ================= SECCIÓN ROOT ================= */}
-          <Route
-            path="/root"
-            element={
-              <ProtectedRoute role="ROOT">
-                <RootDashboard />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<Navigate to="analytics" />} />
-            <Route path="analytics" element={<Analytics />} />
-            <Route path="companies" element={<Companies />} />
-            <Route path="users" element={<Users />} />
-            <Route path="locales" element={<Locales />} />
-            <Route path="planificacion" element={<AdminRoutes />} /> 
-            <Route path="gps" element={<GpsMonitor />} /> 
-            <Route path="questions" element={<QuestionsManager />} />
-            <Route path="auditoria-fotos" element={<PhotoAuditDashboard />} />
-            
-            {/* 🔔 Gestor de envíos */}
-            <Route path="notification-manager" element={<NotificationManager />} />
-            {/* 🔔 NUEVO: Vista de centro de alertas para ROOT */}
-            <Route path="notifications" element={<NotificationsLayout userRole="ROOT" />} />
-          </Route>
+          <Routes>
+            {/* ================= RUTAS PÚBLICAS ================= */}
+            <Route path="/" element={<Login />} />
+            <Route path="/verify/:id" element={<UserCredential />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
-          {/* ================= SECCIÓN ADMIN CLIENTE ================= */}
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute role="ADMIN_CLIENTE">
-                <AdminDashboard />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<AdminOverview />} />
-            <Route path="users" element={<AdminUsers />} />
-            <Route path="locales" element={<AdminLocales />} />
-            <Route path="routes" element={<AdminRoutes />} />
-            <Route path="gps" element={<GpsMonitor />} /> 
-            <Route path="questions" element={<QuestionsManager />} />
-            <Route path="auditoria-fotos" element={<PhotoAuditDashboard />} />
-            
-            <Route path="notification-manager" element={<NotificationManager />} />
-            {/* 🔔 NUEVO: Vista de centro de alertas para ADMIN */}
-            <Route path="notifications" element={<NotificationsLayout userRole="ADMIN" />} />
-          </Route>
+            <Route
+              path="/change-password"
+              element={
+                <ProtectedRoute>
+                  <ChangePassword />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* ================= SECCIÓN USUARIO (MERCADERISTA) ================= */}
-          <Route
-            path="/usuario"
-            element={
-              <ProtectedRoute role="USUARIO">
-                <UserDashboard />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<UserHome />} />
-            <Route path="home" element={<UserHome />} />
-            <Route path="agenda" element={<UserHome />} /> 
-            <Route path="locales" element={<UserLocales />} />
-            <Route path="reporte/:id" element={<VisitFlow />} />
-            
-            {/* 🔔 NUEVO: Vista de centro de alertas para MERCADERISTA */}
-            <Route path="notifications" element={<NotificationsLayout userRole="MERCADERISTA" />} />
-          </Route>
+            {/* ================= SECCIÓN ROOT ================= */}
+            <Route
+              path="/root"
+              element={
+                <ProtectedRoute role="ROOT">
+                  <RootDashboard />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Navigate to="analytics" />} />
+              <Route path="analytics" element={<Analytics />} />
+              <Route path="companies" element={<Companies />} />
+              <Route path="users" element={<Users />} />
+              <Route path="locales" element={<Locales />} />
+              <Route path="planificacion" element={<AdminRoutes />} /> 
+              <Route path="gps" element={<GpsMonitor />} /> 
+              <Route path="questions" element={<QuestionsManager />} />
+              <Route path="auditoria-fotos" element={<PhotoAuditDashboard />} />
+              <Route path="notification-manager" element={<NotificationManager />} />
+              <Route path="notifications" element={<NotificationsLayout userRole="ROOT" />} />
+            </Route>
 
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
+            {/* ================= SECCIÓN ADMIN CLIENTE ================= */}
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute role="ADMIN_CLIENTE">
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<AdminOverview />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="locales" element={<AdminLocales />} />
+              <Route path="routes" element={<AdminRoutes />} />
+              <Route path="gps" element={<GpsMonitor />} /> 
+              <Route path="questions" element={<QuestionsManager />} />
+              <Route path="auditoria-fotos" element={<PhotoAuditDashboard />} />
+              <Route path="notification-manager" element={<NotificationManager />} />
+              <Route path="notifications" element={<NotificationsLayout userRole="ADMIN" />} />
+            </Route>
 
-      </BrowserRouter>
+            {/* ================= SECCIÓN USUARIO (MERCADERISTA) ================= */}
+            <Route
+              path="/usuario"
+              element={
+                <ProtectedRoute role="USUARIO">
+                  <UserDashboard />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<UserHome />} />
+              <Route path="home" element={<UserHome />} />
+              <Route path="agenda" element={<UserHome />} /> 
+              <Route path="locales" element={<UserLocales />} />
+              <Route path="reporte/:id" element={<VisitFlow />} />
+              <Route path="notifications" element={<NotificationsLayout userRole="USUARIO" />} />
+            </Route>
+
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+
+        </BrowserRouter>
+      </NotificationProvider>
     </AuthProvider>
   )
 }
