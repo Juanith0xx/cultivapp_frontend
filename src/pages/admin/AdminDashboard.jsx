@@ -1,83 +1,23 @@
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { Outlet, useNavigate, useLocation } from "react-router-dom"
 import { FiLogOut, FiLayout, FiMenu } from "react-icons/fi"
 import AdminSidebar from "../../components/AdminSidebar" 
-import Notifications from "../../components/Notifications"
+import Notifications from "../../components/Notifications" // Tu componente de campana
 import { useAuth } from "../../context/AuthContext"
-import api from "../../api/apiClient"
-import { supabase } from "../../lib/supabase" // ⚡ Importamos tu cliente de Supabase
+import { useNotificationContext } from "../../context/NotificationContext" // 🔔 Importamos el contexto
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   
+  // 🚩 Quitamos los estados locales de notificaciones que estaban aquí
+  const { notifications, unreadCount, onMarkRead, loading, refresh } = useNotificationContext()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [notifications, setNotifications] = useState([])
-  const [loadingNotifs, setLoadingNotifs] = useState(true)
-
-  // 🔔 CARGA INICIAL (API REST)
-  const fetchNotifications = useCallback(async () => {
-    try {
-      setLoadingNotifs(true)
-      const res = await api.get("/notifications")
-      setNotifications(Array.isArray(res) ? res : res.data || [])
-    } catch (error) {
-      console.error("❌ Error cargando notificaciones:", error.message)
-    } finally {
-      setLoadingNotifs(false)
-    }
-  }, [])
-
-  // ⚡ CONFIGURACIÓN DE REALTIME Y CARGA INICIAL
-  useEffect(() => {
-    fetchNotifications()
-
-    if (!user?.id) return
-
-    // Suscribirse a cambios en la tabla 'notifications'
-    const channel = supabase
-      .channel(`realtime-notifications-${user.id}`) // Canal único por usuario
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT', // Solo nos interesan las nuevas
-          schema: 'public',
-          table: 'notifications',
-          filter: `target_user_id=eq.${user.id}` // Filtro: Solo las mías
-        },
-        (payload) => {
-          console.log("🔔 Nueva notificación en tiempo real:", payload.new)
-          // Insertamos la nueva notificación al inicio de la lista
-          setNotifications((prev) => [payload.new, ...prev])
-        }
-      )
-      .subscribe()
-
-    // Limpiar suscripción al desmontar
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [user?.id, fetchNotifications])
 
   useEffect(() => {
     setIsMobileMenuOpen(false)
   }, [location])
-
-  const handleMarkAsRead = async (id) => {
-    try {
-      await api.put(`/notifications/${id}/read`)
-      setNotifications(prev => 
-        prev.map(n => n.id === id ? { ...n, is_read: true } : n)
-      )
-    } catch (err) {
-      console.error("Error al marcar como leída", err)
-    }
-  }
-
-  const unreadCount = useMemo(() => 
-    notifications.filter(n => !n.is_read).length, 
-  [notifications])
 
   const handleLogoutAction = async () => {
     await logout()
@@ -149,10 +89,11 @@ const AdminDashboard = () => {
           </div>
 
           <div className="flex items-center gap-3 md:gap-8">
+            {/* 🔔 Conectamos la campana al contexto global */}
             <Notifications 
               notifications={notifications} 
               unreadCount={unreadCount} 
-              onMarkAsRead={handleMarkAsRead} 
+              onMarkAsRead={onMarkRead} 
             />
 
             <div className="hidden md:flex items-center gap-4 pl-8 border-l border-gray-100">
@@ -174,12 +115,12 @@ const AdminDashboard = () => {
         {/* CONTENIDO SCROLLABLE */}
         <div className="flex-1 overflow-y-auto bg-[#F8FAFC] custom-scrollbar p-6 md:p-10">
           <div className="max-w-7xl mx-auto">
+            {/* 🚩 El Outlet ahora usa la data centralizada */}
             <Outlet context={{ 
                 notifications, 
-                setNotifications, 
-                handleMarkAsRead, 
-                loading: loadingNotifs,
-                fetchNotifications
+                onMarkRead, 
+                loading,
+                refresh
             }} />
           </div>
         </div>
@@ -188,4 +129,4 @@ const AdminDashboard = () => {
   )
 }
 
-export default AdminDashboard
+export default AdminDashboard;

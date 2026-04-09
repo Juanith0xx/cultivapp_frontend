@@ -1,24 +1,32 @@
 import { useState, useEffect, useMemo } from "react"
 import { useNavigate, Outlet, useLocation } from "react-router-dom"
-import { FiMenu, FiLogOut, FiActivity, FiGlobe } from "react-icons/fi"
+import { FiMenu, FiLogOut, FiActivity } from "react-icons/fi"
 import Sidebar from "../../components/Sidebar"
 import LocalesMap from "../../components/LocalesMap"
 import api from "../../api/apiClient"
-import { toast } from "react-hot-toast"
 
-// 🔔 IMPORTACIONES PARA NOTIFICACIONES
+// 🔔 CONTEXTOS
 import Notifications from "../../components/Notifications"
 import { useAuth } from "../../context/AuthContext"
+import { useNotificationContext } from "../../context/NotificationContext" // ✅ Importación clave
 
 import { Building2, Store, Users, MapPin, Globe } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 
 const RootDashboard = () => {
   const { user } = useAuth() 
+  
+  // 🛰️ CONSUMO DEL CONTEXTO GLOBAL (Realtime vive aquí)
+  const { 
+    notifications, 
+    unreadCount, 
+    onMarkRead, 
+    loading: loadingNotifs 
+  } = useNotificationContext()
+
   const [locales, setLocales] = useState([])
   const [companies, setCompanies] = useState([])
   const [users, setUsers] = useState([])
-  const [notifications, setNotifications] = useState([])
   
   const [selectedCompany, setSelectedCompany] = useState("")
   const [selectedLocalId, setSelectedLocalId] = useState(null)
@@ -27,32 +35,28 @@ const RootDashboard = () => {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Detectamos si estamos en la raíz o en una vista específica para mostrar/ocultar el mapa
   const isDashboard = location.pathname.endsWith("/root/analytics")
   const isLocales = location.pathname.endsWith("/root/locales")
 
   /* =========================================
-     CARGA DE DATOS (PROTEGIDA)
+     CARGA DE DATOS (EXCEPTO NOTIFICACIONES)
   ========================================= */
   const fetchData = async () => {
     try {
       setLoading(true)
       
-      // 🚩 MEJORA: .catch individual para que un error 400 no rompa todo el dashboard
-      const [localesData, companiesData, usersData, notifsData] = await Promise.all([
+      // Ya no pedimos /notifications aquí porque el Contexto lo hace por nosotros
+      const [localesData, companiesData, usersData] = await Promise.all([
         api.get("/locales").catch(err => { console.error("Error Locales:", err); return []; }),
         api.get("/companies").catch(err => { console.error("Error Companies:", err); return []; }),
-        api.get("/users").catch(err => { console.error("Error Users:", err); return []; }),
-        api.get("/notifications").catch(err => { console.error("Error Notifs:", err); return []; })
+        api.get("/users").catch(err => { console.error("Error Users:", err); return []; })
       ])
       
       setLocales(localesData || [])
       setCompanies(companiesData || [])
       setUsers(usersData || [])
-      setNotifications(notifsData || [])
     } catch (error) {
-      // 🚩 FIX: Manejo de error robusto para evitar ".includes is not a function"
-      const errorMsg = error?.message || (typeof error === 'string' ? error : "Error de conexión");
+      const errorMsg = error?.message || "Error de conexión";
       console.error("❌ Error General Dashboard:", errorMsg);
     } finally {
       setLoading(false)
@@ -62,24 +66,6 @@ const RootDashboard = () => {
   useEffect(() => {
     fetchData()
   }, [])
-
-  /* =========================================
-     GESTIÓN DE NOTIFICACIONES
-  ========================================= */
-  const handleMarkAsRead = async (id) => {
-    try {
-      await api.put(`/notifications/${id}/read`)
-      setNotifications(prev => 
-        prev.map(n => n.id === id ? { ...n, is_read: true } : n)
-      )
-    } catch (err) {
-      console.error("Error al marcar como leída", err)
-    }
-  }
-
-  const unreadCount = useMemo(() => 
-    notifications.filter(n => !n.is_read).length, 
-  [notifications])
 
   /* =========================================
      FILTROS Y LÓGICA DE NEGOCIO
@@ -136,11 +122,8 @@ const RootDashboard = () => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex font-[Outfit]">
       
-      {/* SIDEBAR DESKTOP */}
        <div className="hidden md:flex md:flex-col md:w-72 bg-white border-r border-gray-100 min-h-screen px-8 py-10 shadow-sm z-20">
-        
         <Sidebar />
-
         <div className="mt-auto pt-6 border-t border-gray-50">
           <button 
             onClick={handleLogout} 
@@ -153,7 +136,7 @@ const RootDashboard = () => {
 
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         
-        {/* TOPBAR PREMIUM */}
+        {/* TOPBAR */}
         <div className="bg-white border-b border-gray-50 px-10 py-6 flex items-center justify-between shrink-0 z-10 shadow-sm">
           <div className="flex items-center gap-6">
             <button className="md:hidden text-gray-600"><FiMenu size={22}/></button>
@@ -169,10 +152,11 @@ const RootDashboard = () => {
           </div>
 
           <div className="flex items-center gap-8">
+            {/* 🔔 AHORA USA LA DATA DEL CONTEXTO GLOBAL */}
             <Notifications 
               notifications={notifications} 
               unreadCount={unreadCount} 
-              onMarkAsRead={handleMarkAsRead} 
+              onMarkAsRead={onMarkRead} 
             />
             
             <div className="hidden md:flex items-center gap-4 pl-8 border-l border-gray-100">
@@ -181,7 +165,7 @@ const RootDashboard = () => {
                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Super Administrador</p>
               </div>
               <div className="h-12 w-12 rounded-[1.2rem] bg-gray-900 flex items-center justify-center text-white font-black text-xs border-2 border-white shadow-xl shadow-gray-200">
-                RT
+                {user?.name?.substring(0, 2).toUpperCase() || 'RT'}
               </div>
             </div>
           </div>
@@ -189,10 +173,8 @@ const RootDashboard = () => {
 
         <div className="flex-1 overflow-y-auto bg-[#F8FAFC] custom-scrollbar pb-10">
           
-          {/* SECCIÓN DASHBOARD / LOCALES (Mapa y Filtros) */}
           {(isDashboard || isLocales) && (
             <div className="px-10 pt-10 space-y-10">
-              
               {/* FILTRO SUPERIOR */}
               <div className="bg-white border border-gray-50 rounded-[2.5rem] p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl shadow-gray-200/40">
                 <div className="flex items-center gap-4">
@@ -227,10 +209,8 @@ const RootDashboard = () => {
                 ))}
               </div>
 
-              {/* CHARTS & MAP */}
+              {/* MONITOR MAPA & CHARTS */}
               <div className="grid grid-cols-1 xl:grid-cols-5 gap-10">
-                
-                {/* GRÁFICO REGIONAL */}
                 <div className="xl:col-span-2 bg-white p-10 rounded-[3.5rem] border border-gray-50 shadow-xl shadow-gray-200/40">
                   <div className="flex justify-between items-center mb-8">
                     <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Densidad Regional</h3>
@@ -240,50 +220,32 @@ const RootDashboard = () => {
                     <BarChart data={chartData}>
                       <XAxis dataKey="name" fontSize={8} fontWeight={900} tickLine={false} axisLine={false} tick={{fill: '#94a3b8'}} />
                       <YAxis hide />
-                      <Tooltip cursor={{fill: 'transparent'}} contentStyle={{borderRadius: '25px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.1)'}} />
+                      <Tooltip cursor={{fill: 'transparent'}} contentStyle={{borderRadius: '25px', border: 'none'}} />
                       <Bar dataKey="locales" fill="#87be00" radius={[10, 10, 10, 10]} barSize={30} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
 
-                {/* MONITOR MAPA */}
                 <div className="xl:col-span-3 bg-white p-10 rounded-[3.5rem] border border-gray-50 shadow-xl shadow-gray-200/40">
-                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-8 text-center md:text-left">Cobertura en Tiempo Real</h3>
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-8">Cobertura Real</h3>
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                     <div className="lg:col-span-5 max-h-[450px] overflow-y-auto pr-4 custom-scrollbar space-y-3">
-                      {filteredLocales.length > 0 ? (
-                        filteredLocales.map(local => (
-                          <button
-                            key={local.id}
-                            onClick={() => setSelectedLocalId(local.id)}
-                            className={`w-full text-left p-6 rounded-[2rem] border-2 transition-all duration-300 ${
-                              selectedLocalId === local.id
-                                ? "bg-gray-900 border-gray-900 shadow-2xl translate-x-2"
-                                : "bg-white border-gray-50 hover:border-gray-200 shadow-sm"
-                            }`}
-                          >
-                            <div className="flex justify-between items-start mb-2">
-                              <p className={`text-xs font-black uppercase tracking-tighter ${selectedLocalId === local.id ? "text-[#87be00]" : "text-gray-800"}`}>
-                                {local.cadena}
-                              </p>
-                              {!local.is_active && (
-                                <span className="text-[7px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-black uppercase">Off</span>
-                              )}
-                            </div>
-                            <p className={`text-[10px] font-bold line-clamp-1 ${selectedLocalId === local.id ? "text-gray-400" : "text-gray-400"}`}>
-                              {local.direccion}
-                            </p>
-                          </button>
-                        ))
-                      ) : (
-                        <div className="flex flex-col items-center justify-center py-20 text-gray-300">
-                           <Store size={40} />
-                           <p className="text-[9px] font-black uppercase mt-2">Sin locales</p>
-                        </div>
-                      )}
+                      {filteredLocales.map(local => (
+                        <button
+                          key={local.id}
+                          onClick={() => setSelectedLocalId(local.id)}
+                          className={`w-full text-left p-6 rounded-[2rem] border-2 transition-all ${
+                            selectedLocalId === local.id ? "bg-gray-900 border-gray-900 shadow-2xl" : "bg-white border-gray-50"
+                          }`}
+                        >
+                          <p className={`text-xs font-black uppercase tracking-tighter ${selectedLocalId === local.id ? "text-[#87be00]" : "text-gray-800"}`}>
+                            {local.cadena}
+                          </p>
+                          <p className="text-[10px] font-bold text-gray-400">{local.direccion}</p>
+                        </button>
+                      ))}
                     </div>
-
-                    <div className="lg:col-span-7 h-[450px] rounded-[2.5rem] overflow-hidden border border-gray-50 bg-gray-50 shadow-inner">
+                    <div className="lg:col-span-7 h-[450px] rounded-[2.5rem] overflow-hidden bg-gray-50">
                       <LocalesMap locales={filteredLocales} selectedLocal={selectedLocal} />
                     </div>
                   </div>
@@ -292,7 +254,6 @@ const RootDashboard = () => {
             </div>
           )}
 
-          {/* VISTAS HIJAS (Analytics, Users, Companies, etc.) */}
           <div className="px-10 py-5">
             <Outlet context={{ fetchData, companies, users }} />
           </div>
@@ -301,4 +262,4 @@ const RootDashboard = () => {
     </div>
   )
 }
-export default RootDashboard
+export default RootDashboard;
