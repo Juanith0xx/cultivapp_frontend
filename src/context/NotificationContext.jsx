@@ -13,6 +13,7 @@ export const NotificationProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const processedIds = useRef(new Set());
 
+  // 🔄 CARGA DE HISTORIAL (Para que la campana tenga datos al iniciar)
   const fetchNotifs = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!user?.id || !token) return;
@@ -24,11 +25,16 @@ export const NotificationProvider = ({ children }) => {
       setUnreadCount(rawData.filter(n => !n.is_read).length);
       processedIds.current = new Set(rawData.map(n => n.id));
       console.log("📊 [Historial] Sincronizado.");
-    } catch (err) { console.error(err); } finally { setLoading(false); }
+    } catch (err) { 
+      console.error("❌ [API Error]:", err); 
+    } finally { 
+      setLoading(false); 
+    }
   }, [user?.id]);
 
   useEffect(() => { fetchNotifs(); }, [fetchNotifs]);
 
+  // 📡 CONFIGURACIÓN REALTIME
   useEffect(() => {
     let channel;
     
@@ -39,55 +45,87 @@ export const NotificationProvider = ({ children }) => {
       if (!user?.id || !token) return;
 
       try {
+        // Autenticar el socket con el token actual
         await supabase.auth.setSession({ access_token: token, refresh_token: token });
 
-        // 🚩 ESTRATEGIA DE ESCUCHA TOTAL
-        // Escuchamos CUALQUIER cambio en el esquema public
         channel = supabase
-          .channel('schema-db-changes')
+          .channel('notifications-live')
           .on('postgres_changes', 
             { 
               event: 'INSERT', 
-              schema: 'public' 
-              // Quitamos el filtro 'table' para que no haya errores de nombre
+              schema: 'public',
+              table: 'notifications' 
             }, 
             (payload) => {
-              // 🕵️ ESTE LOG DEBE APARECER SIEMPRE QUE SE INSERTE ALGO EN LA DB
-              console.log("🔥 [SUPER-DEBUG] ¡CAMBIO DETECTADO EN DB!", payload);
-              
-              // Solo procesamos si la tabla es 'notifications'
-              if (payload.table !== 'notifications') return;
-              
               const n = payload.new;
+              
+              // 1. Evitar duplicados por seguridad
               if (processedIds.current.has(n.id)) return;
 
-              // Comparación manual y segura
-              const esParaMi = String(n.tenant_id).toLowerCase() === String(user.company_id).toLowerCase() || 
-                               String(n.target_user_id).toLowerCase() === String(user.id).toLowerCase();
+              // 2. Filtro de pertenencia (Tenant o Usuario específico)
+              const cleanNotifTenant = String(n.tenant_id || "").toLowerCase().trim();
+              const cleanUserTenant = String(user.company_id || "").toLowerCase().trim();
+              const cleanTargetUser = String(n.target_user_id || "").toLowerCase().trim();
+              const cleanUserId = String(user.id || "").toLowerCase().trim();
+
+              const esParaMi = cleanNotifTenant === cleanUserTenant || cleanTargetUser === cleanUserId;
 
               if (esParaMi) {
                 processedIds.current.add(n.id);
-                toast.success(`🔔 ${n.title}`, { position: 'top-right' });
+                
+                // 🔔 TOAST GENÉRICO: Solo avisa que hay algo nuevo (sin el detalle)
+                toast('¡Tienes una nueva notificación!', {
+                  icon: '🔔',
+                  duration: 5000,
+                  position: 'top-right',
+                  style: {
+                    borderRadius: '1.2rem',
+                    background: '#333',
+                    color: '#fff',
+                    fontFamily: 'Outfit, sans-serif',
+                    fontWeight: 'bold',
+                    fontSize: '14px',
+                    borderLeft: '5px solid #87be00'
+                  },
+                });
+
+                // 📈 Actualizar estados para la campana y la lista
                 setNotifications(prev => [n, ...prev]);
                 setUnreadCount(c => c + 1);
               }
             }
           )
           .subscribe((status) => {
-            console.log("📡 [Realtime Status]:", status);
+            console.log("📡 [Socket Status]:", status);
           });
 
-      } catch (err) { console.error("❌ Error Realtime:", err); }
+      } catch (err) { 
+        console.error("❌ [Realtime Fatal]:", err); 
+      }
     };
 
     startRealtime();
-    return () => { if (channel) supabase.removeChannel(channel); };
+
+    return () => { 
+      if (channel) supabase.removeChannel(channel); 
+    };
   }, [user?.id, user?.company_id]);
 
   return (
     <NotificationContext.Provider value={{ 
-      notifications, unreadCount, loading, 
-      onMarkRead: service.markAsRead, 
+      notifications, 
+      unreadCount, 
+      loading, 
+      // Función para marcar como leído desde cualquier componente
+      onMarkRead: async (id) => {
+        try {
+          await service.markAsRead(id);
+          setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+          setUnreadCount(c => Math.max(0, c - 1));
+        } catch (err) { 
+          console.error("❌ [Error al marcar leído]:", err); 
+        }
+      }, 
       refresh: fetchNotifs 
     }}>
       {children}

@@ -1,79 +1,21 @@
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState } from "react"
 import { Outlet, useNavigate } from "react-router-dom"
 import { FiLogOut } from "react-icons/fi"
 import { AiOutlineQrcode } from "react-icons/ai"
 import { QRCodeSVG } from "qrcode.react"
 import UserSidebar from "../../components/UserSidebar"
-import Notifications from "../../components/Notifications" // 🔔 Nuevo componente
+import Notifications from "../../components/Notifications"
 import { useAuth } from "../../context/AuthContext"
-import { supabase } from "../../lib/supabase" // ⚡ Cliente Realtime
-import api from "../../api/apiClient"
+import { useNotificationContext } from "../../context/NotificationContext" // 🔔 Importante
 
 const UserDashboard = () => {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   
-  // 📱 ESTADOS
+  // 🔗 Consumimos el estado global de notificaciones
+  const { notifications, unreadCount, onMarkRead } = useNotificationContext()
+
   const [showQR, setShowQR] = useState(false)
-  const [notifications, setNotifications] = useState([])
-  const [loadingNotifs, setLoadingNotifs] = useState(true)
-
-  // 🔔 CARGA INICIAL DE NOTIFICACIONES
-  const fetchNotifications = useCallback(async () => {
-    try {
-      setLoadingNotifs(true)
-      const res = await api.get("/notifications")
-      setNotifications(Array.isArray(res) ? res : res.data || [])
-    } catch (error) {
-      console.error("❌ Error cargando notificaciones:", error.message)
-    } finally {
-      setLoadingNotifs(false)
-    }
-  }, [])
-
-  // ⚡ CONFIGURACIÓN REALTIME
-  useEffect(() => {
-    fetchNotifications()
-
-    if (!user?.id) return
-
-    const channel = supabase
-      .channel(`user-notifications-${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `target_user_id=eq.${user.id}`
-        },
-        (payload) => {
-          setNotifications((prev) => [payload.new, ...prev])
-          // Opcional: Aquí podrías disparar un sonido de notificación
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [user?.id, fetchNotifications])
-
-  // LÓGICA DE GESTIÓN
-  const handleMarkAsRead = async (id) => {
-    try {
-      await api.put(`/notifications/${id}/read`)
-      setNotifications(prev => 
-        prev.map(n => n.id === id ? { ...n, is_read: true } : n)
-      )
-    } catch (err) {
-      console.error("Error al marcar como leída", err)
-    }
-  }
-
-  const unreadCount = useMemo(() => 
-    notifications.filter(n => !n.is_read).length, 
-  [notifications])
 
   const handleLogout = () => {
     logout()
@@ -89,7 +31,7 @@ const UserDashboard = () => {
 
       <div className="flex-1 p-6 md:p-10 flex flex-col h-screen overflow-hidden">
         
-        {/* HEADER CON NOTIFICACIONES Y ACCIONES */}
+        {/* HEADER */}
         <div className="flex justify-between items-center mb-8 shrink-0 bg-white p-4 rounded-[2rem] shadow-sm border border-gray-50">
           
           <div className="flex items-center gap-4 pl-4">
@@ -103,12 +45,8 @@ const UserDashboard = () => {
           </div>
 
           <div className="flex items-center gap-3 md:gap-6">
-            {/* 🔔 COMPONENTE DE NOTIFICACIONES */}
-            <Notifications 
-              notifications={notifications} 
-              unreadCount={unreadCount} 
-              onMarkAsRead={handleMarkAsRead} 
-            />
+            {/* 🔔 Componente de Notificaciones Global */}
+            <Notifications /> 
 
             <div className="h-8 w-[1px] bg-gray-100 hidden md:block"></div>
 
@@ -163,12 +101,8 @@ const UserDashboard = () => {
 
         {/* VISTAS DINÁMICAS */}
         <div className="flex-1 overflow-y-auto custom-scrollbar rounded-[2.5rem] bg-white shadow-sm border border-gray-50 p-6 md:p-8">
-          <Outlet context={{ 
-            notifications, 
-            unreadCount, 
-            handleMarkAsRead,
-            fetchNotifications 
-          }} />
+          {/* Pasamos los datos del contexto por si las vistas hijas los necesitan */}
+          <Outlet context={{ notifications, unreadCount, onMarkRead }} />
         </div>
 
       </div>

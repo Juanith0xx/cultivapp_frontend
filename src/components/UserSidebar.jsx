@@ -1,19 +1,19 @@
 import { NavLink } from "react-router-dom"
-import { FiHome, FiMapPin, FiCalendar, FiFileText, FiLogOut } from "react-icons/fi"
+import { FiHome, FiMapPin, FiCalendar, FiLogOut, FiBell } from "react-icons/fi"
 import { useAuth } from "../context/AuthContext"
+import { useNotificationContext } from "../context/NotificationContext" // 🔔 Hook de notificaciones
 
 const UserSidebar = () => {
   const { user, logout } = useAuth()
+  const { unreadCount } = useNotificationContext() // Obtenemos el contador global
 
   const navItems = [
     { to: "/usuario", icon: <FiHome size={20} />, label: "Inicio", end: true },
     { to: "/usuario/routes", icon: <FiCalendar size={20} />, label: "Mi Agenda" },
     { to: "/usuario/locales", icon: <FiMapPin size={20} />, label: "Mis Locales" },
-    { to: "/usuario/form", icon: <FiFileText size={20} />, label: "Reportes" },
   ]
 
   return (
-    /* 🚩 hidden md:flex -> Se oculta en móvil, aparece en desktop */
     <aside className="hidden md:flex w-64 bg-white border-r border-gray-100 flex-col justify-between min-h-screen p-6 sticky top-0">
       <div>
         <div className="mb-10 px-2">
@@ -37,13 +37,29 @@ const UserSidebar = () => {
               {item.label}
             </NavLink>
           ))}
+          
+          {/* Opcional: Indicador visual rápido en el Sidebar si hay notificaciones */}
+          {unreadCount > 0 && (
+            <div className="px-4 py-2 mt-4 bg-red-50 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-2 text-red-600">
+                <FiBell size={14} />
+                <span className="text-[10px] font-black uppercase">Pendientes</span>
+              </div>
+              <span className="bg-red-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
+                {unreadCount}
+              </span>
+            </div>
+          )}
         </nav>
       </div>
 
       <div className="bg-gray-900 p-4 rounded-2xl shadow-lg mt-auto">
         <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">Operador</p>
         <p className="text-sm font-bold text-white truncate">{user?.first_name} {user?.last_name}</p>
-        <button onClick={logout} className="mt-3 flex items-center gap-2 text-[10px] text-red-400 font-black uppercase hover:text-red-300">
+        <button 
+          onClick={logout} 
+          className="mt-3 flex items-center gap-2 text-[10px] text-red-400 font-black uppercase hover:text-red-300 transition-colors"
+        >
           <FiLogOut size={14}/> Cerrar Sesión
         </button>
       </div>
