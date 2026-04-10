@@ -13,7 +13,6 @@ export const NotificationProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const processedIds = useRef(new Set());
 
-  // 🔄 CARGA DE HISTORIAL (Para que la campana tenga datos al iniciar)
   const fetchNotifs = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!user?.id || !token) return;
@@ -24,7 +23,7 @@ export const NotificationProvider = ({ children }) => {
       setNotifications(rawData);
       setUnreadCount(rawData.filter(n => !n.is_read).length);
       processedIds.current = new Set(rawData.map(n => n.id));
-      console.log("📊 [Historial] Sincronizado.");
+      console.log("📊 [Historial] Sincronizado para el usuario:", user.id);
     } catch (err) { 
       console.error("❌ [API Error]:", err); 
     } finally { 
@@ -34,7 +33,6 @@ export const NotificationProvider = ({ children }) => {
 
   useEffect(() => { fetchNotifs(); }, [fetchNotifs]);
 
-  // 📡 CONFIGURACIÓN REALTIME
   useEffect(() => {
     let channel;
     
@@ -45,11 +43,11 @@ export const NotificationProvider = ({ children }) => {
       if (!user?.id || !token) return;
 
       try {
-        // Autenticar el socket con el token actual
         await supabase.auth.setSession({ access_token: token, refresh_token: token });
 
+        // Cambiamos nombre de canal para evitar conflictos de caché
         channel = supabase
-          .channel('notifications-live')
+          .channel('db-changes-notifications') 
           .on('postgres_changes', 
             { 
               event: 'INSERT', 
@@ -57,23 +55,28 @@ export const NotificationProvider = ({ children }) => {
               table: 'notifications' 
             }, 
             (payload) => {
-              const n = payload.new;
+              console.log("📥 [REALTIME] ¡Algo llegó a la DB!", payload);
               
-              // 1. Evitar duplicados por seguridad
+              const n = payload.new;
               if (processedIds.current.has(n.id)) return;
 
-              // 2. Filtro de pertenencia (Tenant o Usuario específico)
+              // NORMALIZACIÓN DE IDs (Muy importante)
+              const cleanNotifUser = String(n.target_user_id || "").toLowerCase().trim();
+              const cleanUserId = String(user.id || "").toLowerCase().trim();
               const cleanNotifTenant = String(n.tenant_id || "").toLowerCase().trim();
               const cleanUserTenant = String(user.company_id || "").toLowerCase().trim();
-              const cleanTargetUser = String(n.target_user_id || "").toLowerCase().trim();
-              const cleanUserId = String(user.id || "").toLowerCase().trim();
 
-              const esParaMi = cleanNotifTenant === cleanUserTenant || cleanTargetUser === cleanUserId;
+              // DEBUG EN CONSOLA (Para que veas por qué no entra el IF)
+              console.log(`🧐 Comparando Usuario: [${cleanNotifUser}] con [${cleanUserId}]`);
+              console.log(`🧐 Comparando Empresa: [${cleanNotifTenant}] con [${cleanUserTenant}]`);
+
+              const esParaMi = (cleanNotifUser === cleanUserId) || 
+                               (cleanNotifTenant !== "" && cleanNotifTenant === cleanUserTenant);
 
               if (esParaMi) {
+                console.log("✅ ¡Es para mí! Disparando Toast.");
                 processedIds.current.add(n.id);
                 
-                // 🔔 TOAST GENÉRICO: Solo avisa que hay algo nuevo (sin el detalle)
                 toast('¡Tienes una nueva notificación!', {
                   icon: '🔔',
                   duration: 5000,
@@ -89,9 +92,10 @@ export const NotificationProvider = ({ children }) => {
                   },
                 });
 
-                // 📈 Actualizar estados para la campana y la lista
                 setNotifications(prev => [n, ...prev]);
                 setUnreadCount(c => c + 1);
+              } else {
+                console.log("⏭️ Notificación ignorada (no es para este usuario/empresa)");
               }
             }
           )
@@ -107,7 +111,10 @@ export const NotificationProvider = ({ children }) => {
     startRealtime();
 
     return () => { 
-      if (channel) supabase.removeChannel(channel); 
+      if (channel) {
+        console.log("🔌 Cerrando canal de notificaciones");
+        supabase.removeChannel(channel);
+      }
     };
   }, [user?.id, user?.company_id]);
 
@@ -116,7 +123,6 @@ export const NotificationProvider = ({ children }) => {
       notifications, 
       unreadCount, 
       loading, 
-      // Función para marcar como leído desde cualquier componente
       onMarkRead: async (id) => {
         try {
           await service.markAsRead(id);

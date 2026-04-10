@@ -18,7 +18,7 @@ const ResetPasswordAdminModal = ({ user, onClose, onUpdated }) => {
       setError("")
 
       const data = await api.put(
-        `/api/users/${user.id}/reset-password`
+        `/users/${user.id}/reset-password`
       )
 
       // contraseña temporal devuelta por el backend

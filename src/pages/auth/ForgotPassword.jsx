@@ -18,7 +18,7 @@ const ForgotPassword = () => {
     try {
 
       const data = await api.post(
-        "/api/auth/forgot-password",
+        "/auth/forgot-password",
         { email }
       )
 

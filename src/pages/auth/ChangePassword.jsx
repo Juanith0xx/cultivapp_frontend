@@ -33,7 +33,7 @@ const ChangePassword = () => {
 
       setLoading(true)
 
-      await api.put("/api/auth/change-password", {
+      await api.put("/auth/change-password", {
         newPassword: password
       })
 
