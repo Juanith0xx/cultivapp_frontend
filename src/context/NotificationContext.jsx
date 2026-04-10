@@ -13,9 +13,9 @@ export const NotificationProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const processedIds = useRef(new Set());
 
-  // 🔄 CARGA INICIAL
   const fetchNotifs = useCallback(async () => {
-    if (!user?.id) return;
+    const token = localStorage.getItem("token");
+    if (!user?.id || !token) return;
     try {
       setLoading(true);
       const res = await service.getMyNotifications();
@@ -23,59 +23,66 @@ export const NotificationProvider = ({ children }) => {
       setNotifications(rawData);
       setUnreadCount(rawData.filter(n => !n.is_read).length);
       processedIds.current = new Set(rawData.map(n => n.id));
-      console.log("📊 [API] Historial sincronizado.");
-    } catch (err) { console.error("❌ Error API:", err); } 
-    finally { setLoading(false); }
+      console.log("📊 [Historial] Sincronizado.");
+    } catch (err) { console.error(err); } finally { setLoading(false); }
   }, [user?.id]);
 
   useEffect(() => { fetchNotifs(); }, [fetchNotifs]);
 
-  // 📡 REALTIME (Súper simplificado para debug)
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    let channel;
     
-    // 🔍 LOG DE AUDITORÍA: Queremos ver esto en tu consola
-    console.log("🕵️ [Debug-RT] ¿Hay usuario?", !!user?.id, " ¿Hay token?", !!token);
+    const startRealtime = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || localStorage.getItem("token");
 
-    if (!user?.id || !token) {
-      console.warn("🚫 [Debug-RT] El cable no se conectó porque falta el usuario o el token.");
-      return;
-    }
+      if (!user?.id || !token) return;
 
-    const setup = async () => {
       try {
-        console.log("🛰️ [Debug-RT] Intentando conectar a Supabase...");
-        
         await supabase.auth.setSession({ access_token: token, refresh_token: token });
 
-        const channel = supabase
-          .channel('canal_prueba_final')
+        // 🚩 ESTRATEGIA DE ESCUCHA TOTAL
+        // Escuchamos CUALQUIER cambio en el esquema public
+        channel = supabase
+          .channel('schema-db-changes')
           .on('postgres_changes', 
-            { event: 'INSERT', schema: 'public', table: 'notifications' }, 
+            { 
+              event: 'INSERT', 
+              schema: 'public' 
+              // Quitamos el filtro 'table' para que no haya errores de nombre
+            }, 
             (payload) => {
-              console.log("⚡ [Debug-RT] ¡LLEGÓ ALGO POR EL AIRE!", payload.new);
+              // 🕵️ ESTE LOG DEBE APARECER SIEMPRE QUE SE INSERTE ALGO EN LA DB
+              console.log("🔥 [SUPER-DEBUG] ¡CAMBIO DETECTADO EN DB!", payload);
+              
+              // Solo procesamos si la tabla es 'notifications'
+              if (payload.table !== 'notifications') return;
               
               const n = payload.new;
-              // Quitamos filtros por 1 minuto para ver si llega algo
-              toast.success(`🔔 ¡NUEVA NOTIFICACIÓN!`, { position: 'top-center' });
-              setNotifications(prev => [n, ...prev]);
-              setUnreadCount(c => c + 1);
+              if (processedIds.current.has(n.id)) return;
+
+              // Comparación manual y segura
+              const esParaMi = String(n.tenant_id).toLowerCase() === String(user.company_id).toLowerCase() || 
+                               String(n.target_user_id).toLowerCase() === String(user.id).toLowerCase();
+
+              if (esParaMi) {
+                processedIds.current.add(n.id);
+                toast.success(`🔔 ${n.title}`, { position: 'top-right' });
+                setNotifications(prev => [n, ...prev]);
+                setUnreadCount(c => c + 1);
+              }
             }
           )
           .subscribe((status) => {
-            console.log("📡 [Debug-RT] Estado de conexión:", status);
+            console.log("📡 [Realtime Status]:", status);
           });
 
-        return channel;
-      } catch (e) {
-        console.error("❌ [Debug-RT] Error fatal en el setup:", e);
-      }
+      } catch (err) { console.error("❌ Error Realtime:", err); }
     };
 
-    let ch;
-    setup().then(res => ch = res);
-    return () => { if (ch) supabase.removeChannel(ch); };
-  }, [user?.id]); // 🚩 Solo depende del ID del usuario
+    startRealtime();
+    return () => { if (channel) supabase.removeChannel(channel); };
+  }, [user?.id, user?.company_id]);
 
   return (
     <NotificationContext.Provider value={{ 
