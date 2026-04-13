@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { AuthProvider } from "./context/AuthContext"
-import { NotificationProvider } from "./context/NotificationContext" // 🔔 Proveedor SaaS Centralizado
+import { NotificationProvider } from "./context/NotificationContext" 
 import { Toaster } from "react-hot-toast"
 
 // --- HOOKS ---
@@ -37,6 +37,14 @@ import GpsMonitor from "./pages/admin/GpsMonitor"
 /* ================= AUDITORÍA FOTOGRÁFICA ================= */
 import PhotoAuditDashboard from "./components/PhotoAuditDashboard"
 
+/* ================= SUPERVISOR (NUEVO) ================= */
+import SupervisorDashboard from "./pages/supervisor/SupervisorDashboard"
+import SupervisorPanel from "./pages/supervisor/SupervisorPanel"
+import LiveMap from "./pages/supervisor/LiveMap"
+import AlertManager from "./pages/supervisor/AlertManager"
+import AttendanceControl from "./pages/supervisor/AttendanceControl"
+import PhotoValidation from "./pages/supervisor/PhotoValidation"
+
 /* ================= USUARIO (MERCADERISTA) ================= */
 import UserDashboard from "./pages/user/UserDashboard"
 import UserHome from "./pages/user/UserHome" 
@@ -72,9 +80,7 @@ const OfflineMonitor = () => {
 
 function App() {
   return (
-    /* 🛡️ 1. AuthProvider primero: Garantiza que el usuario esté cargado */
     <AuthProvider>
-      {/* 🔔 2. NotificationProvider segundo: Escucha a Supabase usando los datos de Auth */}
       <NotificationProvider> 
         <BrowserRouter>
           
@@ -118,7 +124,7 @@ function App() {
               }
             />
 
-            {/* ================= SECCIÓN ROOT (ACCESO TOTAL) ================= */}
+            {/* ================= SECCIÓN ROOT ================= */}
             <Route
               path="/root"
               element={
@@ -136,8 +142,6 @@ function App() {
               <Route path="gps" element={<GpsMonitor />} /> 
               <Route path="questions" element={<QuestionsManager />} />
               <Route path="auditoria-fotos" element={<PhotoAuditDashboard />} />
-              
-              {/* 🚀 Rutas de Comunicación Root */}
               <Route path="notification-manager" element={<NotificationManager />} />
               <Route path="notifications" element={<NotificationsLayout userRole="ROOT" />} />
             </Route>
@@ -158,10 +162,27 @@ function App() {
               <Route path="gps" element={<GpsMonitor />} /> 
               <Route path="questions" element={<QuestionsManager />} />
               <Route path="auditoria-fotos" element={<PhotoAuditDashboard />} />
-              
-              {/* 🚀 Rutas de Comunicación Admin */}
               <Route path="notification-manager" element={<NotificationManager />} />
               <Route path="notifications" element={<NotificationsLayout userRole="ADMIN" />} />
+            </Route>
+
+            {/* ================= SECCIÓN SUPERVISOR (NUEVA) ================= */}
+            <Route
+              path="/supervisor"
+              element={
+                <ProtectedRoute role="SUPERVISOR">
+                  <SupervisorDashboard />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<SupervisorPanel />} />
+              <Route path="mapa" element={<LiveMap />} />
+              <Route path="alertas" element={<AlertManager />} />
+              <Route path="asistencia" element={<AttendanceControl />} />
+              <Route path="ejecucion" element={<PhotoValidation />} />
+              
+              {/* Bandeja de entrada para el Supervisor */}
+              <Route path="notificaciones" element={<NotificationsLayout userRole="SUPERVISOR" />} />
             </Route>
 
             {/* ================= SECCIÓN USUARIO (MERCADERISTA) ================= */}
@@ -178,8 +199,6 @@ function App() {
               <Route path="agenda" element={<UserHome />} /> 
               <Route path="locales" element={<UserLocales />} />
               <Route path="reporte/:id" element={<VisitFlow />} />
-              
-              {/* 🚀 El usuario solo ve su bandeja de entrada */}
               <Route path="notifications" element={<NotificationsLayout userRole="MERCADERISTA" />} />
             </Route>
 

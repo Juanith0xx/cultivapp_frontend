@@ -45,7 +45,9 @@ const redirectByRole = (role) => {
       return <Navigate to="/root" replace />
     case "ADMIN_CLIENTE":
       return <Navigate to="/admin" replace />
-    case "USUARIO": // 🚩 DEBE SER "USUARIO", antes decía "USER"
+    case "SUPERVISOR": // 🚀 NUEVO ROL SUPERVISOR
+      return <Navigate to="/supervisor" replace />
+    case "USUARIO":
       return <Navigate to="/usuario" replace />
     default:
       return <Navigate to="/" replace />

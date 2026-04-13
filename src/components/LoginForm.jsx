@@ -60,6 +60,7 @@ const LoginForm = () => {
       const roleRoutes = {
         ROOT: "/root",
         ADMIN_CLIENTE: "/admin",
+        SUPERVISOR: "/supervisor",
         USER: "/usuario",
         USUARIO: "/usuario"
       }
