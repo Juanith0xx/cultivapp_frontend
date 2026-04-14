@@ -11,11 +11,20 @@ const AttendanceControl = () => {
   const fetchAttendance = async () => {
     try {
       setLoading(true);
+      
+      /**
+       * 🚩 FIX CRÍTICO: Tu apiClient.jsx ya retorna 'data'.
+       * No debemos usar response.data, sino la respuesta directa.
+       */
       const response = await api.get("/routes/attendance-report");
-      const data = Array.isArray(response) ? response : (response?.data || []);
-      setAttendance(data);
+      
+      // LOG de depuración para ver a ALVI en la consola (F12)
+      console.log("📥 Datos recibidos de la API:", response);
+
+      const finalData = Array.isArray(response) ? response : [];
+      setAttendance(finalData);
     } catch (error) {
-      console.error("Error cargando asistencia:", error);
+      console.error("❌ Error cargando asistencia:", error);
     } finally {
       setLoading(false);
     }
@@ -23,7 +32,7 @@ const AttendanceControl = () => {
 
   useEffect(() => {
     fetchAttendance();
-    const interval = setInterval(fetchAttendance, 30000);
+    const interval = setInterval(fetchAttendance, 30000); // Auto-refresco
     return () => clearInterval(interval);
   }, []);
 
@@ -83,9 +92,9 @@ const AttendanceControl = () => {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {loading && attendance.length === 0 ? (
-                <tr><td colSpan="7" className="px-6 py-20 text-center animate-pulse text-xs font-bold text-gray-400 uppercase">Sincronizando...</td></tr>
+                <tr><td colSpan="7" className="px-6 py-20 text-center animate-pulse text-xs font-bold text-gray-400 uppercase">Sincronizando registros...</td></tr>
               ) : filteredData.length === 0 ? (
-                <tr><td colSpan="7" className="px-6 py-20 text-center text-xs font-bold text-gray-400 uppercase italic">No se encontraron registros</td></tr>
+                <tr><td colSpan="7" className="px-6 py-20 text-center text-xs font-bold text-gray-400 uppercase italic text-gray-300">No hay actividad registrada para hoy</td></tr>
               ) : (
                 filteredData.map((row, idx) => {
                   const isLate = row.check_in && row.diff > 0;
@@ -102,8 +111,8 @@ const AttendanceControl = () => {
                       {/* Colaborador */}
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-[10px] font-black">
-                            {row.first_name?.[0]}{row.last_name?.[0]}
+                          <div className="h-8 w-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-[10px] font-black shadow-sm">
+                            {row.first_name?.[0].toUpperCase()}{row.last_name?.[0].toUpperCase()}
                           </div>
                           <div>
                             <p className="text-xs font-black text-gray-900 leading-none">{row.first_name} {row.last_name}</p>
@@ -118,9 +127,9 @@ const AttendanceControl = () => {
                         <p className="text-[9px] text-[#87be00] font-black uppercase italic">Cod: {row.local_code || 'N/A'}</p>
                       </td>
 
-                      {/* Hora de Visita (Plan) */}
+                      {/* Hora de Visita */}
                       <td className="px-6 py-5 text-center">
-                        <span className="text-xs font-black text-gray-400">{row.plan_in}</span>
+                        <span className="text-xs font-black text-gray-400">{row.plan_in || '--:--'}</span>
                       </td>
 
                       {/* Entrada Real */}
@@ -138,9 +147,9 @@ const AttendanceControl = () => {
                             <span className="text-[8px] font-bold text-gray-400 uppercase">Duración</span>
                           </div>
                         ) : row.status === 'IN_PROGRESS' ? (
-                          <span className="text-[10px] font-black text-blue-500 animate-pulse italic">EN PROCESO</span>
+                          <span className="text-[10px] font-black text-blue-500 animate-pulse italic">EN CURSO</span>
                         ) : (
-                          <span className="text-xs font-black text-gray-300">--</span>
+                          <span className="text-xs font-black text-gray-300 italic">--</span>
                         )}
                       </td>
 
@@ -159,7 +168,7 @@ const AttendanceControl = () => {
                       {/* Desvío */}
                       <td className="px-6 py-5 text-center">
                         {isPending ? (
-                          <FiAlertCircle className="mx-auto text-red-500" size={18} />
+                          <FiAlertCircle className="mx-auto text-red-500 animate-bounce" size={18} />
                         ) : (
                           <span className={`text-[10px] font-black italic ${isLate ? 'text-red-500' : 'text-[#87be00]'}`}>
                             {isLate ? `+${row.diff} MIN` : 'A TIEMPO'}

@@ -6,15 +6,13 @@ import { QRCodeSVG } from "qrcode.react"
 import UserSidebar from "../../components/UserSidebar"
 import Notifications from "../../components/Notifications"
 import { useAuth } from "../../context/AuthContext"
-import { useNotificationContext } from "../../context/NotificationContext" // 🔔 Importante
+import { useNotificationContext } from "../../context/NotificationContext"
 
 const UserDashboard = () => {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   
-  // 🔗 Consumimos el estado global de notificaciones
   const { notifications, unreadCount, onMarkRead } = useNotificationContext()
-
   const [showQR, setShowQR] = useState(false)
 
   const handleLogout = () => {
@@ -23,6 +21,23 @@ const UserDashboard = () => {
   }
 
   const shareUrl = user ? `${window.location.origin}/verify/${user.id}` : ""
+
+  /**
+   * 🚩 EXTRACCIÓN DE INICIALES (JE)
+   * Basado en las columnas: first_name y last_name
+   */
+  const getInitials = () => {
+    const fName = user?.first_name?.trim() || "";
+    const lName = user?.last_name?.trim() || "";
+    
+    if (fName && lName) {
+      return `${fName.charAt(0)}${lName.charAt(0)}`.toUpperCase();
+    }
+    // Fallback: Si last_name está vacío, intenta tomar 2 letras de first_name
+    if (fName) return fName.substring(0, 2).toUpperCase();
+    
+    return "JE"; 
+  };
 
   return (
     <div className="min-h-screen flex bg-[#F8FAFC] font-[Outfit]">
@@ -35,17 +50,22 @@ const UserDashboard = () => {
         <div className="flex justify-between items-center mb-8 shrink-0 bg-white p-4 rounded-[2rem] shadow-sm border border-gray-50">
           
           <div className="flex items-center gap-4 pl-4">
-            <div className="h-10 w-10 rounded-full bg-[#87be00]/10 flex items-center justify-center text-[#87be00] font-black text-xs border border-[#87be00]/20">
-              {user?.first_name?.substring(0, 1)}{user?.last_name?.substring(0, 1)}
+            {/* 🎨 Avatar Estilo JE solicitado */}
+            <div className="h-12 w-12 rounded-[1.2rem] bg-[#87be00]/10 flex items-center justify-center text-[#87be00] font-black text-xs border border-[#87be00]/20 shadow-sm overflow-hidden">
+              {getInitials()}
             </div>
+
             <div>
-              <p className="text-[11px] font-black text-gray-900 uppercase italic leading-none">Hola, {user?.first_name}</p>
-              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Panel de Colaborador</p>
+              <p className="text-[11px] font-black text-gray-900 uppercase italic leading-none">
+                Hola, {user?.first_name}
+              </p>
+              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">
+                Panel de Colaborador
+              </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3 md:gap-6">
-            {/* 🔔 Componente de Notificaciones Global */}
             <Notifications /> 
 
             <div className="h-8 w-[1px] bg-gray-100 hidden md:block"></div>
@@ -101,7 +121,6 @@ const UserDashboard = () => {
 
         {/* VISTAS DINÁMICAS */}
         <div className="flex-1 overflow-y-auto custom-scrollbar rounded-[2.5rem] bg-white shadow-sm border border-gray-50 p-6 md:p-8">
-          {/* Pasamos los datos del contexto por si las vistas hijas los necesitan */}
           <Outlet context={{ notifications, unreadCount, onMarkRead }} />
         </div>
 
