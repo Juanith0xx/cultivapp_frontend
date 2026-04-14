@@ -1,8 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { 
-  FiSearch, FiFilter, FiCalendar, FiMapPin, 
-  FiImage, FiBriefcase, FiHash, FiExternalLink, FiCamera 
+  FiSearch, FiFilter, FiCalendar, FiImage, FiHash, FiExternalLink, 
+  FiCamera, FiX, FiDownload 
 } from "react-icons/fi";
 import api from "../../api/apiClient"; 
 import { useAuth } from "../../context/AuthContext";
@@ -11,21 +11,28 @@ const PhotoValidation = () => {
   const { user } = useAuth(); 
   const isRoot = user?.role === 'ROOT';
 
-  // --- ESTADOS DE FILTROS ---
-  // Si no es ROOT, ya viene pre-filtrado por la empresa del supervisor
+  const [searchTerm, setSearchTerm] = useState(""); 
+  const [debouncedSearch, setDebouncedSearch] = useState(""); 
   const [filters, setFilters] = useState({
     empresa_id: isRoot ? "" : user?.company_id,
     cadena: "",
     codigo: "",
     fecha: new Date().toISOString().split('T')[0], 
-    search: ""
   });
 
-  // --- 1. CARGA DE LOCALES (Para selectores) ---
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+    }, 600);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
   const { data: allLocales = [] } = useQuery({
     queryKey: ["all-locales-list", filters.empresa_id],
     queryFn: async () => {
-      const response = await api.get(`/locales?company_id=${filters.empresa_id}`);
+      const response = await api.get("/locales", { 
+        params: { company_id: filters.empresa_id || undefined } 
+      });
       return response.data || response || [];
     },
     enabled: !!filters.empresa_id 
@@ -42,38 +49,60 @@ const PhotoValidation = () => {
     return [...new Set(filteredByChain.map(l => l.codigo_local || l.codigo_pos).filter(Boolean))].sort();
   }, [allLocales, filters.cadena]);
 
-  // --- 2. FETCH DE FOTOS ---
-  const { data: photos = [], isLoading: isLoadingPhotos } = useQuery({
-    queryKey: ["audit-photos", filters.fecha, filters.empresa_id], 
+  const { data: photos = [], isLoading: isLoadingPhotos, isFetching } = useQuery({
+    queryKey: ["audit-photos", filters.fecha, filters.empresa_id, debouncedSearch], 
     queryFn: async () => {
-      const response = await api.get("/reports/photos", { 
-        params: { fecha: filters.fecha, empresa_id: filters.empresa_id } 
-      });
-      return response.data || [];
+      const params = {};
+      if (filters.empresa_id) params.empresa_id = filters.empresa_id;
+      if (debouncedSearch) {
+        params.search = debouncedSearch;
+      } else {
+        params.fecha = filters.fecha;
+      }
+      const response = await api.get("/reports/photos", { params });
+      return response.data || response || [];
     },
     enabled: !!filters.empresa_id
   });
 
   const filteredPhotos = useMemo(() => {
     if (!Array.isArray(photos)) return [];
-    const searchTerm = filters.search.toLowerCase().trim();
-
     return photos.filter(p => {
       const matchesCadena = filters.cadena === "" || p.cadena === filters.cadena;
       const matchesCodigo = filters.codigo === "" || String(p.local_codigo) === String(filters.codigo);
-      const matchesSearch = searchTerm === "" || 
-        p.user_name?.toLowerCase().includes(searchTerm) ||
-        p.local_nombre?.toLowerCase().includes(searchTerm);
-      
-      return matchesCadena && matchesCodigo && matchesSearch;
+      return matchesCadena && matchesCodigo;
     });
-  }, [photos, filters.cadena, filters.codigo, filters.search]);
+  }, [photos, filters.cadena, filters.codigo]);
 
+  /**
+   * 🖼️ GESTIÓN DE URL DE IMÁGENES
+   */
   const getImageUrl = (path) => {
     if (!path) return "https://via.placeholder.com/400x300?text=Sin+Imagen";
     if (path.startsWith('http')) return path;
     const baseUrl = import.meta.env.VITE_API_URL.replace('/api', '');
-    return `${baseUrl}/uploads${path.startsWith('/') ? path : `/${path}`}`;
+    const cleanPath = path.trim().replace(/\\/g, "/").replace(/^uploads\//, '').replace(/^\//, '');
+    return `${baseUrl}/uploads/${cleanPath}`;
+  };
+
+  /**
+   * 📥 FUNCIÓN PARA DESCARGAR IMAGEN
+   */
+  const handleDownload = async (imageUrl, fileName) => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName || 'evidencia-cultiva.jpg';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error al descargar la imagen:", error);
+    }
   };
 
   return (
@@ -84,19 +113,23 @@ const PhotoValidation = () => {
           <h2 className="text-2xl font-black text-gray-900 uppercase italic tracking-tighter leading-none">
             Validación de Ejecución
           </h2>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-2">
-            Evidencias fotográficas en sala
-          </p>
+          <div className="flex items-center gap-2 mt-2">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              {debouncedSearch ? `Resultados para: ${debouncedSearch}` : `Evidencias: ${filters.fecha}`}
+            </p>
+            {(isFetching || searchTerm !== debouncedSearch) && (
+               <div className="w-2 h-2 bg-[#87be00] rounded-full animate-ping"></div>
+            )}
+          </div>
         </div>
-        <div className="bg-[#87be00]/10 p-4 rounded-2xl border border-[#87be00]/20 hidden md:block">
+        <div className="bg-black p-4 rounded-2xl shadow-xl hidden md:block border border-white/10">
             <FiCamera className="text-[#87be00]" size={24} />
         </div>
       </div>
 
-      {/* FILTROS CULTIVA STYLE */}
-      <section className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-50 overflow-visible">
+      {/* FILTROS */}
+      <section className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-50">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          
           <div className="relative">
             <FiFilter className="absolute left-4 top-1/2 -translate-y-1/2 text-[#87be00] z-10" />
             <select 
@@ -127,7 +160,10 @@ const PhotoValidation = () => {
               type="date"
               className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[1.5rem] border-none text-[10px] font-black outline-none focus:ring-2 focus:ring-[#87be00]/20"
               value={filters.fecha}
-              onChange={(e) => setFilters({...filters, fecha: e.target.value})}
+              onChange={(e) => {
+                setSearchTerm(""); 
+                setFilters({...filters, fecha: e.target.value});
+              }}
             />
           </div>
 
@@ -135,62 +171,83 @@ const PhotoValidation = () => {
             <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 z-10" />
             <input 
               type="text"
-              placeholder="BUSCAR COLABORADOR..."
+              placeholder="NOMBRE O RUT..."
               className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[1.5rem] border-none text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-[#87be00]/20"
-              value={filters.search}
-              onChange={(e) => setFilters({...filters, search: e.target.value})}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
+            {searchTerm && (
+                <button 
+                    onClick={() => { setSearchTerm(""); setDebouncedSearch(""); }}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-red-500"
+                >
+                    <FiX size={16}/>
+                </button>
+            )}
           </div>
         </div>
       </section>
 
-      {/* GRID DE FOTOS */}
+      {/* GALERÍA */}
       {isLoadingPhotos ? (
         <div className="py-20 text-center">
-            <div className="w-10 h-10 border-4 border-gray-100 border-t-[#87be00] rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-[10px] font-black text-gray-400 uppercase italic tracking-widest">Sincronizando Galería...</p>
+            <div className="w-12 h-12 border-4 border-gray-100 border-t-[#87be00] rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-[10px] font-black text-gray-400 uppercase italic">Sincronizando evidencias...</p>
         </div>
       ) : filteredPhotos.length === 0 ? (
-        <div className="py-20 text-center bg-white rounded-[3rem] border border-dashed border-gray-200">
-           <FiImage className="mx-auto text-gray-200 mb-4" size={50} />
-           <p className="text-[10px] font-black text-gray-400 uppercase italic">No se encontraron evidencias para los filtros seleccionados</p>
+        <div className="py-32 text-center bg-white rounded-[3.5rem] border border-dashed border-gray-100">
+           <FiImage className="mx-auto text-gray-100 mb-6" size={60} />
+           <p className="text-[10px] font-black text-gray-300 uppercase italic tracking-[0.2em]">Sin registros para mostrar</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {filteredPhotos.map((item) => (
-            <div key={item.id} className="bg-white rounded-[2.5rem] overflow-hidden shadow-sm border border-gray-50 hover:shadow-xl transition-all group relative">
-              <div className="relative h-60 overflow-hidden">
+            <div key={item.id} className="bg-white rounded-[2.5rem] overflow-hidden shadow-sm border border-gray-50 hover:shadow-2xl transition-all group">
+              <div className="relative h-64 overflow-hidden bg-gray-50">
                 <img 
                   src={getImageUrl(item.photo_url)} 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
                   alt="Evidencia" 
+                  loading="lazy"
+                  onError={(e) => { e.target.src = "https://via.placeholder.com/400x300?text=Archivo+No+Encontrado"; }}
                 />
-                <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-md text-[#87be00] text-[8px] font-black px-3 py-1.5 rounded-full uppercase italic tracking-widest border border-white/10">
-                  {item.photo_type}
+                <div className="absolute top-5 left-5 bg-black/80 backdrop-blur-md text-[#87be00] text-[8px] font-black px-4 py-2 rounded-full uppercase italic border border-white/10 shadow-lg">
+                  {item.photo_type || 'General'}
                 </div>
               </div>
               
-              <div className="p-5">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-gray-900 rounded-2xl flex items-center justify-center text-[#87be00] font-black text-xs italic">
-                    {item.user_name?.substring(0,1).toUpperCase()}{item.user_name?.split(' ')[1]?.substring(0,1).toUpperCase()}
+              <div className="p-6">
+                <div className="flex items-center gap-4 mb-5">
+                  <div className="w-11 h-11 bg-black rounded-2xl flex items-center justify-center text-[#87be00] font-black text-xs shadow-lg">
+                    {item.user_name ? item.user_name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase() : '??'}
                   </div>
                   <div className="min-w-0">
                     <p className="text-[11px] font-black text-gray-900 uppercase italic truncate">{item.user_name}</p>
-                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter truncate leading-none mt-1">
-                      {item.cadena} - {item.local_nombre}
+                    <p className="text-[9px] font-bold text-gray-400 uppercase truncate mt-1">
+                      {item.cadena} • {item.local_nombre}
                     </p>
                   </div>
                 </div>
 
-                <a 
-                  href={getImageUrl(item.photo_url)} 
-                  target="_blank" 
-                  rel="noreferrer" 
-                  className="w-full py-3 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 hover:bg-gray-900 hover:text-[#87be00] transition-all group-hover:bg-[#87be00]/10"
-                >
-                  <FiExternalLink size={18}/>
-                </a>
+                <div className="grid grid-cols-2 gap-3">
+                    <a 
+                    href={getImageUrl(item.photo_url)} 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="py-4 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-400 hover:bg-black hover:text-[#87be00] transition-all"
+                    title="Ver original"
+                    >
+                    <FiExternalLink size={20}/>
+                    </a>
+                    
+                    <button 
+                    onClick={() => handleDownload(getImageUrl(item.photo_url), `${item.user_name}-${item.photo_type}.jpg`)}
+                    className="py-4 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-400 hover:bg-[#87be00] hover:text-white transition-all"
+                    title="Descargar imagen"
+                    >
+                    <FiDownload size={20}/>
+                    </button>
+                </div>
               </div>
             </div>
           ))}

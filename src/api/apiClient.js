@@ -8,7 +8,6 @@ const API_URL = BASE_URL.replace(/\/+$/, "") + (BASE_URL.includes("/api") ? "" :
  */
 const getToken = () => {
   const token = localStorage.getItem("token");
-  // Si no hay nada, o es basura de sesión anterior, retornar null
   if (!token || token === "null" || token === "undefined" || token.length < 10) return null;
   
   const cleanToken = token.startsWith("Bearer ") ? token.split(" ")[1] : token;
@@ -20,7 +19,6 @@ const request = async (endpoint, options = {}) => {
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   const finalUrl = `${API_URL}${cleanEndpoint}`;
   
-  // Debug para el Supervisor
   if (!token && !cleanEndpoint.includes("/auth/login")) {
     console.warn(`⚠️ [API] Acceso denegado a ${cleanEndpoint}: No hay token de sesión.`);
   }
@@ -32,7 +30,6 @@ const request = async (endpoint, options = {}) => {
     ...options,
     headers: {
       ...(!isFD && { "Content-Type": "application/json" }),
-      // 🔥 IMPORTANTE: Aseguramos que el Supervisor envíe el Bearer correctamente
       ...(token ? { "Authorization": `Bearer ${token}` } : {}), 
       ...options.headers,
     },
@@ -41,10 +38,8 @@ const request = async (endpoint, options = {}) => {
   try {
     const response = await fetch(finalUrl, config);
 
-    // 🔴 Manejo de errores de permisos (Crítico para el Supervisor)
     if (response.status === 401) {
       console.error("❌ Sesión expirada. Redirigiendo al login...");
-      // localStorage.clear(); // Opcional: limpiar todo para forzar re-login
       throw { status: 401, message: "Sesión no autorizada" };
     }
 
@@ -83,22 +78,42 @@ const request = async (endpoint, options = {}) => {
 };
 
 const api = {
-  get: (endpoint, params = null) => {
+  /**
+   * ✅ MEJORA: Manejo inteligente de parámetros
+   * Ahora detecta si pasas { params: { ... } } o directamente los filtros.
+   */
+  get: (endpoint, config = null) => {
     let url = endpoint;
-    if (params) {
-      const query = new URLSearchParams(params).toString();
-      url += `${url.includes("?") ? "&" : "?"}${query}`;
+    
+    // Extraemos los parámetros reales: si config tiene .params, los usamos; si no, config es el parámetro.
+    const actualParams = config?.params ? config.params : config;
+
+    if (actualParams && typeof actualParams === "object" && !(actualParams instanceof FormData)) {
+      // Limpiamos nulos, undefined o strings vacíos para una URL limpia
+      const cleanParams = Object.fromEntries(
+        Object.entries(actualParams).filter(([_, v]) => v != null && v !== "" && v !== "undefined")
+      );
+
+      const query = new URLSearchParams(cleanParams).toString();
+      if (query) {
+        url += `${url.includes("?") ? "&" : "?"}${query}`;
+      }
     }
-    return request(url, { method: "GET" });
+    
+    // Pasamos el resto de la configuración (headers, etc.) al request
+    return request(url, { method: "GET", ...config });
   },
+
   post: (endpoint, body) => request(endpoint, {
       method: "POST",
       body: body instanceof FormData ? body : JSON.stringify(body),
   }),
+  
   put: (endpoint, body) => request(endpoint, {
       method: "PUT",
       body: body instanceof FormData ? body : JSON.stringify(body),
   }),
+  
   delete: (endpoint) => request(endpoint, { method: "DELETE" }),
 };
 
