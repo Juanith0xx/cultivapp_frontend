@@ -11,7 +11,6 @@ const PhotoValidation = () => {
   const { user } = useAuth(); 
   const isRoot = user?.role === 'ROOT';
 
-  // --- ESTADOS DE FILTROS ---
   const [searchTerm, setSearchTerm] = useState(""); 
   const [debouncedSearch, setDebouncedSearch] = useState(""); 
   const [filters, setFilters] = useState({
@@ -21,7 +20,6 @@ const PhotoValidation = () => {
     fecha: new Date().toISOString().split('T')[0], 
   });
 
-  // --- LÓGICA DE DEBOUNCE ---
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchTerm.trim());
@@ -29,7 +27,7 @@ const PhotoValidation = () => {
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
-  // --- 1. CARGA DE LOCALES (Dinamismo para los Selects) ---
+  // --- 1. CARGA DE LOCALES ---
   const { data: allLocales = [] } = useQuery({
     queryKey: ["all-locales-list", filters.empresa_id],
     queryFn: async () => {
@@ -56,25 +54,16 @@ const PhotoValidation = () => {
   const { data: photos = [], isLoading: isLoadingPhotos, isFetching } = useQuery({
     queryKey: ["audit-photos", filters.fecha, filters.empresa_id, debouncedSearch], 
     queryFn: async () => {
-      const params = {};
-      if (filters.empresa_id) params.empresa_id = filters.empresa_id;
-      
-      /**
-       * Si hay búsqueda global, el backend prioriza el texto sobre la fecha
-       */
-      if (debouncedSearch) {
-        params.search = debouncedSearch;
-      } else {
-        params.fecha = filters.fecha;
-      }
-
+      const params = {
+        empresa_id: filters.empresa_id,
+        ...(debouncedSearch ? { search: debouncedSearch } : { fecha: filters.fecha })
+      };
       const response = await api.get("/reports/photos", { params });
       return response.data || response || [];
     },
     enabled: !!filters.empresa_id
   });
 
-  // Filtros locales sobre el set de datos descargado
   const filteredPhotos = useMemo(() => {
     if (!Array.isArray(photos)) return [];
     return photos.filter(p => {
@@ -85,25 +74,45 @@ const PhotoValidation = () => {
   }, [photos, filters.cadena, filters.codigo]);
 
   /**
-   * 🖼️ GESTIÓN DE URL DE IMÁGENES
-   * Limpia rutas corruptas (ej. default_tenant) para que el navegador las encuentre.
+   * 🛠️ REPARACIÓN DINÁMICA DE RUTAS
+   * Si la ruta dice "usuario_desconocido", la reconstruimos con los datos reales
    */
-  const getImageUrl = (path) => {
+  const getImageUrl = (item) => {
+    const path = item.photo_url || "";
     if (!path) return "https://via.placeholder.com/400x300?text=Sin+Imagen";
     if (path.startsWith('http')) return path;
 
     const baseUrl = import.meta.env.VITE_API_URL.split('/api')[0];
-    const cleanPath = path.trim()
-      .replace(/\\/g, "/") // Convierte barras Windows a Web
-      .replace(/^uploads\//i, '') // Evita duplicar 'uploads/'
-      .replace(/^\//, '');
+    
+    // Normalización de barras
+    let cleanPath = path.trim().replace(/\\/g, "/").replace(/^uploads\//i, '');
+
+    // 🚩 SI LA RUTA ESTÁ MAL (Desconocido), LA ARREGLAMOS SEGÚN TU CARPETA REAL
+    if (cleanPath.includes("usuario_desconocido") || cleanPath.includes("default_tenant")) {
+      const slugify = (text) => text?.toString().toLowerCase().trim()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "") || "desconocido";
+      
+      const safeCompany = slugify(item.empresa_nombre);
+      const safeUser = slugify(item.user_name);
+      const fileName = cleanPath.split('/').pop();
+
+      // Mapeo para encontrar la subcarpeta de evidencia correcta
+      const mapeo = { 
+        'Fachada': 'foto_local', 
+        'Góndola Inicio': 'foto_gondola', 
+        'Góndola Final': 'foto_term_producto', 
+        'Observaciones': 'foto_observaciones' 
+      };
+      const subFolder = mapeo[item.photo_type] || "otros";
+
+      // Reconstruimos la ruta para que coincida con tu disco duro
+      cleanPath = `${safeCompany}/${safeUser}/evidencias/${subFolder}/${fileName}`;
+    }
 
     return `${baseUrl}/uploads/${cleanPath}`;
   };
 
-  /**
-   * 📥 FUNCIÓN DE DESCARGA (Forzada por Blob)
-   */
   const handleDownload = async (imageUrl, fileName) => {
     try {
       const response = await fetch(imageUrl);
@@ -111,44 +120,42 @@ const PhotoValidation = () => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      // Nombre limpio: evidencia_juan_perez_fachada.jpg
       link.download = fileName.replace(/\s+/g, '_').toLowerCase();
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      alert("Error al descargar: La imagen no pudo ser procesada.");
+      alert("Error al descargar.");
     }
   };
 
   return (
-    <div className="space-y-8 font-[Outfit]">
+    <div className="space-y-8 font-[Outfit] pb-10">
       {/* HEADER */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center px-2">
         <div>
-          <h2 className="text-2xl font-black text-gray-900 uppercase italic tracking-tighter leading-none">
+          <h2 className="text-2xl font-black text-gray-900 uppercase italic tracking-tighter">
             Validación de Ejecución
           </h2>
-          <div className="flex items-center gap-2 mt-2">
+          <div className="flex items-center gap-2 mt-1">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-              {debouncedSearch ? `Búsqueda Global: ${debouncedSearch}` : `Evidencias: ${filters.fecha}`}
+              Sincronización de Evidencias en Tiempo Real
             </p>
-            {isFetching && <div className="w-2 h-2 bg-[#87be00] rounded-full animate-ping"></div>}
           </div>
         </div>
-        <div className="bg-black p-4 rounded-2xl shadow-xl hidden md:block border border-white/10">
+        <div className="bg-black p-4 rounded-2xl shadow-xl">
             <FiCamera className="text-[#87be00]" size={24} />
         </div>
       </div>
 
       {/* FILTROS */}
-      <section className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-50">
+      <section className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-50 mx-2">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="relative">
-            <FiFilter className="absolute left-4 top-1/2 -translate-y-1/2 text-[#87be00] z-10" />
+            <FiFilter className="absolute left-4 top-1/2 -translate-y-1/2 text-[#87be00]" />
             <select 
-              className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[1.5rem] border-none text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-[#87be00]/20 cursor-pointer"
+              className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[1.5rem] text-[10px] font-black uppercase outline-none"
               value={filters.cadena}
               onChange={(e) => setFilters({...filters, cadena: e.target.value, codigo: ""})}
             >
@@ -158,9 +165,9 @@ const PhotoValidation = () => {
           </div>
 
           <div className="relative">
-            <FiHash className="absolute left-4 top-1/2 -translate-y-1/2 text-[#87be00] z-10" />
+            <FiHash className="absolute left-4 top-1/2 -translate-y-1/2 text-[#87be00]" />
             <select 
-              className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[1.5rem] border-none text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-[#87be00]/20 cursor-pointer"
+              className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[1.5rem] text-[10px] font-black uppercase outline-none"
               value={filters.codigo}
               onChange={(e) => setFilters({...filters, codigo: e.target.value})}
             >
@@ -170,79 +177,66 @@ const PhotoValidation = () => {
           </div>
 
           <div className="relative">
-            <FiCalendar className="absolute left-4 top-1/2 -translate-y-1/2 text-[#87be00] z-10" />
+            <FiCalendar className="absolute left-4 top-1/2 -translate-y-1/2 text-[#87be00]" />
             <input 
               type="date"
-              className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[1.5rem] border-none text-[10px] font-black outline-none focus:ring-2 focus:ring-[#87be00]/20"
+              className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[1.5rem] text-[10px] font-black outline-none"
               value={filters.fecha}
-              onChange={(e) => {
-                setSearchTerm(""); 
-                setFilters({...filters, fecha: e.target.value});
-              }}
+              onChange={(e) => setFilters({...filters, fecha: e.target.value})}
             />
           </div>
 
           <div className="relative">
-            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 z-10" />
+            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
             <input 
               type="text"
-              placeholder="NOMBRE O RUT..."
-              className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[1.5rem] border-none text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-[#87be00]/20"
+              placeholder="BUSCAR..."
+              className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[1.5rem] text-[10px] font-black uppercase outline-none"
               value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                // Si el usuario escribe, limpiamos los filtros de local para no bloquear resultados
-                if(e.target.value) setFilters(prev => ({...prev, cadena: "", codigo: ""}));
-              }}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
-            {searchTerm && (
-                <button 
-                  onClick={() => { setSearchTerm(""); setDebouncedSearch(""); }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-red-500"
-                >
-                  <FiX size={16} />
-                </button>
-            )}
           </div>
         </div>
       </section>
 
-      {/* GRID DE RESULTADOS */}
+      {/* GRID */}
       {isLoadingPhotos ? (
-        <div className="py-20 text-center text-[10px] font-black uppercase italic animate-pulse">
-            Localizando evidencias en servidor...
+        <div className="py-20 text-center text-[10px] font-black uppercase italic animate-pulse text-gray-400">
+            Cargando imágenes...
         </div>
       ) : filteredPhotos.length === 0 ? (
-        <div className="py-32 text-center bg-white rounded-[3.5rem] border border-dashed border-gray-100">
-           <FiImage className="mx-auto text-gray-100 mb-6" size={60} />
-           <p className="text-[10px] font-black text-gray-300 uppercase italic">Sin registros encontrados</p>
+        <div className="py-32 text-center bg-white rounded-[3.5rem] border border-dashed border-gray-100 mx-2">
+           <FiImage className="mx-auto text-gray-100 mb-4" size={50} />
+           <p className="text-[10px] font-black text-gray-300 uppercase italic">Sin registros</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 px-2">
           {filteredPhotos.map((item) => {
-            const currentUrl = getImageUrl(item.photo_url);
+            // 🚩 PASAMOS EL OBJETO COMPLETO PARA REPARAR LA RUTA
+            const currentUrl = getImageUrl(item);
+            
             return (
-              <div key={item.id} className="bg-white rounded-[2.5rem] overflow-hidden shadow-sm border border-gray-50 group hover:shadow-xl transition-all">
+              <div key={item.id} className="bg-white rounded-[2rem] overflow-hidden shadow-sm border border-gray-50 group hover:shadow-xl transition-all">
                 <div className="relative h-60 overflow-hidden bg-gray-50">
                   <img 
                     src={currentUrl} 
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
                     alt="Evidencia" 
-                    onError={(e) => { e.target.src = "https://via.placeholder.com/400x300?text=Error+al+cargar"; }}
+                    onError={(e) => { e.target.src = "https://via.placeholder.com/400x300?text=No+Encontrada"; }}
                   />
-                  <div className="absolute top-4 left-4 bg-black/80 text-[#87be00] text-[8px] font-black px-3 py-1.5 rounded-full uppercase italic shadow-lg">
-                    {item.photo_type || 'Visita'}
+                  <div className="absolute top-4 left-4 bg-black/80 text-[#87be00] text-[8px] font-black px-3 py-1.5 rounded-full uppercase italic">
+                    {item.photo_type || 'Evidencia'}
                   </div>
                 </div>
                 
                 <div className="p-5">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 bg-black rounded-2xl flex items-center justify-center text-[#87be00] font-black text-xs italic">
-                      {item.user_name ? item.user_name.substring(0,2).toUpperCase() : '??'}
+                      {item.user_name?.substring(0,2).toUpperCase()}
                     </div>
                     <div className="min-w-0">
                       <p className="text-[11px] font-black text-gray-900 uppercase italic truncate">{item.user_name}</p>
-                      <p className="text-[9px] font-bold text-gray-400 uppercase truncate mt-1">
+                      <p className="text-[9px] font-bold text-gray-400 uppercase truncate">
                         {item.cadena} • {item.local_nombre}
                       </p>
                     </div>
@@ -253,7 +247,7 @@ const PhotoValidation = () => {
                         className="py-3 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 hover:bg-black hover:text-[#87be00] transition-all">
                         <FiExternalLink size={18}/>
                       </a>
-                      <button onClick={() => handleDownload(currentUrl, `evidencia_${item.user_name}_${item.photo_type}.jpg`)}
+                      <button onClick={() => handleDownload(currentUrl, `evidencia_${item.user_name}.jpg`)}
                         className="py-3 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 hover:bg-[#87be00] hover:text-white transition-all">
                         <FiDownload size={18}/>
                       </button>
