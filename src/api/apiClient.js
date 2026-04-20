@@ -4,21 +4,13 @@ const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const API_URL = BASE_URL.replace(/\/+$/, "") + (BASE_URL.includes("/api") ? "" : "/api");
 
 /**
- * 🛡️ OBTENCIÓN SEGURA DEL TOKEN (MEJORADA)
- * Limpia comillas, detecta strings inválidos y normaliza el Bearer
+ * 🛡️ OBTENCIÓN SEGURA DEL TOKEN
  */
 const getToken = () => {
   let token = localStorage.getItem("token");
-  
-  // 1. Validaciones básicas de existencia
   if (!token || token === "null" || token === "undefined" || token === "") return null;
-  
-  // 2. Limpieza de comillas (común si usas JSON.stringify al guardar)
   token = token.replace(/^"|"$/g, '');
-  
-  // 3. Normalización: extraemos solo el hash si viene con prefijo
   const cleanToken = token.startsWith("Bearer ") ? token.split(" ")[1] : token;
-  
   const finalToken = cleanToken?.trim();
   return finalToken && finalToken.length > 10 ? finalToken : null;
 };
@@ -28,11 +20,6 @@ const request = async (endpoint, options = {}) => {
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   const finalUrl = `${API_URL}${cleanEndpoint}`;
   
-  // Debug para desarrollo (puedes comentarlo después)
-  if (!token && !cleanEndpoint.includes("/auth/login")) {
-    console.warn(`⚠️ [API] No hay token para: ${cleanEndpoint}`);
-  }
-
   const isFD = options.body instanceof FormData;
 
   const config = {
@@ -48,11 +35,23 @@ const request = async (endpoint, options = {}) => {
   try {
     const response = await fetch(finalUrl, config);
 
-    // Si el backend nos rebota con 401, forzamos limpieza local
+    // 🚩 MANEJO CRÍTICO DE SESIÓN INVÁLIDA (401)
     if (response.status === 401) {
-      console.error("❌ Sesión inválida o expirada en el servidor.");
-      // Opcional: localStorage.removeItem("token"); 
-      throw { status: 401, message: "Sesión no autorizada" };
+      console.error("❌ [API] Sesión inválida o expirada. Limpiando credenciales...");
+      
+      // 1. Limpiamos el rastro del token corrupto
+      localStorage.removeItem("token");
+      localStorage.removeItem("user"); // Si guardas el objeto user, límpialo también
+      
+      // 2. Solo redirigimos si no estamos ya en el login para evitar bucles
+      if (window.location.pathname !== "/") {
+        // Pequeño delay para que el usuario alcance a ver el toast de error si existe
+        setTimeout(() => {
+          window.location.href = "/?error=session_expired";
+        }, 500);
+      }
+      
+      throw { status: 401, message: "Sesión no autorizada o mismatch de sesión" };
     }
 
     if (response.status === 403) {

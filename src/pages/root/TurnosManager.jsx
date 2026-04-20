@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import api from "../../api/apiClient";
-import { FiPlus, FiTrash2, FiClock, FiCalendar, FiLoader, FiLayers, FiAlertCircle } from "react-icons/fi";
+import { FiPlus, FiTrash2, FiClock, FiLayers, FiLoader, FiAlertCircle, FiCheck } from "react-icons/fi";
 import toast from "react-hot-toast";
 
 const TurnosManager = () => {
@@ -17,7 +17,10 @@ const TurnosManager = () => {
     salida: "15:30"
   });
 
-  const diasCortos = ["D", "L", "M", "M", "J", "V", "S"];
+  const diasCompletos = [
+    { label: "D", id: 0 }, { label: "L", id: 1 }, { label: "M", id: 2 },
+    { label: "M", id: 3 }, { label: "J", id: 4 }, { label: "V", id: 5 }, { label: "S", id: 6 },
+  ];
 
   const fetchTurnos = async () => {
     try {
@@ -25,7 +28,6 @@ const TurnosManager = () => {
       const res = await api.get("/turnos-config");
       setTurnos(Array.isArray(res) ? res : []);
     } catch (err) {
-      console.error("Error fetching turnos:", err);
       toast.error("Error al cargar turnos");
     } finally {
       setLoading(false);
@@ -34,7 +36,6 @@ const TurnosManager = () => {
 
   useEffect(() => { fetchTurnos(); }, []);
 
-  // 🚩 LÓGICA DE AGRUPAMIENTO: Transformamos la lista plana en grupos por nombre
   const turnosAgrupados = useMemo(() => {
     const grupos = turnos.reduce((acc, current) => {
       const key = current.nombre_turno.toUpperCase();
@@ -42,7 +43,7 @@ const TurnosManager = () => {
         acc[key] = {
           ...current,
           dias: [current.day_of_week],
-          ids: [current.id] // Guardamos todos los IDs para el borrado masivo
+          ids: [current.id]
         };
       } else {
         acc[key].dias.push(current.day_of_week);
@@ -65,7 +66,6 @@ const TurnosManager = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (newTurno.days.length === 0) return toast.error("Selecciona al menos un día");
-
     setSubmitting(true);
     try {
       await api.post("/turnos-config/bulk", newTurno);
@@ -80,49 +80,49 @@ const TurnosManager = () => {
     }
   };
 
-  // 🚩 BORRADO SEGURO: Borramos todos los registros asociados a ese nombre de turno
   const deleteGrupo = async (ids) => {
-    if (!confirm(`¿Eliminar este turno y sus ${ids.length} días configurados?`)) return;
+    if (!confirm(`¿Eliminar este turno completo?`)) return;
     try {
-      // Ejecutamos las eliminaciones en paralelo
       await Promise.all(ids.map(id => api.delete(`/turnos-config/${id}`)));
-      toast.success("Turno eliminado completo");
+      toast.success("Turno eliminado");
       fetchTurnos();
     } catch (err) {
-      toast.error("Error al eliminar algunos bloques");
+      toast.error("Error al eliminar");
     }
   };
 
-  const formatTime = (timeStr) => {
-    if (!timeStr) return "00:00";
-    return timeStr.length > 5 ? timeStr.slice(0, 5) : timeStr;
-  };
-
   return (
-    <div className="p-6 space-y-6 font-[Outfit]">
+    <div className="p-6 space-y-8 font-[Outfit] max-w-7xl mx-auto">
       {/* HEADER */}
-      <div className="flex justify-between items-center bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
         <div>
-          <h1 className="text-2xl font-black text-gray-800 uppercase italic leading-none tracking-tighter">Configuración de Turnos</h1>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em] mt-2">Gestión de horarios por empresa</p>
+          <div className="flex items-center gap-3 mb-1">
+            <div className="w-10 h-10 bg-[#87be00]/10 rounded-2xl flex items-center justify-center text-[#87be00]">
+                <FiLayers size={20} />
+            </div>
+            <h1 className="text-3xl font-black text-gray-900 uppercase italic tracking-tighter">Gestión de Turnos</h1>
+          </div>
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.2em] ml-1">Horarios dinámicos Cultivapp</p>
         </div>
         <button 
           onClick={() => setShowForm(!showForm)}
-          className="bg-black text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 hover:scale-105 transition-all shadow-lg hover:bg-[#87be00]"
+          className={`px-8 py-4 rounded-2xl text-[11px] font-black uppercase transition-all flex items-center gap-3 shadow-xl ${
+            showForm ? "bg-red-50 text-red-500 border border-red-100" : "bg-black text-white hover:bg-[#87be00]"
+          }`}
         >
-          {showForm ? "CANCELAR" : <><FiPlus /> NUEVO BLOQUE</>}
+          {showForm ? "CANCELAR" : <><FiPlus size={18}/> AGREGAR TURNO</>}
         </button>
       </div>
 
       {/* FORMULARIO */}
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white p-8 rounded-[2rem] shadow-xl border-2 border-[#87be00] animate-in fade-in zoom-in-95">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-            <div className="md:col-span-4 space-y-4">
-              <div className="flex flex-col gap-1">
-                <label className="text-[9px] font-black uppercase text-gray-400 ml-2 italic">Rol Base</label>
+        <form onSubmit={handleSubmit} className="bg-white p-10 rounded-[3rem] shadow-2xl border border-gray-100 animate-in fade-in slide-in-from-top-4">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            <div className="lg:col-span-4 space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-gray-500 tracking-widest ml-1">Rol Base</label>
                 <select 
-                  className="p-4 bg-gray-50 rounded-2xl text-xs font-black outline-none border-2 border-transparent focus:border-[#87be00]"
+                  className="w-full p-4 bg-gray-50 rounded-2xl text-xs font-black border-2 border-transparent focus:border-[#87be00] outline-none"
                   value={newTurno.categoria_rol}
                   onChange={e => setNewTurno({...newTurno, categoria_rol: e.target.value})}
                 >
@@ -131,27 +131,36 @@ const TurnosManager = () => {
                   <option value="Supervisor">Supervisor</option>
                 </select>
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[9px] font-black uppercase text-gray-400 ml-2 italic">Nombre (Ej: Turno A1)</label>
-                <input required className="p-4 bg-gray-50 rounded-2xl text-xs font-black outline-none border-2 border-transparent focus:border-[#87be00] uppercase" value={newTurno.nombre_turno} onChange={e => setNewTurno({...newTurno, nombre_turno: e.target.value.toUpperCase()})} />
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-gray-500 tracking-widest ml-1">Nombre</label>
+                <input required placeholder="EJ: TURNO A1" className="w-full p-4 bg-gray-50 rounded-2xl text-xs font-black border-2 border-transparent focus:border-[#87be00] outline-none uppercase" value={newTurno.nombre_turno} onChange={e => setNewTurno({...newTurno, nombre_turno: e.target.value.toUpperCase()})} />
               </div>
             </div>
 
-            <div className="md:col-span-5 space-y-4">
-              <label className="text-[9px] font-black uppercase text-gray-400 ml-2 italic">Días de Aplicación</label>
-              <div className="flex justify-between gap-1">
-                {diasCortos.map((label, index) => (
-                  <button key={index} type="button" onClick={() => toggleDay(index)} className={`flex-1 h-10 rounded-xl text-[10px] font-black transition-all border-2 ${newTurno.days.includes(index) ? "bg-[#87be00] border-[#87be00] text-white shadow-md shadow-[#87be00]/20" : "bg-gray-50 border-transparent text-gray-400 hover:border-gray-200"}`}>{label}</button>
+            <div className="lg:col-span-8 space-y-6">
+              <label className="text-[10px] font-black uppercase text-gray-500 tracking-widest ml-1">Días Operativos</label>
+              <div className="grid grid-cols-4 md:grid-cols-7 gap-2">
+                {diasCompletos.map((dia) => (
+                  <button 
+                    key={dia.id} type="button" onClick={() => toggleDay(dia.id)} 
+                    className={`h-14 rounded-2xl text-[10px] font-black transition-all border-2 flex flex-col items-center justify-center ${
+                        newTurno.days.includes(dia.id) 
+                        ? "bg-[#87be00] border-[#87be00] text-white shadow-lg shadow-[#87be00]/20 scale-105" 
+                        : "bg-gray-50 border-gray-100 text-gray-400 hover:border-[#87be00]/30"
+                    }`}
+                  >
+                    {dia.label}
+                    {newTurno.days.includes(dia.id) && <FiCheck size={12} />}
+                  </button>
                 ))}
               </div>
-              <div className="grid grid-cols-2 gap-3">
+
+              <div className="grid grid-cols-2 gap-4">
                 <input type="time" className="p-4 bg-gray-50 rounded-2xl text-xs font-black outline-none border-2 border-transparent focus:border-[#87be00]" value={newTurno.entrada} onChange={e => setNewTurno({...newTurno, entrada: e.target.value})} />
                 <input type="time" className="p-4 bg-gray-50 rounded-2xl text-xs font-black outline-none border-2 border-transparent focus:border-[#87be00]" value={newTurno.salida} onChange={e => setNewTurno({...newTurno, salida: e.target.value})} />
               </div>
-            </div>
 
-            <div className="md:col-span-3 flex flex-col justify-end">
-              <button disabled={submitting} type="submit" className="bg-[#87be00] text-white rounded-2xl font-black uppercase text-[11px] h-[52px] shadow-lg shadow-[#87be00]/20 flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all">
+              <button disabled={submitting} type="submit" className="w-full bg-[#87be00] text-white rounded-[1.5rem] font-black uppercase text-xs h-16 shadow-xl shadow-[#87be00]/20 flex items-center justify-center gap-3">
                 {submitting ? <FiLoader className="animate-spin" /> : "GUARDAR CONFIGURACIÓN"}
               </button>
             </div>
@@ -159,54 +168,51 @@ const TurnosManager = () => {
         </form>
       )}
 
-      {/* LISTADO AGRUPADO */}
+      {/* LISTADO CON DÍAS EN VERDE */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center p-20 gap-4"><FiLoader size={40} className="animate-spin text-[#87be00]" /></div>
+        <div className="flex flex-col items-center justify-center p-20"><FiLoader size={40} className="animate-spin text-[#87be00]" /></div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {turnosAgrupados.length > 0 ? turnosAgrupados.map((t) => (
-            <div key={t.nombre_turno} className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden">
-              <button 
-                onClick={() => deleteGrupo(t.ids)} 
-                className="absolute top-5 right-5 text-gray-200 hover:text-red-500 transition-colors z-10"
-              >
-                <FiTrash2 size={18}/>
-              </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+          {turnosAgrupados.map((t) => (
+            <div key={t.nombre_turno} className="bg-white rounded-[3rem] p-8 border border-gray-100 shadow-sm hover:shadow-2xl transition-all duration-500 group relative">
+              <button onClick={() => deleteGrupo(t.ids)} className="absolute top-8 right-8 text-gray-200 hover:text-red-500 transition-all scale-125"><FiTrash2 size={20}/></button>
               
-              <div className="flex items-center gap-2 mb-4">
-                 <div className="w-2 h-2 rounded-full bg-[#87be00]"></div>
-                 <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">{t.categoria_rol}</span>
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gray-50 rounded-full mb-6 text-[9px] font-black uppercase text-gray-500 italic">
+                 <div className="w-2 h-2 rounded-full bg-[#87be00]"></div> {t.categoria_rol}
               </div>
 
-              <h3 className="text-xl font-black text-gray-800 uppercase italic mb-5 leading-none tracking-tighter">{t.nombre_turno}</h3>
+              <h3 className="text-2xl font-black text-gray-900 uppercase italic mb-8 tracking-tighter leading-none">{t.nombre_turno}</h3>
 
-              <div className="space-y-4 bg-gray-50 p-6 rounded-[2rem] border border-gray-50 group-hover:bg-gray-100 transition-colors">
-                <div className="flex justify-between items-center">
-                  <div className="flex gap-1">
-                    {diasCortos.map((label, idx) => (
-                      <div key={idx} className={`w-7 h-7 flex items-center justify-center rounded-lg text-[9px] font-black transition-all ${t.dias.includes(idx) ? "bg-[#87be00] text-white shadow-sm shadow-[#87be00]/30" : "bg-white text-gray-300"}`}>
-                        {label}
-                      </div>
-                    ))}
-                  </div>
+              <div className="space-y-6">
+                <div className="bg-gray-50/50 p-5 rounded-[2rem] border border-gray-50">
+                    <div className="flex justify-between gap-1">
+                        {diasCompletos.map((dia) => (
+                        <div 
+                            key={dia.id} 
+                            className={`w-9 h-9 flex items-center justify-center rounded-xl text-[10px] font-black transition-all ${
+                                t.dias.includes(dia.id) 
+                                ? "bg-[#87be00] text-white shadow-lg shadow-[#87be00]/20 scale-110" // 🚩 CAMBIO A VERDE AQUÍ
+                                : "bg-white text-gray-200 border border-gray-100"
+                            }`}
+                        >
+                            {dia.label}
+                        </div>
+                        ))}
+                    </div>
                 </div>
 
-                <div className="flex items-center gap-3 text-sm font-black text-gray-900 border-t border-gray-200/50 pt-4">
-                  <FiClock className="text-[#87be00]" size={16} /> 
-                  <span className="tracking-tighter">{formatTime(t.entrada)} — {formatTime(t.salida)}</span>
+                <div className="flex items-center gap-4 px-2">
+                    <div className="p-3 bg-[#87be00]/10 rounded-2xl text-[#87be00]"><FiClock size={20} /></div>
+                    <div className="flex flex-col">
+                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Horario</span>
+                        <span className="text-lg font-black text-gray-900 tracking-tighter italic">
+                            {t.entrada.slice(0, 5)} — {t.salida.slice(0, 5)}
+                        </span>
+                    </div>
                 </div>
               </div>
-              
-              <div className="absolute -bottom-4 -right-4 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
-                <FiLayers size={100} />
-              </div>
             </div>
-          )) : (
-            <div className="col-span-full flex flex-col items-center justify-center p-20 bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-200">
-              <FiAlertCircle size={40} className="text-gray-300 mb-4" />
-              <p className="text-gray-400 font-black uppercase text-[10px] tracking-widest italic text-center">No hay turnos configurados aún.</p>
-            </div>
-          )}
+          ))}
         </div>
       )}
     </div>

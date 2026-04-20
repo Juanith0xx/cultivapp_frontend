@@ -25,7 +25,7 @@ import Companies from "./pages/root/Companies"
 import Users from "./pages/root/Users"
 import Locales from "./pages/root/Locales"
 import NotificationManager from "./pages/root/NotificationManager"
-import TurnosManager from "./pages/root/TurnosManager" // ✅ IMPORTADO
+import TurnosManager from "./pages/root/TurnosManager"
 
 /* ================= ADMIN CLIENTE ================= */
 import AdminDashboard from "./pages/admin/AdminDashboard"
@@ -38,41 +38,40 @@ import GpsMonitor from "./pages/admin/GpsMonitor"
 /* ================= AUDITORÍA FOTOGRÁFICA ================= */
 import PhotoAuditDashboard from "./components/PhotoAuditDashboard"
 
-/* ================= SUPERVISOR (NUEVO) ================= */
+/* ================= SUPERVISOR ================= */
 import SupervisorDashboard from "./pages/supervisor/SupervisorDashboard"
 import SupervisorPanel from "./pages/supervisor/SupervisorPanel"
 import LiveMap from "./pages/supervisor/LiveMap"
 import AlertManager from "./pages/supervisor/AlertManager"
 import AttendanceControl from "./pages/supervisor/AttendanceControl"
 import PhotoValidation from "./pages/supervisor/PhotoValidation"
+import SupervisorAlertsHistory from "./pages/supervisor/SupervisorAlertsHistory" 
 
 /* ================= USUARIO (MERCADERISTA) ================= */
 import UserDashboard from "./pages/user/UserDashboard"
 import UserHome from "./pages/user/UserHome" 
 import UserLocales from "./pages/user/UserLocales"
 import VisitFlow from "./pages/user/VisitFlow" 
+import UserAgenda from "./pages/user/UserAgenda" // 🚩 VERIFICAR QUE EL ARCHIVO SE LLAME EXACTAMENTE ASÍ
 
 /* ================= QUESTIONS ================= */
 import QuestionsManager from "./pages/admin/QuestionsManager"
 
 import "./App.css"
 
-// 🚩 COMPONENTE DE MONITOREO OFFLINE
 const OfflineMonitor = () => {
   const { isOnline, syncing } = useOfflineSync();
-
   return (
     <>
       {!isOnline && (
         <div className="fixed top-0 left-0 w-full bg-orange-500 text-white text-[10px] font-black py-1.5 flex items-center justify-center gap-2 z-[9999] shadow-lg uppercase tracking-widest animate-pulse">
-          <FiCloudOff size={14} /> Modo Offline: Los datos se guardarán localmente
+          <FiCloudOff size={14} /> Modo Offline
         </div>
       )}
-
       {syncing && (
         <div className="fixed bottom-6 right-6 bg-black text-white px-4 py-3 rounded-2xl shadow-2xl z-[9999] flex items-center gap-3 border border-white/10 animate-bounce">
           <FiRefreshCw size={18} className="animate-spin text-[#87be00]" />
-          <span className="text-[10px] font-black uppercase tracking-tighter">Sincronizando Cultivapp...</span>
+          <span className="text-[10px] font-black uppercase tracking-tighter">Sincronizando...</span>
         </div>
       )}
     </>
@@ -84,101 +83,29 @@ function App() {
     <AuthProvider>
       <NotificationProvider> 
         <BrowserRouter>
-          
           <OfflineMonitor />
-
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              duration: 5000,
-              style: {
-                borderRadius: "16px",
-                background: "#111",
-                color: "#fff",
-                fontSize: "12px",
-                fontFamily: 'Outfit, sans-serif',
-                border: "1px solid rgba(255,255,255,0.1)",
-                padding: '16px'
-              },
-              success: {
-                iconTheme: {
-                  primary: '#87be00',
-                  secondary: '#fff',
-                },
-              }
-            }}
-          />
-
+          <Toaster position="top-right" />
           <Routes>
-            {/* ================= RUTAS PÚBLICAS ================= */}
             <Route path="/" element={<Login />} />
-            <Route path="/verify/:id" element={<UserCredential />} />
+            {/* ... otras rutas públicas ... */}
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
 
-            <Route
-              path="/change-password"
-              element={
-                <ProtectedRoute>
-                  <ChangePassword />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* ================= SECCIÓN ROOT ================= */}
-            <Route
-              path="/root"
-              element={
-                <ProtectedRoute role="ROOT">
-                  <RootDashboard />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Navigate to="analytics" />} />
-              <Route path="analytics" element={<Analytics />} />
-              <Route path="companies" element={<Companies />} />
-              <Route path="users" element={<Users />} />
-              <Route path="locales" element={<Locales />} />
-              <Route path="turnos" element={<TurnosManager />} /> {/* ✅ RUTA AGREGADA */}
-              <Route path="planificacion" element={<AdminRoutes />} /> 
-              <Route path="gps" element={<GpsMonitor />} /> 
-              <Route path="questions" element={<QuestionsManager />} />
-              <Route path="auditoria-fotos" element={<PhotoAuditDashboard />} />
-              <Route path="notification-manager" element={<NotificationManager />} />
-              <Route path="notifications" element={<NotificationsLayout userRole="ROOT" />} />
+            {/* SECCIÓN USUARIO */}
+            <Route path="/usuario" element={<ProtectedRoute role="USUARIO"><UserDashboard /></ProtectedRoute>}>
+              <Route index element={<UserHome />} />
+              <Route path="home" element={<UserHome />} />
+              <Route path="agenda" element={<UserAgenda />} /> 
+              <Route path="locales" element={<UserLocales />} />
+              <Route path="reporte/:id" element={<VisitFlow />} />
+              <Route path="notifications" element={<NotificationsLayout userRole="MERCADERISTA" />} />
             </Route>
 
-            {/* ================= SECCIÓN ADMIN CLIENTE ================= */}
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute role="ADMIN_CLIENTE">
-                  <AdminDashboard />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<AdminOverview />} />
-              <Route path="users" element={<AdminUsers />} />
-              <Route path="locales" element={<AdminLocales />} />
-              <Route path="turnos" element={<TurnosManager />} /> {/* ✅ RUTA AGREGADA */}
-              <Route path="routes" element={<AdminRoutes />} />
-              <Route path="gps" element={<GpsMonitor />} /> 
-              <Route path="questions" element={<QuestionsManager />} />
-              <Route path="auditoria-fotos" element={<PhotoAuditDashboard />} />
-              <Route path="notification-manager" element={<NotificationManager />} />
-              <Route path="notifications" element={<NotificationsLayout userRole="ADMIN" />} />
-            </Route>
-
-            {/* ================= SECCIÓN SUPERVISOR (NUEVA) ================= */}
-            <Route
-              path="/supervisor"
-              element={
-                <ProtectedRoute role="SUPERVISOR">
-                  <SupervisorDashboard />
-                </ProtectedRoute>
-              }
-            >
+            {/* SECCIÓN SUPERVISOR */}
+            <Route path="/supervisor" element={<ProtectedRoute role="SUPERVISOR"><SupervisorDashboard /></ProtectedRoute>}>
               <Route index element={<SupervisorPanel />} />
+              <Route path="trazabilidad-alertas" element={<SupervisorAlertsHistory />} />
               <Route path="mapa" element={<LiveMap />} />
               <Route path="alertas" element={<AlertManager />} />
               <Route path="asistencia" element={<AttendanceControl />} />
@@ -186,26 +113,18 @@ function App() {
               <Route path="notificaciones" element={<NotificationsLayout userRole="SUPERVISOR" />} />
             </Route>
 
-            {/* ================= SECCIÓN USUARIO (MERCADERISTA) ================= */}
-            <Route
-              path="/usuario"
-              element={
-                <ProtectedRoute role="USUARIO">
-                  <UserDashboard />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<UserHome />} />
-              <Route path="home" element={<UserHome />} />
-              <Route path="agenda" element={<UserHome />} /> 
-              <Route path="locales" element={<UserLocales />} />
-              <Route path="reporte/:id" element={<VisitFlow />} />
-              <Route path="notifications" element={<NotificationsLayout userRole="MERCADERISTA" />} />
+            {/* SECCIÓN ADMIN */}
+            <Route path="/admin" element={<ProtectedRoute role="ADMIN_CLIENTE"><AdminDashboard /></ProtectedRoute>}>
+              <Route index element={<AdminOverview />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="locales" element={<AdminLocales />} />
+              <Route path="turnos" element={<TurnosManager />} />
+              <Route path="routes" element={<AdminRoutes />} />
+              <Route path="notifications" element={<NotificationsLayout userRole="ADMIN" />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
-
         </BrowserRouter>
       </NotificationProvider>
     </AuthProvider>

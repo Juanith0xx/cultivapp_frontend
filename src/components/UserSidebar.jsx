@@ -7,7 +7,6 @@ const UserSidebar = () => {
   const { user, logout } = useAuth()
   const { unreadCount } = useNotificationContext()
 
-  // Clases homologadas del AdminSidebar
   const linkBase =
     "flex items-center gap-3 px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-300"
 
@@ -34,11 +33,9 @@ const UserSidebar = () => {
         {/* NAVEGACIÓN */}
         <nav className="flex flex-col gap-1.5">
           
-          {/* GENERAL */}
           <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] mb-2 ml-4">General</p>
           <NavLink
-            to="/usuario"
-            end
+            to="/usuario/home"
             className={({ isActive }) =>
               `${linkBase} ${isActive ? linkActive : linkInactive}`
             }
@@ -49,8 +46,10 @@ const UserSidebar = () => {
 
           {/* PLANIFICACIÓN */}
           <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] mt-6 mb-2 ml-4">Planificación</p>
+          
+          {/* 📅 MI AGENDA: Corregido de /routes a /agenda para que coincida con App.jsx */}
           <NavLink
-            to="/usuario/routes"
+            to="/usuario/agenda" 
             className={({ isActive }) =>
               `${linkBase} ${isActive ? linkActive : linkInactive}`
             }
@@ -69,10 +68,8 @@ const UserSidebar = () => {
             Mis Locales
           </NavLink>
 
-          {/* COMUNICACIÓN */}
           <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] mt-6 mb-2 ml-4">Comunicación</p>
           
-          {/* MI BANDEJA (Sincronizado con estilo Admin) */}
           <NavLink
             to="/usuario/notifications"
             className={({ isActive }) =>
@@ -97,9 +94,14 @@ const UserSidebar = () => {
       <div className="pt-6 border-t border-gray-100 mt-10">
         <div className="px-4 mb-4">
           <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">Operador</p>
-          <p className="text-[10px] font-black text-[#87be00] uppercase truncate italic">
-            {user?.first_name} {user?.last_name}
-          </p>
+          <div className="flex items-center gap-3">
+             <div className="h-8 w-8 rounded-lg bg-[#87be00]/10 flex items-center justify-center text-[#87be00] font-black text-[10px]">
+                {user?.first_name?.charAt(0)}{user?.last_name?.charAt(0)}
+             </div>
+             <p className="text-[10px] font-black text-[#87be00] uppercase truncate italic">
+                {user?.first_name} {user?.last_name}
+             </p>
+          </div>
         </div>
         
         <button 
