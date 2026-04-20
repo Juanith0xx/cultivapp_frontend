@@ -8,7 +8,8 @@ import {
   FiCalendar, 
   FiCamera,
   FiSend, // ✈️ Icono para emitir (enviar)
-  FiBell  // 🔔 Icono para la bandeja (recibir)
+  FiBell,  // 🔔 Icono para la bandeja (recibir)
+  FiClock  // 🕒 Icono para Turnos
 } from "react-icons/fi"
 import { useNotificationContext } from "../context/NotificationContext"
 
@@ -104,6 +105,15 @@ const Sidebar = () => {
         >
           <FiCalendar size={18} />
           Planificación
+        </NavLink>
+
+        {/* 🚩 NUEVO: GESTIÓN DE TURNOS */}
+        <NavLink
+          to="/root/turnos"
+          className={({ isActive }) => `${linkBase} ${isActive ? linkActive : linkInactive}`}
+        >
+          <FiClock size={18} />
+          Configurar Turnos
         </NavLink>
 
         <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] mt-6 mb-2 ml-4">Estructura</p>

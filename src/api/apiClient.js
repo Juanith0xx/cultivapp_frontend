@@ -4,14 +4,23 @@ const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const API_URL = BASE_URL.replace(/\/+$/, "") + (BASE_URL.includes("/api") ? "" : "/api");
 
 /**
- * 🛡️ OBTENCIÓN SEGURA DEL TOKEN
+ * 🛡️ OBTENCIÓN SEGURA DEL TOKEN (MEJORADA)
+ * Limpia comillas, detecta strings inválidos y normaliza el Bearer
  */
 const getToken = () => {
-  const token = localStorage.getItem("token");
-  if (!token || token === "null" || token === "undefined" || token.length < 10) return null;
+  let token = localStorage.getItem("token");
   
+  // 1. Validaciones básicas de existencia
+  if (!token || token === "null" || token === "undefined" || token === "") return null;
+  
+  // 2. Limpieza de comillas (común si usas JSON.stringify al guardar)
+  token = token.replace(/^"|"$/g, '');
+  
+  // 3. Normalización: extraemos solo el hash si viene con prefijo
   const cleanToken = token.startsWith("Bearer ") ? token.split(" ")[1] : token;
-  return cleanToken.trim();
+  
+  const finalToken = cleanToken?.trim();
+  return finalToken && finalToken.length > 10 ? finalToken : null;
 };
 
 const request = async (endpoint, options = {}) => {
@@ -19,8 +28,9 @@ const request = async (endpoint, options = {}) => {
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   const finalUrl = `${API_URL}${cleanEndpoint}`;
   
+  // Debug para desarrollo (puedes comentarlo después)
   if (!token && !cleanEndpoint.includes("/auth/login")) {
-    console.warn(`⚠️ [API] Acceso denegado a ${cleanEndpoint}: No hay token de sesión.`);
+    console.warn(`⚠️ [API] No hay token para: ${cleanEndpoint}`);
   }
 
   const isFD = options.body instanceof FormData;
@@ -38,18 +48,20 @@ const request = async (endpoint, options = {}) => {
   try {
     const response = await fetch(finalUrl, config);
 
+    // Si el backend nos rebota con 401, forzamos limpieza local
     if (response.status === 401) {
-      console.error("❌ Sesión expirada. Redirigiendo al login...");
+      console.error("❌ Sesión inválida o expirada en el servidor.");
+      // Opcional: localStorage.removeItem("token"); 
       throw { status: 401, message: "Sesión no autorizada" };
     }
 
     if (response.status === 403) {
-      console.error(`🚫 PERMISOS INSUFICIENTES: El rol de este usuario no puede acceder a ${cleanEndpoint}`);
-      throw { status: 403, message: "Tu cuenta no tiene permisos para ver esta sección" };
+      throw { status: 403, message: "No tienes permisos para esta acción" };
     }
 
     const contentType = response.headers.get("content-type");
     let data = null;
+    
     if (contentType && contentType.includes("application/json")) {
       data = await response.json();
     } else {
@@ -78,18 +90,11 @@ const request = async (endpoint, options = {}) => {
 };
 
 const api = {
-  /**
-   * ✅ MEJORA: Manejo inteligente de parámetros
-   * Ahora detecta si pasas { params: { ... } } o directamente los filtros.
-   */
   get: (endpoint, config = null) => {
     let url = endpoint;
-    
-    // Extraemos los parámetros reales: si config tiene .params, los usamos; si no, config es el parámetro.
     const actualParams = config?.params ? config.params : config;
 
     if (actualParams && typeof actualParams === "object" && !(actualParams instanceof FormData)) {
-      // Limpiamos nulos, undefined o strings vacíos para una URL limpia
       const cleanParams = Object.fromEntries(
         Object.entries(actualParams).filter(([_, v]) => v != null && v !== "" && v !== "undefined")
       );
@@ -99,8 +104,6 @@ const api = {
         url += `${url.includes("?") ? "&" : "?"}${query}`;
       }
     }
-    
-    // Pasamos el resto de la configuración (headers, etc.) al request
     return request(url, { method: "GET", ...config });
   },
 

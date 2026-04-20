@@ -25,6 +25,7 @@ import Companies from "./pages/root/Companies"
 import Users from "./pages/root/Users"
 import Locales from "./pages/root/Locales"
 import NotificationManager from "./pages/root/NotificationManager"
+import TurnosManager from "./pages/root/TurnosManager" // ✅ IMPORTADO
 
 /* ================= ADMIN CLIENTE ================= */
 import AdminDashboard from "./pages/admin/AdminDashboard"
@@ -138,6 +139,7 @@ function App() {
               <Route path="companies" element={<Companies />} />
               <Route path="users" element={<Users />} />
               <Route path="locales" element={<Locales />} />
+              <Route path="turnos" element={<TurnosManager />} /> {/* ✅ RUTA AGREGADA */}
               <Route path="planificacion" element={<AdminRoutes />} /> 
               <Route path="gps" element={<GpsMonitor />} /> 
               <Route path="questions" element={<QuestionsManager />} />
@@ -158,6 +160,7 @@ function App() {
               <Route index element={<AdminOverview />} />
               <Route path="users" element={<AdminUsers />} />
               <Route path="locales" element={<AdminLocales />} />
+              <Route path="turnos" element={<TurnosManager />} /> {/* ✅ RUTA AGREGADA */}
               <Route path="routes" element={<AdminRoutes />} />
               <Route path="gps" element={<GpsMonitor />} /> 
               <Route path="questions" element={<QuestionsManager />} />
@@ -180,8 +183,6 @@ function App() {
               <Route path="alertas" element={<AlertManager />} />
               <Route path="asistencia" element={<AttendanceControl />} />
               <Route path="ejecucion" element={<PhotoValidation />} />
-              
-              {/* Bandeja de entrada para el Supervisor */}
               <Route path="notificaciones" element={<NotificationsLayout userRole="SUPERVISOR" />} />
             </Route>
 

@@ -6,8 +6,9 @@ import {
   FiHelpCircle, 
   FiCalendar, 
   FiNavigation,
-  FiSend, // ✈️ Icono para emitir
-  FiBell  // 🔔 Icono para la bandeja
+  FiSend, 
+  FiBell,
+  FiClock // 🕒 Nuevo icono para turnos
 } from "react-icons/fi"
 import { useAuth } from "../context/AuthContext"
 import { useNotificationContext } from "../context/NotificationContext" 
@@ -57,6 +58,17 @@ const AdminSidebar = () => {
             Planificación
           </NavLink>
 
+          {/* 🕒 NUEVO: CONFIGURAR TURNOS */}
+          <NavLink
+            to="/admin/turnos"
+            className={({ isActive }) =>
+              `${linkBase} ${isActive ? linkActive : linkInactive}`
+            }
+          >
+            <FiClock size={18} />
+            Configurar Turnos
+          </NavLink>
+
           <NavLink
             to="/admin/gps"
             className={({ isActive }) =>
@@ -67,10 +79,9 @@ const AdminSidebar = () => {
             Monitoreo GPS
           </NavLink>
 
-          {/* 🔔 COMUNICACIÓN */}
+          {/* COMUNICACIÓN */}
           <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] mt-6 mb-2 ml-4">Comunicación</p>
           
-          {/* EMITIR ALERTAS (Ahora con estilo de link normal) */}
           <NavLink
             to="/admin/notification-manager"
             className={({ isActive }) =>
@@ -81,7 +92,6 @@ const AdminSidebar = () => {
             Emitir Alertas
           </NavLink>
 
-          {/* MI BANDEJA */}
           <NavLink
             to="/admin/notifications"
             className={({ isActive }) =>

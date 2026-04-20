@@ -3,12 +3,12 @@ import { useOutletContext } from "react-router-dom";
 import { 
   FiPlus, FiRefreshCw, FiEdit3, FiCalendar, FiList, FiClock, 
   FiCheckCircle, FiAlertCircle, FiXCircle, FiPlayCircle, FiBriefcase,
-  FiUploadCloud // 🚩 Nuevo icono
+  FiUploadCloud 
 } from "react-icons/fi";
 import api from "../../api/apiClient";
 import ManageRoutesModal from "../../components/ManageRoutesModal";
 import toast from "react-hot-toast";
-import * as XLSX from "xlsx"; // 🚩 Recuerda instalar: npm install xlsx
+import * as XLSX from "xlsx";
 
 const WeeklyStatus = ({ activeDays = [] }) => {
   const days = [
@@ -29,7 +29,7 @@ const WeeklyStatus = ({ activeDays = [] }) => {
 const AdminRoutes = () => {
   const context = useOutletContext();
   const globalSelectedCompany = context?.selectedCompany || "";
-  const fileInputRef = useRef(null); // 🚩 Referencia para el input de Excel
+  const fileInputRef = useRef(null);
 
   const [routes, setRoutes] = useState([]);
   const [users, setUsers] = useState([]);
@@ -50,7 +50,6 @@ const AdminRoutes = () => {
       setRoutes(Array.isArray(routesRes.data) ? routesRes.data : routesRes || []);
       setUsers(Array.isArray(usersRes.data) ? usersRes.data : usersRes || []);
       setLocales(Array.isArray(localesRes.data) ? localesRes.data : localesRes || []);
-
       try {
         const companiesRes = await api.get("/companies");
         setCompanies(Array.isArray(companiesRes.data) ? companiesRes.data : companiesRes || []);
@@ -62,51 +61,103 @@ const AdminRoutes = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // --- 📊 LÓGICA DE CARGA MASIVA EXCEL ---
+  // --- 📊 LÓGICA DE CARGA MASIVA CON EXPANSIÓN CORREGIDA ---
   const handleImportExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
+      const toastId = toast.loading("Procesando y expandiendo rutas...");
       try {
-        toast.loading("Procesando Excel...", { id: 'import-excel' });
         const bstr = evt.target.result;
-        const wb = XLSX.read(bstr, { type: "binary" });
+        // Agregamos cellDates: true para que XLSX convierta fechas automáticamente
+        const wb = XLSX.read(bstr, { type: "binary", cellDates: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const excelData = XLSX.utils.sheet_to_json(ws);
 
-        // Mapeo exacto de tus columnas
-        const diasMap = [
-          { key: "lunes", val: 1 }, { key: "martes", val: 2 },
-          { key: "miercoles", val: 3 }, { key: "jueves", val: 4 },
-          { key: "viernes", val: 5 }, { key: "sabadodomingo", val: 6 }
-        ];
+        if (!excelData || excelData.length === 0) throw new Error("El archivo está vacío");
+
+        const cleanRut = (r) => r?.toString().toLowerCase().replace(/[^0-9k]/g, "") || "";
 
         const routesToUpload = [];
-        excelData.forEach(row => {
-          const rut = row["Rut 2"];
-          const centerCode = row["center_code"];
-          if (!rut || rut === "#VALUE!") return;
 
-          diasMap.forEach(dia => {
-            if (row[dia.key] && parseFloat(row[dia.key]) > 0) {
-              routesToUpload.push({
-                rut_mercaderista: String(rut).trim(),
-                codigo_local: String(centerCode).trim(),
-                day_of_week: dia.val,
-                start_time: "08:00",
-                end_time: "16:00"
+        excelData.forEach((row) => {
+          const rutExcel = row["Rut_Mercaderista"];
+          const codigoLocalExcel = row["Codigo "];
+          const rolExcel = row["Rol"];
+          const tipoTurnoExcel = row["Tipo de Turno"]?.toString().trim().toUpperCase();
+          
+          // Validación de fecha para evitar "Invalid time value"
+          let fechaRaw = row["Fecha"];
+          let baseDate;
+
+          if (fechaRaw instanceof Date && !isNaN(fechaRaw)) {
+            baseDate = fechaRaw;
+          } else if (typeof fechaRaw === "string") {
+            baseDate = new Date(fechaRaw + "T12:00:00");
+          } else {
+            // Si no hay fecha, usamos hoy como emergencia
+            baseDate = new Date();
+            baseDate.setHours(12, 0, 0, 0);
+          }
+
+          if (isNaN(baseDate.getTime())) return; // Salta si la fecha es inválida
+
+          const foundUser = users.find(u => cleanRut(u.rut) === cleanRut(rutExcel));
+          const foundLocal = locales.find(l => l.codigo_local?.toString().trim() === codigoLocalExcel?.toString().trim());
+
+          if (foundUser && foundLocal) {
+            const crearRuta = (dateObj) => ({
+              user_id: foundUser.id,
+              local_id: foundLocal.id,
+              Rol: rolExcel,
+              Tipo_de_Turno: tipoTurnoExcel,
+              Fecha: dateObj.toISOString().split('T')[0]
+            });
+
+            // EXPANSIÓN
+            if (tipoTurnoExcel === "TURNO A1") {
+              // Lunes(0), Jueves(3), Viernes(4)
+              [0, 3, 4].forEach(offset => {
+                const d = new Date(baseDate);
+                d.setDate(baseDate.getDate() + offset);
+                routesToUpload.push(crearRuta(d));
+              });
+            } 
+            else if (tipoTurnoExcel === "TURNO A2") {
+              // Martes(1), Miércoles(2), Sábados(5)
+              [1, 2, 5].forEach(offset => {
+                const d = new Date(baseDate);
+                d.setDate(baseDate.getDate() + offset);
+                routesToUpload.push(crearRuta(d));
               });
             }
-          });
+            else if (tipoTurnoExcel === "TURNO A") {
+              // Lunes(0), Miércoles(2), Viernes(4)
+              [0, 2, 4].forEach(offset => {
+                const d = new Date(baseDate);
+                d.setDate(baseDate.getDate() + offset);
+                routesToUpload.push(crearRuta(d));
+              });
+            }
+            else {
+              routesToUpload.push(crearRuta(baseDate));
+            }
+          }
         });
 
-        await api.post("/routes/bulk-create", { routes: routesToUpload });
-        toast.success(`¡Éxito! Cargadas ${routesToUpload.length} visitas`, { id: 'import-excel' });
-        fetchData(); // Refrescar tabla
+        if (routesToUpload.length === 0) {
+          toast.error("No se encontraron datos válidos.", { id: toastId });
+          return;
+        }
+
+        const res = await api.post("/routes/bulk-create", routesToUpload);
+        toast.success(`Carga exitosa: ${res.count || routesToUpload.length} visitas creadas.`, { id: toastId });
+        fetchData(); 
       } catch (err) {
-        toast.error("Error al procesar el Excel", { id: 'import-excel' });
+        console.error("Error en expansión:", err);
+        toast.error("Error: " + err.message, { id: toastId });
       } finally {
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
@@ -119,32 +170,24 @@ const AdminRoutes = () => {
     const filteredRoutes = globalSelectedCompany 
       ? routes.filter(r => String(r.company_id) === String(globalSelectedCompany))
       : routes;
-
     const groups = {};
     filteredRoutes.forEach(r => {
       const key = `${r.user_id}-${r.local_id}`;
       if (!groups[key]) {
-        groups[key] = { 
-          ...r, 
-          days_array: r.day_of_week !== null ? [parseInt(r.day_of_week, 10)] : [],
-          all_statuses: [r.status],
-          company_name: companies.find(c => c.id === r.company_id)?.name || "N/A"
-        };
+        groups[key] = { ...r, days_array: r.day_of_week !== null ? [parseInt(r.day_of_week, 10)] : [], all_statuses: [r.status] };
       } else {
         const d = parseInt(r.day_of_week, 10);
         if (!groups[key].days_array.includes(d)) groups[key].days_array.push(d);
         groups[key].all_statuses.push(r.status);
       }
     });
-
-    return Object.values(groups).map(group => {
-      let finalStatus = 'PENDING';
-      if (group.all_statuses.includes('IN_PROGRESS')) finalStatus = 'IN_PROGRESS';
-      else if (group.all_statuses.every(s => s === 'COMPLETED' || s === 'OK')) finalStatus = 'COMPLETED';
-      else if (group.all_statuses.some(s => s === 'COMPLETED' || s === 'OK')) finalStatus = 'PARTIAL';
-      return { ...group, displayStatus: finalStatus };
-    });
-  }, [routes, globalSelectedCompany, companies]);
+    return Object.values(groups).map(group => ({
+      ...group,
+      displayStatus: group.all_statuses.includes('IN_PROGRESS') ? 'IN_PROGRESS' : 
+                     group.all_statuses.every(s => s === 'COMPLETED' || s === 'OK') ? 'COMPLETED' : 
+                     group.all_statuses.some(s => s === 'COMPLETED' || s === 'OK') ? 'PARTIAL' : 'PENDING'
+    }));
+  }, [routes, globalSelectedCompany]);
 
   const getStatusBadge = (status) => {
     const config = {
@@ -163,42 +206,16 @@ const AdminRoutes = () => {
 
   return (
     <div className="p-4 space-y-6 font-[Outfit]">
-      {/* HEADER PANEL CON BOTONES */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tight italic">Planificación de Rutas</h1>
-          {globalSelectedCompany && companies.length > 0 && (
-            <span className="bg-[#87be00]/10 text-[#87be00] text-[10px] font-black px-3 py-1 rounded-lg w-fit uppercase tracking-tighter">
-              Filtrado: {companies.find(c => String(c.id) === String(globalSelectedCompany))?.name}
-            </span>
-          )}
-        </div>
-        
+        <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tight italic">Planificación de Rutas</h1>
         <div className="flex flex-wrap items-center gap-3">
-          <button onClick={fetchData} className="p-4 bg-gray-50 text-gray-400 rounded-2xl hover:text-[#87be00] transition-all">
-            <FiRefreshCw className={loading ? "animate-spin" : ""}/>
-          </button>
-
-          {/* 🚩 BOTÓN IMPORTAR EXCEL (VERDE) */}
+          <button onClick={fetchData} className="p-4 bg-gray-50 text-gray-400 rounded-2xl hover:text-[#87be00] transition-all"><FiRefreshCw className={loading ? "animate-spin" : ""}/></button>
           <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleImportExcel} />
-          <button 
-            onClick={() => fileInputRef.current.click()}
-            className="bg-[#87be00] text-white px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#87be00]/20 flex items-center gap-2 hover:scale-105 transition-all"
-          >
-            <FiUploadCloud size={16}/> Importar Excel
-          </button>
-
-          {/* BOTÓN NUEVA VISITA (NEGRO) */}
-          <button 
-            onClick={() => { setSelectedRoute(null); setIsModalOpen(true); }} 
-            className="bg-black text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl flex items-center gap-2 hover:scale-105 transition-all"
-          >
-            <FiPlus size={16}/> Nueva Visita
-          </button>
+          <button onClick={() => fileInputRef.current.click()} className="bg-[#87be00] text-white px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center gap-2 hover:scale-105 transition-all"><FiUploadCloud size={16}/> Importar Excel</button>
+          <button onClick={() => { setSelectedRoute(null); setIsModalOpen(true); }} className="bg-black text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl flex items-center gap-2 hover:scale-105 transition-all"><FiPlus size={16}/> Nueva Visita</button>
         </div>
       </div>
 
-      {/* TABLA */}
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -213,31 +230,21 @@ const AdminRoutes = () => {
             </thead>
             <tbody className="divide-y divide-gray-50 text-xs">
               {loading ? (
-                 <tr><td colSpan="5" className="p-20 text-center text-[10px] font-black text-gray-300 uppercase animate-pulse">Cargando...</td></tr>
+                 <tr><td colSpan="5" className="p-20 text-center text-[10px] font-black text-gray-300 uppercase animate-pulse">Sincronizando...</td></tr>
               ) : groupedRoutes.map((r) => (
                 <tr key={`${r.user_id}-${r.local_id}`} className="hover:bg-gray-50/50 transition-colors group">
-                  <td className="p-6 font-black text-gray-800 uppercase italic">
-                    {r.cadena}<br/><span className="text-[10px] text-gray-400">{r.direccion}</span>
-                  </td>
+                  <td className="p-6 font-black text-gray-800 uppercase italic">{r.cadena}<br/><span className="text-[10px] text-gray-400">{r.direccion}</span></td>
                   <td className="p-6 font-black text-gray-700 uppercase">{r.first_name} {r.last_name}</td>
                   <td className="p-6"><WeeklyStatus activeDays={r.days_array} /></td>
                   <td className="p-6 text-center">{getStatusBadge(r.displayStatus)}</td>
-                  <td className="p-6 text-right">
-                    <button onClick={() => { setSelectedRoute({ ...r, selectedDays: r.days_array }); setIsModalOpen(true); }} className="p-3 bg-gray-50 text-gray-400 hover:bg-[#87be00] hover:text-white rounded-xl transition-all">
-                      <FiEdit3 size={16}/>
-                    </button>
-                  </td>
+                  <td className="p-6 text-right"><button onClick={() => { setSelectedRoute({ ...r, selectedDays: r.days_array }); setIsModalOpen(true); }} className="p-3 bg-gray-50 text-gray-400 hover:bg-[#87be00] hover:text-white rounded-xl transition-all"><FiEdit3 size={16}/></button></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
-
-      <ManageRoutesModal 
-        isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setSelectedRoute(null); }} 
-        users={users} locales={locales} companies={companies} onCreated={fetchData} initialData={selectedRoute} 
-      />
+      <ManageRoutesModal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setSelectedRoute(null); }} users={users} locales={locales} companies={companies} onCreated={fetchData} initialData={selectedRoute} />
     </div>
   );
 };
