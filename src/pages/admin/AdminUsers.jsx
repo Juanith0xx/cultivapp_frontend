@@ -7,7 +7,8 @@ import {
   FiActivity,
   FiUsers,
   FiEye,
-  FiShield
+  FiShield,
+  FiMapPin 
 } from "react-icons/fi"
 import { toast } from "react-hot-toast"
 import api from "../../api/apiClient"
@@ -15,6 +16,7 @@ import api from "../../api/apiClient"
 import CreateAdminUserModal from "../../components/CreateAdminUserModal"
 import EditAdminUserModal from "../../components/EditAdminUserModal"
 import ResetPasswordAdminModal from "../../components/ResetPasswordAdminModal"
+import AssignLocalesModal from "./AssignLocalesModal" 
 
 const AdminUsers = () => {
   const [users, setUsers] = useState([])
@@ -22,6 +24,7 @@ const AdminUsers = () => {
   const [openModal, setOpenModal] = useState(false)
   const [editUser, setEditUser] = useState(null)
   const [resetUser, setResetUser] = useState(null)
+  const [assignSupervisor, setAssignSupervisor] = useState(null)
   const [loading, setLoading] = useState(true)
 
   const userLocal = JSON.parse(localStorage.getItem("user"))
@@ -145,7 +148,7 @@ const AdminUsers = () => {
         </button>
       </div>
 
-      {/* STATS PROGRESS BARS */}
+      {/* STATS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <ProgressCard 
             title="Supervisores" used={usedSupervisors} max={maxSupervisors} 
@@ -206,7 +209,19 @@ const AdminUsers = () => {
                 </td>
 
                 <td className="p-6">
-                  <div className="flex justify-end gap-3 opacity-30 group-hover:opacity-100 transition-opacity">
+                  <div className="flex justify-end gap-2.5 opacity-30 group-hover:opacity-100 transition-opacity">
+                    
+                    {/* ✅ ACCIÓN: ASIGNAR LOCALES (Solo para Supervisor) */}
+                    {user.role === 'SUPERVISOR' && (
+                      <button 
+                        onClick={() => setAssignSupervisor(user)}
+                        className="p-2 bg-gray-50 text-[#87be00] rounded-xl hover:bg-[#87be00] hover:text-white transition-all shadow-sm"
+                        title="Asignar Cobertura"
+                      >
+                        <FiMapPin size={16} />
+                      </button>
+                    )}
+
                     <button 
                       onClick={() => setEditUser(user)}
                       className="p-2 bg-gray-50 text-gray-600 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-all shadow-sm"
@@ -237,7 +252,17 @@ const AdminUsers = () => {
 
       <CreateAdminUserModal isOpen={openModal} onClose={() => setOpenModal(false)} onCreated={fetchData} />
       <EditAdminUserModal isOpen={!!editUser} user={editUser} stats={stats} onClose={() => setEditUser(null)} onUpdated={fetchData} />
+      
+      {/* ✅ MODALES ADICIONALES */}
       {resetUser && <ResetPasswordAdminModal user={resetUser} onClose={() => setResetUser(null)} onUpdated={fetchData} />}
+      
+      {assignSupervisor && (
+        <AssignLocalesModal 
+          supervisor={assignSupervisor} 
+          onClose={() => setAssignSupervisor(null)} 
+          onRefresh={fetchData}
+        />
+      )}
     </div>
   )
 }
