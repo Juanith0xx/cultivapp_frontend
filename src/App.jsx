@@ -87,14 +87,16 @@ function App() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
 
-            {/* 👑 SECCIÓN ROOT: Acceso Total */}
+            {/* 👑 SECCIÓN ROOT: Acceso Total Maestro */}
             <Route path="/root" element={<ProtectedRoute role="ROOT"><RootDashboard /></ProtectedRoute>}>
-              <Route index element={<SupervisorPanel />} /> 
+              {/* index cargará Analytics por defecto al entrar a /root */}
+              <Route index element={<Analytics />} /> 
               <Route path="analytics" element={<Analytics />} />
               <Route path="companies" element={<Companies />} />
               <Route path="users" element={<Users />} />
               <Route path="locales" element={<Locales />} />
               <Route path="turnos" element={<TurnosManager />} />
+              {/* 🚩 Sincronizado: PLURAL para que coincida con el Sidebar */}
               <Route path="notifications-manager" element={<NotificationManager />} />
               <Route path="questions" element={<QuestionsManager />} />
               <Route path="gps-monitor" element={<GpsMonitor />} />
@@ -123,20 +125,18 @@ function App() {
             </Route>
 
             {/* 🏢 SECCIÓN ADMIN CLIENTE */}
-            <Route path="/admin" element={<ProtectedRoute role="ADMIN_CLIENTE"><AdminDashboard /></ProtectedRoute>}>
+            <Route path="/admin" element={<ProtectedRoute roles={["ADMIN_CLIENTE", "ROOT"]}><AdminDashboard /></ProtectedRoute>}>
               <Route index element={<AdminOverview />} />
               <Route path="users" element={<AdminUsers />} />
               <Route path="locales" element={<AdminLocales />} />
               <Route path="turnos" element={<TurnosManager />} />
               <Route path="routes" element={<AdminRoutes />} />
-              {/* 🚩 CORRECCIÓN: Sincronizado con AdminSidebar (gps-monitor) */}
               <Route path="gps-monitor" element={<GpsMonitor />} /> 
               <Route path="notification-manager" element={<NotificationManager />} />
               <Route path="questions" element={<QuestionsManager />} />
               <Route path="notifications" element={<NotificationsLayout userRole="ADMIN" />} />
             </Route>
 
-            {/* REDIRECCIÓN POR DEFECTO A LOGIN */}
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </BrowserRouter>
