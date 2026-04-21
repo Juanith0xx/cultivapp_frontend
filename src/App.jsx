@@ -14,7 +14,6 @@ import ForgotPassword from "./pages/auth/ForgotPassword"
 import ResetPassword from "./pages/auth/ResetPassword"
 
 // --- COMPONENTES GLOBALES ---
-import UserCredential from "./components/UserCredential" 
 import ProtectedRoute from "./components/ProtectedRoute"
 import NotificationsLayout from "./components/NotificationsLayout" 
 
@@ -35,9 +34,6 @@ import AdminLocales from "./components/AdminLocales"
 import AdminRoutes from "./pages/admin/AdminRoutes"
 import GpsMonitor from "./pages/admin/GpsMonitor" 
 
-/* ================= AUDITORÍA FOTOGRÁFICA ================= */
-import PhotoAuditDashboard from "./components/PhotoAuditDashboard"
-
 /* ================= SUPERVISOR ================= */
 import SupervisorDashboard from "./pages/supervisor/SupervisorDashboard"
 import SupervisorPanel from "./pages/supervisor/SupervisorPanel"
@@ -52,7 +48,7 @@ import UserDashboard from "./pages/user/UserDashboard"
 import UserHome from "./pages/user/UserHome" 
 import UserLocales from "./pages/user/UserLocales"
 import VisitFlow from "./pages/user/VisitFlow" 
-import UserAgenda from "./pages/user/UserAgenda" // 🚩 VERIFICAR QUE EL ARCHIVO SE LLAME EXACTAMENTE ASÍ
+import UserAgenda from "./pages/user/UserAgenda"
 
 /* ================= QUESTIONS ================= */
 import QuestionsManager from "./pages/admin/QuestionsManager"
@@ -87,12 +83,25 @@ function App() {
           <Toaster position="top-right" />
           <Routes>
             <Route path="/" element={<Login />} />
-            {/* ... otras rutas públicas ... */}
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
 
-            {/* SECCIÓN USUARIO */}
+            {/* 👑 SECCIÓN ROOT: Acceso Total */}
+            <Route path="/root" element={<ProtectedRoute role="ROOT"><RootDashboard /></ProtectedRoute>}>
+              <Route index element={<SupervisorPanel />} /> 
+              <Route path="analytics" element={<Analytics />} />
+              <Route path="companies" element={<Companies />} />
+              <Route path="users" element={<Users />} />
+              <Route path="locales" element={<Locales />} />
+              <Route path="turnos" element={<TurnosManager />} />
+              <Route path="notifications-manager" element={<NotificationManager />} />
+              <Route path="questions" element={<QuestionsManager />} />
+              <Route path="gps-monitor" element={<GpsMonitor />} />
+              <Route path="notifications" element={<NotificationsLayout userRole="ROOT" />} />
+            </Route>
+
+            {/* 👤 SECCIÓN USUARIO (MERCADERISTA) */}
             <Route path="/usuario" element={<ProtectedRoute role="USUARIO"><UserDashboard /></ProtectedRoute>}>
               <Route index element={<UserHome />} />
               <Route path="home" element={<UserHome />} />
@@ -102,7 +111,7 @@ function App() {
               <Route path="notifications" element={<NotificationsLayout userRole="MERCADERISTA" />} />
             </Route>
 
-            {/* SECCIÓN SUPERVISOR */}
+            {/* 📡 SECCIÓN SUPERVISOR */}
             <Route path="/supervisor" element={<ProtectedRoute role="SUPERVISOR"><SupervisorDashboard /></ProtectedRoute>}>
               <Route index element={<SupervisorPanel />} />
               <Route path="trazabilidad-alertas" element={<SupervisorAlertsHistory />} />
@@ -113,16 +122,21 @@ function App() {
               <Route path="notificaciones" element={<NotificationsLayout userRole="SUPERVISOR" />} />
             </Route>
 
-            {/* SECCIÓN ADMIN */}
+            {/* 🏢 SECCIÓN ADMIN CLIENTE */}
             <Route path="/admin" element={<ProtectedRoute role="ADMIN_CLIENTE"><AdminDashboard /></ProtectedRoute>}>
               <Route index element={<AdminOverview />} />
               <Route path="users" element={<AdminUsers />} />
               <Route path="locales" element={<AdminLocales />} />
               <Route path="turnos" element={<TurnosManager />} />
               <Route path="routes" element={<AdminRoutes />} />
+              {/* 🚩 CORRECCIÓN: Sincronizado con AdminSidebar (gps-monitor) */}
+              <Route path="gps-monitor" element={<GpsMonitor />} /> 
+              <Route path="notification-manager" element={<NotificationManager />} />
+              <Route path="questions" element={<QuestionsManager />} />
               <Route path="notifications" element={<NotificationsLayout userRole="ADMIN" />} />
             </Route>
 
+            {/* REDIRECCIÓN POR DEFECTO A LOGIN */}
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </BrowserRouter>

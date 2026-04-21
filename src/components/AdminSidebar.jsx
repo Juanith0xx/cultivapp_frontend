@@ -70,7 +70,7 @@ const AdminSidebar = () => {
           </NavLink>
 
           <NavLink
-            to="/admin/gps"
+            to="/admin/gps-monitor"
             className={({ isActive }) =>
               `${linkBase} ${isActive ? linkActive : linkInactive}`
             }
