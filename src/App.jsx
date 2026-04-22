@@ -95,9 +95,8 @@ function App() {
               <Route path="users" element={<Users />} />
               <Route path="locales" element={<Locales />} />
               
-              {/* 🚩 LOGÍSTICA ROOT ACTUALIZADA */}
               <Route path="planificacion" element={<Analytics />} /> 
-              <Route path="routes" element={<AdminRoutes />} /> {/* 🚩 Agregada aquí */}
+              <Route path="routes" element={<AdminRoutes />} />
               <Route path="turnos" element={<TurnosManager />} />
               <Route path="gps-monitor" element={<GpsMonitor />} />
 
@@ -107,7 +106,7 @@ function App() {
               <Route path="questions" element={<QuestionsManager />} />
             </Route>
 
-            {/* ... Resto de rutas (Usuario, Supervisor, Admin) se mantienen igual ... */}
+            {/* 👤 SECCIÓN USUARIO */}
             <Route path="/usuario" element={<ProtectedRoute role="USUARIO"><UserDashboard /></ProtectedRoute>}>
               <Route index element={<UserHome />} />
               <Route path="home" element={<UserHome />} />
@@ -117,6 +116,7 @@ function App() {
               <Route path="notifications" element={<NotificationsLayout userRole="MERCADERISTA" />} />
             </Route>
 
+            {/* 🛡️ SECCIÓN SUPERVISOR */}
             <Route path="/supervisor" element={<ProtectedRoute role="SUPERVISOR"><SupervisorDashboard /></ProtectedRoute>}>
               <Route index element={<SupervisorPanel />} />
               <Route path="trazabilidad-alertas" element={<AlertsHistory userRole="SUPERVISOR" />} />
@@ -127,10 +127,15 @@ function App() {
               <Route path="notificaciones" element={<NotificationsLayout userRole="SUPERVISOR" />} />
             </Route>
 
+            {/* 💼 SECCIÓN ADMIN CLIENTE */}
             <Route path="/admin" element={<ProtectedRoute roles={["ADMIN_CLIENTE", "ROOT"]}><AdminDashboard /></ProtectedRoute>}>
               <Route index element={<AdminOverview />} />
               <Route path="users" element={<AdminUsers />} />
               <Route path="locales" element={<AdminLocales />} />
+              
+              {/* 🚩 NUEVA RUTA AGREGADA PARA EMPRESAS EN PANEL ADMIN */}
+              <Route path="companies" element={<Companies />} />
+              
               <Route path="turnos" element={<TurnosManager />} />
               <Route path="routes" element={<AdminRoutes />} />
               <Route path="gps-monitor" element={<GpsMonitor />} /> 

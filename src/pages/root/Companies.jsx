@@ -1,16 +1,13 @@
 import { useEffect, useState } from "react"
-import { FiPlus, FiBriefcase, FiUsers, FiEye, FiActivity, FiEdit3 } from "react-icons/fi"
+import { FiPlus, FiBriefcase, FiUsers, FiEye, FiActivity, FiEdit3, FiTrash2 } from "react-icons/fi"
 import CreateCompanyModal from "../../components/CreateCompanyModal"
 import { toast } from "react-hot-toast"
-
-const API_URL = import.meta.env.VITE_API_URL
+import api from "../../api/apiClient" // 🚩 Usamos tu apiClient para consistencia
 
 const Companies = () => {
   const [companies, setCompanies] = useState([])
   const [openModal, setOpenModal] = useState(false)
   const [loading, setLoading] = useState(true)
-  
-  // NUEVO: Estado para manejar la edición
   const [editingCompany, setEditingCompany] = useState(null)
 
   useEffect(() => {
@@ -19,28 +16,21 @@ const Companies = () => {
 
   const fetchCompanies = async () => {
     try {
-      const token = localStorage.getItem("token")
-      const res = await fetch(`${API_URL}/api/companies`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      if (!res.ok) throw new Error("Error obteniendo empresas")
-      const data = await res.json()
+      setLoading(true)
+      const data = await api.get("/companies")
       setCompanies(data)
     } catch (err) {
-      console.error("Error cargando empresas:", err)
       toast.error("No se pudieron cargar las empresas")
     } finally {
       setLoading(false)
     }
   }
 
-  // NUEVO: Abrir modal en modo edición
   const handleEdit = (company) => {
     setEditingCompany(company)
     setOpenModal(true)
   }
 
-  // NUEVO: Limpiar edición al cerrar modal
   const handleCloseModal = () => {
     setEditingCompany(null)
     setOpenModal(false)
@@ -48,15 +38,28 @@ const Companies = () => {
 
   const toggleCompany = async (id) => {
     try {
-      const token = localStorage.getItem("token")
-      await fetch(`${API_URL}/api/companies/${id}/toggle`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      await api.patch(`/companies/${id}/toggle`)
       toast.success("Estado actualizado")
       fetchCompanies()
     } catch (err) {
-      console.error("Error cambiando estado:", err)
+      toast.error("Error al cambiar estado")
+    }
+  }
+
+  // 🚩 NUEVA FUNCIÓN: Eliminar Empresa
+  const handleDelete = async (company) => {
+    const confirmDelete = window.confirm(
+      `¿Estás seguro de eliminar a "${company.name}"? Esta acción no se puede deshacer y afectará a todos sus usuarios.`
+    )
+
+    if (!confirmDelete) return
+
+    try {
+      await api.delete(`/companies/${company.id}`)
+      toast.success("Empresa eliminada correctamente")
+      fetchCompanies()
+    } catch (err) {
+      toast.error(err.message || "Error al eliminar la empresa")
     }
   }
 
@@ -121,6 +124,7 @@ const Companies = () => {
 
                   <td className="p-6">
                     <div className="flex gap-4">
+                      {/* Límites de Supervisores, Mercs, Views */}
                       <div className="flex flex-col">
                         <span className="text-[8px] font-black text-gray-400 uppercase mb-1">Sups</span>
                         <div className="flex items-center gap-1 text-xs font-black text-gray-700">
@@ -143,11 +147,11 @@ const Companies = () => {
                   </td>
 
                   <td className="p-6">
-                    <div className="flex items-center justify-center gap-4">
-                      {/* BOTÓN EDITAR LÍMITES */}
+                    <div className="flex items-center justify-center gap-3">
+                      {/* BOTÓN EDITAR */}
                       <button
                         onClick={() => handleEdit(company)}
-                        className="p-2.5 bg-gray-100 text-gray-400 rounded-xl hover:bg-gray-900 hover:text-[#87be00] transition-all shadow-sm"
+                        className="p-2.5 bg-gray-50 text-gray-400 rounded-xl hover:bg-gray-900 hover:text-[#87be00] transition-all"
                         title="Editar Límites"
                       >
                         <FiEdit3 size={16} />
@@ -165,6 +169,15 @@ const Companies = () => {
                           }`}
                         />
                       </button>
+
+                      {/* 🚩 BOTÓN ELIMINAR (ROOT) */}
+                      <button
+                        onClick={() => handleDelete(company)}
+                        className="p-2.5 bg-red-50 text-red-300 rounded-xl hover:bg-red-500 hover:text-white transition-all"
+                        title="Eliminar Empresa"
+                      >
+                        <FiTrash2 size={16} />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -178,7 +191,7 @@ const Companies = () => {
         isOpen={openModal}
         onClose={handleCloseModal}
         onCreated={fetchCompanies}
-        editingCompany={editingCompany} // Pasar la empresa a editar
+        editingCompany={editingCompany}
       />
     </div>
   )

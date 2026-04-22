@@ -8,7 +8,8 @@ import {
   FiNavigation,
   FiSend, 
   FiBell,
-  FiClock // 🕒 Nuevo icono para turnos
+  FiClock,
+  FiBriefcase // 💼 Nuevo icono para Empresas
 } from "react-icons/fi"
 import { useAuth } from "../context/AuthContext"
 import { useNotificationContext } from "../context/NotificationContext" 
@@ -58,7 +59,6 @@ const AdminSidebar = () => {
             Planificación
           </NavLink>
 
-          {/* 🕒 NUEVO: CONFIGURAR TURNOS */}
           <NavLink
             to="/admin/turnos"
             className={({ isActive }) =>
@@ -107,6 +107,18 @@ const AdminSidebar = () => {
               )}
             </div>
             Mi Bandeja
+          </NavLink>
+
+          {/* 🚩 NUEVO: ADMINISTRACIÓN (Para Empresas) */}
+          <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] mt-6 mb-2 ml-4">Administración</p>
+          <NavLink
+            to="/admin/companies"
+            className={({ isActive }) =>
+              `${linkBase} ${isActive ? linkActive : linkInactive}`
+            }
+          >
+            <FiBriefcase size={18} />
+            Empresas
           </NavLink>
 
           {/* ESTRUCTURA */}
