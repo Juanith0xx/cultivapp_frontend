@@ -1,75 +1,86 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { FiUsers, FiMapPin, FiCheckCircle, FiAlertCircle, FiClock } from "react-icons/fi";
-import api from "../../api/apiClient"; // Ajusta la ruta a tu cliente API
+import { FiUsers, FiMapPin, FiCheckCircle, FiAlertCircle, FiClock, FiShield } from "react-icons/fi";
+import api from "../../api/apiClient";
 import { useAuth } from "../../context/AuthContext";
 
 const SupervisorPanel = () => {
   const { user } = useAuth();
 
-  // 1. FETCH DE DATOS REALES DESDE LA API
+  // 1. FETCH DE DATOS REALES FILTRADOS POR CARTERA DE SUPERVISOR
   const { data: stats, isLoading } = useQuery({
-    queryKey: ['dashboard-stats', user?.company_id],
+    queryKey: ['dashboard-stats', user?.company_id, user?.id],
     queryFn: async () => {
-      // El endpoint debe devolver: { no_atendido: X, atendiendo: X, atendido: X, sin_asignacion: X }
       const response = await api.get("/reports/dashboard-stats", {
-        params: { company_id: user?.company_id }
+        params: { 
+          company_id: user?.company_id,
+          supervisor_id: user?.id 
+        }
       });
       return response.data || response;
     },
-    refetchInterval: 30000, // Se actualiza solo cada 30 segundos (Tiempo Real)
+    enabled: !!user?.id,
+    refetchInterval: 30000, 
   });
 
-  // 2. CONFIGURACIÓN DE TARJETAS (Mapeo de la respuesta)
+  // 2. CONFIGURACIÓN DE TARJETAS (Textos optimizados para la nueva lógica del backend)
   const cards = [
     { 
-      label: "Locales No Atendidos", 
+      label: "Rutas Pendientes", 
       value: stats?.no_atendido || 0, 
       color: "bg-red-500", 
       icon: <FiAlertCircle size={24} />,
-      desc: "Rojo: Urgencia alta"
+      desc: "Planificados hoy sin inicio"
     },
     { 
-      label: "Locales Atendiendo", 
+      label: "Visitas en Curso", 
       value: stats?.atendiendo || 0, 
       color: "bg-yellow-400", 
       icon: <FiClock size={24} />,
-      desc: "Amarillo: En proceso"
+      desc: "Operación activa en vivo"
     },
     { 
-      label: "Locales Atendidos", 
+      label: "Visitas Finalizadas", 
       value: stats?.atendido || 0, 
       color: "bg-[#87be00]", 
       icon: <FiCheckCircle size={24} />,
-      desc: "Verde: Cobertura exitosa"
+      desc: "Cobertura total de hoy"
     },
     { 
-      label: "Sin Mercaderista", 
+      label: "Locales fuera de Ruta", 
       value: stats?.sin_asignacion || 0, 
       color: "bg-gray-900", 
       icon: <FiUsers size={24} />,
-      desc: "Negro: Revisar contratos"
+      desc: "Tu cartera sin plan hoy"
     },
   ];
 
   if (isLoading) return (
-    <div className="py-20 text-center font-black uppercase italic animate-pulse text-gray-400 tracking-widest">
-      Sincronizando Semáforo de Cobertura...
+    <div className="py-20 text-center font-[Outfit] font-black uppercase italic animate-pulse text-gray-400 tracking-widest">
+      Sincronizando Semáforo de Cartera...
     </div>
   );
 
   return (
-    <div className="space-y-8 font-[Outfit]">
+    <div className="space-y-8 font-[Outfit] pb-10">
       {/* HEADER DE LA VISTA */}
-      <div className="px-2">
-        <h2 className="text-3xl font-black text-gray-900 uppercase italic tracking-tighter leading-none">
-          Semáforo de Cobertura
-        </h2>
-        <div className="flex items-center gap-2 mt-2">
-            <div className="w-2 h-2 bg-[#87be00] rounded-full animate-ping"></div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-              Estado de la operación en vivo
-            </p>
+      <div className="px-2 flex justify-between items-end">
+        <div>
+          <h2 className="text-3xl font-black text-gray-900 uppercase italic tracking-tighter leading-none">
+            Semáforo de Cartera
+          </h2>
+          <div className="flex items-center gap-2 mt-2">
+              <div className="w-2 h-2 bg-[#87be00] rounded-full animate-ping"></div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                Estado operativo de tus locales asignados
+              </p>
+          </div>
+        </div>
+        <div className="hidden md:flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-2xl border border-gray-200">
+            <FiShield className="text-[#87be00]" size={14} />
+            <span className="text-[9px] font-black uppercase text-gray-500 tracking-widest">
+                Supervisor: {user?.first_name}
+            </span>
         </div>
       </div>
 
@@ -89,7 +100,9 @@ const SupervisorPanel = () => {
               <div className={`p-3 rounded-2xl ${card.color} text-white shadow-lg`}>
                 {card.icon}
               </div>
-              <span className="text-[8px] font-black text-gray-300 uppercase italic tracking-widest">Update: Now</span>
+              <span className="text-[8px] font-black text-gray-300 uppercase italic tracking-widest flex items-center gap-1">
+                <FiClock size={10} /> Real Time
+              </span>
             </div>
 
             <h3 className="text-5xl font-black text-gray-900 mb-1 tracking-tighter">
@@ -105,17 +118,17 @@ const SupervisorPanel = () => {
         ))}
       </div>
 
-      {/* LISTADO DETALLADO (ESPACIO PARA TABLA) */}
-      <div className="mx-2 bg-white rounded-[3rem] p-1 shadow-sm border border-gray-50">
+      {/* LISTADO DETALLADO */}
+      <div className="mx-2 bg-white rounded-[3rem] p-1 shadow-sm border border-gray-100 group transition-all duration-500 hover:shadow-lg">
         <div className="p-10 text-center">
-            <FiMapPin className="mx-auto text-gray-200 mb-4" size={40} />
+            <FiMapPin className="mx-auto text-gray-200 mb-4 group-hover:text-[#87be00] transition-colors duration-500" size={40} />
             <p className="text-[10px] font-black text-gray-400 uppercase italic tracking-[0.2em]">
                 Desglose Detallado por Zona y Cadena
             </p>
             <div className="mt-4 flex justify-center gap-4">
-                <div className="h-1 w-12 bg-gray-100 rounded-full"></div>
-                <div className="h-1 w-12 bg-gray-100 rounded-full"></div>
-                <div className="h-1 w-12 bg-gray-100 rounded-full"></div>
+                <div className="h-1 w-12 bg-gray-100 rounded-full group-hover:bg-[#87be00]/30 transition-colors"></div>
+                <div className="h-1 w-12 bg-gray-100 rounded-full group-hover:bg-[#87be00]/60 transition-colors"></div>
+                <div className="h-1 w-12 bg-gray-100 rounded-full group-hover:bg-[#87be00] transition-colors"></div>
             </div>
         </div>
       </div>
