@@ -39,13 +39,10 @@ const request = async (endpoint, options = {}) => {
     if (response.status === 401) {
       console.error("❌ [API] Sesión inválida o expirada. Limpiando credenciales...");
       
-      // 1. Limpiamos el rastro del token corrupto
       localStorage.removeItem("token");
-      localStorage.removeItem("user"); // Si guardas el objeto user, límpialo también
+      localStorage.removeItem("user"); 
       
-      // 2. Solo redirigimos si no estamos ya en el login para evitar bucles
       if (window.location.pathname !== "/") {
-        // Pequeño delay para que el usuario alcance a ver el toast de error si existe
         setTimeout(() => {
           window.location.href = "/?error=session_expired";
         }, 500);
@@ -88,6 +85,9 @@ const request = async (endpoint, options = {}) => {
   }
 };
 
+/**
+ * 🚀 OBJETO API CON MÉTODOS EXPLÍCITOS
+ */
 const api = {
   get: (endpoint, config = null) => {
     let url = endpoint;
@@ -113,6 +113,12 @@ const api = {
   
   put: (endpoint, body) => request(endpoint, {
       method: "PUT",
+      body: body instanceof FormData ? body : JSON.stringify(body),
+  }),
+
+  // Mejora para actualizaciones parciales
+  patch: (endpoint, body) => request(endpoint, {
+      method: "PATCH",
       body: body instanceof FormData ? body : JSON.stringify(body),
   }),
   

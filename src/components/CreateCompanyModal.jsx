@@ -1,9 +1,9 @@
-import { useState } from "react"
-import { FiX, FiBriefcase, FiUser, FiBarChart2, FiLock, FiPlus } from "react-icons/fi"
+import { useEffect, useState } from "react"
+import { FiX, FiBriefcase, FiUser, FiBarChart2, FiLock, FiPlus, FiSave } from "react-icons/fi"
 import api from "../api/apiClient"
 import { toast } from "react-hot-toast"
 
-const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
+const CreateCompanyModal = ({ isOpen, onClose, onCreated, editingCompany }) => {
   const initialState = {
     rut: "",
     name: "",
@@ -21,7 +21,20 @@ const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
   const [form, setForm] = useState(initialState)
   const [loading, setLoading] = useState(false)
 
-  // Funciones de RUT (se mantienen igual para la lógica, pero aplicamos limpieza)
+  // 🔄 Efecto para cargar datos si estamos editando
+  useEffect(() => {
+    if (editingCompany) {
+      setForm({
+        ...initialState,
+        ...editingCompany,
+        // Visualmente ocultamos la contraseña en edición
+        admin_password: "••••••••" 
+      })
+    } else {
+      setForm(initialState)
+    }
+  }, [editingCompany, isOpen])
+
   const cleanRut = (rut) => rut.replace(/\./g, "").replace("-", "").toUpperCase()
   
   const formatRut = (rut) => {
@@ -58,10 +71,15 @@ const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!validateRut(form.rut)) return toast.error("El RUT ingresado no es válido")
+    
+    // Si no estamos editando, validamos el RUT (en edición está bloqueado)
+    if (!editingCompany && !validateRut(form.rut)) {
+      return toast.error("El RUT ingresado no es válido")
+    }
 
     setLoading(true)
     try {
+      // 📦 Payload base con parseo numérico
       const payload = {
         ...form,
         rut: cleanRut(form.rut),
@@ -69,13 +87,26 @@ const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
         max_users: parseInt(form.max_users) || 0,
         max_view: parseInt(form.max_view) || 0
       }
-      await api.post("/companies/with-admin", payload)
-      toast.success("Empresa y administrador creados")
-      setForm(initialState)
+
+      if (editingCompany) {
+        // ✨ ACTUALIZACIÓN (PATCH): Solo enviamos los campos del plan
+        const planPayload = {
+          max_supervisors: payload.max_supervisors,
+          max_users: payload.max_users,
+          max_view: payload.max_view
+        }
+        await api.patch(`/companies/${editingCompany.id}`, planPayload)
+        toast.success("Plan de suscripción actualizado")
+      } else {
+        // 🚀 CREACIÓN (POST): Flujo normal completo
+        await api.post("/companies/with-admin", payload)
+        toast.success("Empresa y administrador creados")
+      }
+
       onCreated()
       onClose()
     } catch (err) {
-      toast.error(err.message)
+      toast.error(err.message || "Error al procesar la solicitud")
     } finally {
       setLoading(false)
     }
@@ -89,7 +120,7 @@ const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
     </label>
   )
 
-  const InputStyle = "w-full bg-gray-50 border-none rounded-2xl px-5 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-[#87be00]/20 transition-all placeholder:text-gray-300 shadow-sm"
+  const InputStyle = "w-full bg-gray-50 border-none rounded-2xl px-5 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-[#87be00]/20 transition-all placeholder:text-gray-300 shadow-sm disabled:text-gray-300 disabled:cursor-not-allowed"
 
   return (
     <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] font-[Outfit]">
@@ -99,10 +130,10 @@ const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
         <div className="flex justify-between items-start mb-8">
           <div>
             <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tighter leading-none">
-              Nueva Empresa
+              {editingCompany ? "Editar Plan Contratado" : "Nueva Empresa"}
             </h3>
             <p className="text-[10px] font-bold text-[#87be00] uppercase tracking-[0.3em] mt-2">
-              Configuración de Cliente Root
+              {editingCompany ? `Empresa: ${editingCompany.name}` : "Configuración de Cliente Root"}
             </p>
           </div>
           <button 
@@ -115,97 +146,97 @@ const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
 
         <form onSubmit={handleSubmit} className="space-y-8">
           
-          {/* SECCIÓN 1: DATOS EMPRESA */}
-          <div className="space-y-4">
+          {/* SECCIÓN 1: DATOS EMPRESA (Bloqueada en edición) */}
+          <div className={`space-y-4 ${editingCompany ? 'opacity-50' : ''}`}>
             <div className="flex items-center gap-2 mb-2 px-2">
               <FiBriefcase className="text-[#87be00]" />
-              <h4 className="text-xs font-black text-gray-800 uppercase tracking-widest">Información Legal</h4>
+              <h4 className="text-xs font-black text-gray-800 uppercase tracking-widest flex items-center gap-2">
+                Información Legal {editingCompany && <FiLock size={12} />}
+              </h4>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label>RUT Empresa</Label>
-                <input name="rut" value={form.rut} onChange={handleChange} placeholder="76.123.456-7" required className={InputStyle} />
+                <input name="rut" value={form.rut} disabled={!!editingCompany} placeholder="76.123.456-7" required className={InputStyle} />
               </div>
               <div>
                 <Label>Nombre de Fantasía</Label>
-                <input name="name" value={form.name} onChange={handleChange} placeholder="Empresa SPA" required className={InputStyle} />
+                <input name="name" value={form.name} disabled={!!editingCompany} placeholder="Empresa SPA" required className={InputStyle} />
               </div>
-            </div>
-            <div>
-              <Label>Dirección Casa Matriz</Label>
-              <input name="address" value={form.address} onChange={handleChange} placeholder="Av. Ejemplo 123, Santiago" required className={InputStyle} />
             </div>
           </div>
 
-          {/* SECCIÓN 2: LÍMITES */}
-          <div className="bg-gray-50/50 p-6 rounded-[2rem] border border-gray-100">
-            <div className="flex items-center gap-2 mb-4">
+          {/* SECCIÓN 2: LÍMITES (SIEMPRE EDITABLE) */}
+          <div className="bg-[#87be00]/5 p-8 rounded-[2.5rem] border-2 border-[#87be00]/10 shadow-inner">
+            <div className="flex items-center gap-2 mb-6">
               <FiBarChart2 className="text-[#87be00]" />
-              <h4 className="text-xs font-black text-gray-800 uppercase tracking-widest">Límites del Plan</h4>
+              <h4 className="text-xs font-black text-gray-800 uppercase tracking-widest italic">Configuración de Cuotas</h4>
             </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
+            <div className="grid grid-cols-3 gap-6">
+              <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
                 <Label>Supervisores</Label>
-                <input type="number" name="max_supervisors" value={form.max_supervisors} onChange={handleChange} className={InputStyle} />
+                <input type="number" name="max_supervisors" value={form.max_supervisors} onChange={handleChange} className="w-full text-center text-xl font-black text-gray-900 outline-none bg-transparent" />
               </div>
-              <div>
+              <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
                 <Label>Mercaderistas</Label>
-                <input type="number" name="max_users" value={form.max_users} onChange={handleChange} className={InputStyle} />
+                <input type="number" name="max_users" value={form.max_users} onChange={handleChange} className="w-full text-center text-xl font-black text-gray-900 outline-none bg-transparent" />
               </div>
-              <div>
+              <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
                 <Label>Solo Vista</Label>
-                <input type="number" name="max_view" value={form.max_view} onChange={handleChange} className={InputStyle} />
+                <input type="number" name="max_view" value={form.max_view} onChange={handleChange} className="w-full text-center text-xl font-black text-gray-900 outline-none bg-transparent" />
               </div>
             </div>
           </div>
 
-          {/* SECCIÓN 3: ADMINISTRADOR */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-2 px-2">
-              <FiUser className="text-[#87be00]" />
-              <h4 className="text-xs font-black text-gray-800 uppercase tracking-widest">Administrador de Cliente</h4>
+          {/* SECCIÓN 3: ADMINISTRADOR (Oculta en edición de plan) */}
+          {!editingCompany && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-2 px-2">
+                <FiUser className="text-[#87be00]" />
+                <h4 className="text-xs font-black text-gray-800 uppercase tracking-widest">Administrador de Cliente</h4>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Nombre Completo</Label>
+                  <input name="admin_name" value={form.admin_name} onChange={handleChange} placeholder="Juan Pérez" required className={InputStyle} />
+                </div>
+                <div>
+                  <Label>Cargo / Posición</Label>
+                  <input name="admin_position" value={form.admin_position} onChange={handleChange} placeholder="Gerente de Operaciones" className={InputStyle} />
+                </div>
+                <div>
+                  <Label>Email Corporativo</Label>
+                  <input name="admin_email" value={form.admin_email} onChange={handleChange} placeholder="admin@empresa.cl" required className={InputStyle} />
+                </div>
+                <div>
+                  <Label>Teléfono</Label>
+                  <input name="admin_phone" value={form.admin_phone} onChange={handleChange} placeholder="+56 9..." className={InputStyle} />
+                </div>
+              </div>
+              <div>
+                <Label>Contraseña de Acceso</Label>
+                <div className="relative">
+                  <FiLock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" />
+                  <input 
+                    type="password" name="admin_password" value={form.admin_password} 
+                    onChange={handleChange} placeholder="••••••••" required className={`${InputStyle} pl-12`} 
+                  />
+                </div>
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label>Nombre Completo</Label>
-                <input name="admin_name" value={form.admin_name} onChange={handleChange} placeholder="Juan Pérez" required className={InputStyle} />
-              </div>
-              <div>
-                <Label>Cargo / Posición</Label>
-                <input name="admin_position" value={form.admin_position} onChange={handleChange} placeholder="Gerente de Operaciones" className={InputStyle} />
-              </div>
-              <div>
-                <Label>Email Corporativo</Label>
-                <input name="admin_email" value={form.admin_email} onChange={handleChange} placeholder="admin@empresa.cl" required className={InputStyle} />
-              </div>
-              <div>
-                <Label>Teléfono</Label>
-                <input name="admin_phone" value={form.admin_phone} onChange={handleChange} placeholder="+56 9..." className={InputStyle} />
-              </div>
-            </div>
-            <div>
-              <Label>Contraseña de Acceso</Label>
-              <div className="relative">
-                <FiLock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" />
-                <input 
-                  type="password" name="admin_password" value={form.admin_password} 
-                  onChange={handleChange} placeholder="••••••••" required className={`${InputStyle} pl-12`} 
-                />
-              </div>
-            </div>
-          </div>
+          )}
 
           {/* Footer / Submit */}
           <div className="pt-4">
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#87be00] hover:bg-[#76a500] text-white py-5 rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-[#87be00]/20 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+              className="w-full bg-gray-900 hover:bg-black text-[#87be00] py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] text-[11px] shadow-xl transition-all flex items-center justify-center gap-3 disabled:opacity-50"
             >
               {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-[#87be00]/30 border-t-[#87be00] rounded-full animate-spin" />
               ) : (
-                <><FiPlus size={18} /> Crear Empresa y Admin</>
+                editingCompany ? <><FiSave size={18} /> Actualizar Suscripción</> : <><FiPlus size={18} /> Crear Empresa y Admin</>
               )}
             </button>
           </div>
@@ -215,4 +246,4 @@ const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
   )
 }
 
-export default CreateCompanyModal
+export default CreateCompanyModal;
