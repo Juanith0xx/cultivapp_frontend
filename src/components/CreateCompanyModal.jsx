@@ -69,7 +69,7 @@ const CreateCompanyModal = ({ isOpen, onClose, onCreated }) => {
         max_users: parseInt(form.max_users) || 0,
         max_view: parseInt(form.max_view) || 0
       }
-      await api.post("/api/companies/with-admin", payload)
+      await api.post("/companies/with-admin", payload)
       toast.success("Empresa y administrador creados")
       setForm(initialState)
       onCreated()

@@ -2,8 +2,11 @@ import { useState, useEffect } from "react";
 import api from "../../api/apiClient";
 import { toast } from "react-hot-toast";
 import { Send, Users, Store, Globe, Loader2, X, CheckCircle2, Mail, UserCircle } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
+import { FiShield } from "react-icons/fi";
 
 const NotificationManager = () => {
+  const { user } = useAuth();
   const [companies, setCompanies] = useState([]);
   const [chains, setChains] = useState([]);
   const [locales, setLocales] = useState([]);
@@ -12,19 +15,30 @@ const NotificationManager = () => {
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(false);
 
+  // 🚩 CONSTANTE MAESTRA: ID DE CULTIVA
+  const ID_CULTIVA = '0e342e01-d213-4353-b210-39a12ac335cf'; 
+  
+  // Lógica de permisos: ROOT o ADMIN de Cultiva
+  const canSeeCompanies = 
+    user?.role === 'ROOT' || 
+    (user?.role === 'ADMIN_CLIENTE' && user?.company_id === ID_CULTIVA);
+
   const [form, setForm] = useState({
     title: "",
     message: "",
     scope: "global",
-    companyId: "",
+    // Si no tiene permisos, se fija su propia empresa automáticamente
+    companyId: canSeeCompanies ? "" : (user?.company_id || ""),
     chainId: "",
     localId: "",
     selectedTargets: [] 
   });
 
   useEffect(() => {
-    api.get("/companies").then(res => setCompanies(res || []));
-  }, []);
+    if (canSeeCompanies) {
+      api.get("/companies").then(res => setCompanies(res || []));
+    }
+  }, [canSeeCompanies]);
 
   useEffect(() => {
     if (form.companyId) {
@@ -67,15 +81,11 @@ const NotificationManager = () => {
     });
   };
 
-  // 🛡️ EXTRACCIÓN BASADA EN TU ESQUEMA POSTGRES
   const getUserInfo = (u) => {
     if (!u) return { name: "Desconocido", email: "-", role: "-" };
-
-    // Concatenamos first_name y last_name según tu tabla
     const name = `${u.first_name || ''} ${u.last_name || ''}`.trim() || "Sin nombre";
     const email = u.email || "No registra";
     const role = u.role || "Personal";
-
     return { name, email, role };
   };
 
@@ -106,28 +116,51 @@ const NotificationManager = () => {
   };
 
   return (
-    <div className="p-8 max-w-5xl mx-auto font-[Outfit]">
+    <div className="p-8 max-w-5xl mx-auto font-[Outfit] animate-in fade-in duration-500">
       <div className="bg-white rounded-[3rem] p-10 shadow-2xl shadow-gray-200/50 border border-gray-100">
-        <div className="mb-8">
-          <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">Generador de Alertas</h2>
-          <p className="text-[10px] font-bold text-[#87be00] uppercase tracking-[0.3em]">Gestión de Personal Cultivapp</p>
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">Generador de Alertas</h2>
+            <p className="text-[10px] font-bold text-[#87be00] uppercase tracking-[0.3em]">
+              {canSeeCompanies ? "Panel Maestro de Comunicaciones" : "Gestión de Alertas Internas"}
+            </p>
+          </div>
+          {canSeeCompanies && (
+            <div className="px-4 py-1.5 bg-blue-50 border border-blue-100 rounded-xl flex items-center gap-2">
+              <FiShield className="text-blue-600" size={14} />
+              <span className="text-[9px] font-black text-blue-600 uppercase">Acceso Elevado</span>
+            </div>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
           
-          {/* CLIENTE Y ALCANCE */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-6 rounded-[2.5rem]">
-            <div className="md:col-span-1">
-              <label className="text-[9px] font-black text-gray-400 uppercase ml-2 mb-1 block">Empresa Cliente</label>
-              <select 
-                className="w-full bg-white border-none rounded-2xl px-5 py-4 text-xs font-bold outline-none ring-1 ring-gray-100 focus:ring-2 focus:ring-[#87be00]/20"
-                value={form.companyId}
-                onChange={(e) => setForm({...form, companyId: e.target.value})}
-              >
-                <option value="">Seleccionar...</option>
-                {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
+            
+            {canSeeCompanies ? (
+              <div className="md:col-span-1">
+                <label className="text-[9px] font-black text-gray-400 uppercase ml-2 mb-1 block">Empresa Destino</label>
+                <select 
+                  className="w-full bg-white border-none rounded-2xl px-5 py-4 text-xs font-bold outline-none ring-1 ring-gray-100 focus:ring-2 focus:ring-[#87be00]/20 transition-all"
+                  value={form.companyId}
+                  onChange={(e) => setForm({...form, companyId: e.target.value})}
+                  required
+                >
+                  <option value="">Seleccionar Cliente...</option>
+                  {companies.map(c => <option key={c.id} value={c.id}>{c.name.toUpperCase()}</option>)}
+                </select>
+              </div>
+            ) : (
+              <div className="md:col-span-1 flex items-center px-6 bg-white/80 rounded-2xl border border-gray-100 shadow-sm">
+                <div className="flex items-center gap-3">
+                   <CheckCircle2 size={18} className="text-[#87be00]" />
+                   <div className="flex flex-col">
+                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none">Canal Seguro</p>
+                      <p className="text-[11px] font-black text-gray-800 uppercase italic">Mi Organización</p>
+                   </div>
+                </div>
+              </div>
+            )}
 
             <div className="md:col-span-2">
               <label className="text-[9px] font-black text-gray-400 uppercase ml-2 mb-1 block">Alcance</label>
@@ -142,7 +175,7 @@ const NotificationManager = () => {
                     type="button"
                     onClick={() => setForm({...form, scope: s.id, selectedTargets: []})}
                     className={`flex-1 py-4 rounded-2xl flex items-center justify-center gap-2 transition-all font-black text-[9px] uppercase ${
-                      form.scope === s.id ? 'bg-gray-900 text-white shadow-lg' : 'bg-white text-gray-400 hover:bg-gray-100'
+                      form.scope === s.id ? 'bg-gray-900 text-white shadow-lg' : 'bg-white text-gray-400 hover:bg-gray-100 border border-gray-100'
                     }`}
                   >
                     {s.icon} {s.label}
@@ -155,37 +188,28 @@ const NotificationManager = () => {
           {/* CASCADA RETAIL */}
           {form.scope === 'local' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-2 animate-in slide-in-from-top-4">
-              <select 
-                className="bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold outline-none"
-                value={form.chainId}
-                onChange={(e) => setForm({...form, chainId: e.target.value})}
-              >
+              <select className="bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold outline-none" value={form.chainId} onChange={(e) => setForm({...form, chainId: e.target.value})}>
                 <option value="">Seleccione cadena...</option>
                 {chains.map(ch => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
               </select>
-              <select 
-                className="bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold outline-none"
-                value={form.localId}
-                onChange={(e) => setForm({...form, localId: e.target.value})}
-                disabled={!form.chainId}
-              >
+              <select className="bg-gray-50 border-none rounded-2xl px-5 py-4 text-xs font-bold outline-none" value={form.localId} onChange={(e) => setForm({...form, localId: e.target.value})} disabled={!form.chainId}>
                 <option value="">Seleccione local...</option>
                 {locales.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
             </div>
           )}
 
-          {/* LISTADO DE PERSONAL CON FIRST_NAME Y LAST_NAME */}
+          {/* LISTADO DE PERSONAL */}
           {(form.scope === 'individual' || form.scope === 'local') && (
             <div className="space-y-4">
               <div className="flex justify-between items-end px-2">
-                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Personal Cultivapp</label>
+                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Personal Seleccionado</label>
                 <div className="flex flex-wrap gap-2">
                   {form.selectedTargets.map(id => {
                     const u = users.find(user => user.id === id);
                     const { name } = getUserInfo(u);
                     return (
-                      <span key={id} className="bg-[#87be00] text-white px-3 py-1 rounded-full text-[9px] font-bold flex items-center gap-1 animate-in zoom-in-95">
+                      <span key={id} className="bg-[#87be00] text-white px-3 py-1 rounded-full text-[9px] font-bold flex items-center gap-1">
                         {name} <X size={10} className="cursor-pointer" onClick={() => toggleUserSelection(id)}/>
                       </span>
                     );
@@ -219,7 +243,7 @@ const NotificationManager = () => {
                         </div>
                         <div className="flex justify-between items-center mt-4">
                           <div className={`text-[8px] font-black px-2.5 py-1 rounded-lg uppercase ${isSelected ? 'bg-[#87be00] text-white' : 'bg-gray-100 text-gray-500'}`}>
-                            <UserCircle size={10} className="inline mr-1"/> {role}
+                            {role}
                           </div>
                           {isSelected && <CheckCircle2 className="text-[#87be00]" size={18}/>}
                         </div>
@@ -231,28 +255,24 @@ const NotificationManager = () => {
             </div>
           )}
 
-          {/* MENSAJE Y BOTÓN */}
+          {/* MENSAJE */}
           <div className="grid grid-cols-1 gap-4 bg-gray-50 p-8 rounded-[2.5rem]">
             <input 
-              type="text" placeholder="Título..."
+              type="text" placeholder="Título de la alerta..."
               className="w-full bg-white border-none rounded-2xl px-6 py-5 text-xs font-bold outline-none focus:ring-2 focus:ring-[#87be00]/20"
-              value={form.title}
-              onChange={(e) => setForm({...form, title: e.target.value})}
-              required
+              value={form.title} onChange={(e) => setForm({...form, title: e.target.value})} required
             />
             <textarea 
-              placeholder="Mensaje de alerta..." rows="3"
+              placeholder="Mensaje..." rows="3"
               className="w-full bg-white border-none rounded-2xl px-6 py-5 text-xs font-bold outline-none focus:ring-2 focus:ring-[#87be00]/20 resize-none"
-              value={form.message}
-              onChange={(e) => setForm({...form, message: e.target.value})}
-              required
+              value={form.message} onChange={(e) => setForm({...form, message: e.target.value})} required
             />
             <button 
               type="submit" disabled={loading}
               className="mt-4 w-full bg-[#87be00] hover:bg-[#76a500] text-white font-black uppercase text-[12px] py-6 rounded-2xl shadow-xl transition-all flex items-center justify-center gap-4 disabled:opacity-50"
             >
               {loading ? <Loader2 className="animate-spin" size={20}/> : <Send size={20}/>}
-              {loading ? "Sincronizando..." : `Enviar Alerta a ${form.selectedTargets.length || 'la Empresa'}`}
+              {loading ? "Sincronizando..." : `Emitir Notificación`}
             </button>
           </div>
         </form>
