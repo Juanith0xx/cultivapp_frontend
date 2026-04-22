@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import api from "../../api/apiClient";
-import { FiPlus, FiTrash2, FiClock, FiLayers, FiLoader, FiAlertCircle, FiCheck } from "react-icons/fi";
+import { FiPlus, FiTrash2, FiClock, FiLayers, FiLoader, FiCheck, FiEdit3 } from "react-icons/fi";
 import toast from "react-hot-toast";
 
 const TurnosManager = () => {
@@ -8,14 +8,19 @@ const TurnosManager = () => {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  
+  // 🚩 Nuevo estado para controlar la edición
+  const [isEditing, setIsEditing] = useState(null); 
 
-  const [newTurno, setNewTurno] = useState({
+  const initialFormState = {
     nombre_turno: "",
     categoria_rol: "Mercaderista Full",
     days: [], 
     entrada: "07:30",
     salida: "15:30"
-  });
+  };
+
+  const [newTurno, setNewTurno] = useState(initialFormState);
 
   const diasCompletos = [
     { label: "D", id: 0 }, { label: "L", id: 1 }, { label: "M", id: 2 },
@@ -54,6 +59,21 @@ const TurnosManager = () => {
     return Object.values(grupos);
   }, [turnos]);
 
+  // 🚩 Función para cargar datos en el formulario
+  const handleEdit = (turnoGrupo) => {
+    setNewTurno({
+      nombre_turno: turnoGrupo.nombre_turno,
+      categoria_rol: turnoGrupo.categoria_rol,
+      days: turnoGrupo.dias,
+      entrada: turnoGrupo.entrada.slice(0, 5),
+      salida: turnoGrupo.salida.slice(0, 5),
+      ids_originales: turnoGrupo.ids // Guardamos los IDs para el backend
+    });
+    setIsEditing(turnoGrupo.nombre_turno);
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const toggleDay = (dayIndex) => {
     setNewTurno(prev => ({
       ...prev,
@@ -67,14 +87,24 @@ const TurnosManager = () => {
     e.preventDefault();
     if (newTurno.days.length === 0) return toast.error("Selecciona al menos un día");
     setSubmitting(true);
+    
     try {
-      await api.post("/turnos-config/bulk", newTurno);
-      toast.success("Configuración guardada");
-      setNewTurno({ nombre_turno: "", categoria_rol: "Mercaderista Full", days: [], entrada: "07:30", salida: "15:30" });
+      if (isEditing) {
+        // 🚩 Lógica de Edición: Normalmente el backend de bulk borra y recrea
+        // O puedes enviar una ruta específica para update masivo
+        await api.put(`/turnos-config/bulk/${isEditing}`, newTurno);
+        toast.success("Turno actualizado correctamente");
+      } else {
+        await api.post("/turnos-config/bulk", newTurno);
+        toast.success("Configuración guardada");
+      }
+      
+      setNewTurno(initialFormState);
       setShowForm(false);
+      setIsEditing(null);
       fetchTurnos();
     } catch (err) {
-      toast.error("Error al guardar");
+      toast.error(isEditing ? "Error al actualizar" : "Error al guardar");
     } finally {
       setSubmitting(false);
     }
@@ -100,12 +130,19 @@ const TurnosManager = () => {
             <div className="w-10 h-10 bg-[#87be00]/10 rounded-2xl flex items-center justify-center text-[#87be00]">
                 <FiLayers size={20} />
             </div>
-            <h1 className="text-3xl font-black text-gray-900 uppercase italic tracking-tighter">Gestión de Turnos</h1>
+            <h1 className="text-3xl font-black text-gray-900 uppercase italic tracking-tighter">
+                {isEditing ? "Editando Turno" : "Gestión de Turnos"}
+            </h1>
           </div>
-          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.2em] ml-1">Horarios dinámicos Cultivapp</p>
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.2em] ml-1">
+              {isEditing ? `Modificando: ${isEditing}` : "Horarios dinámicos Cultivapp"}
+          </p>
         </div>
         <button 
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => {
+              setShowForm(!showForm);
+              if (showForm) { setIsEditing(null); setNewTurno(initialFormState); }
+          }}
           className={`px-8 py-4 rounded-2xl text-[11px] font-black uppercase transition-all flex items-center gap-3 shadow-xl ${
             showForm ? "bg-red-50 text-red-500 border border-red-100" : "bg-black text-white hover:bg-[#87be00]"
           }`}
@@ -133,7 +170,14 @@ const TurnosManager = () => {
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-gray-500 tracking-widest ml-1">Nombre</label>
-                <input required placeholder="EJ: TURNO A1" className="w-full p-4 bg-gray-50 rounded-2xl text-xs font-black border-2 border-transparent focus:border-[#87be00] outline-none uppercase" value={newTurno.nombre_turno} onChange={e => setNewTurno({...newTurno, nombre_turno: e.target.value.toUpperCase()})} />
+                <input 
+                    required 
+                    readOnly={!!isEditing} // 🚩 Evitamos cambiar el nombre si estamos editando para no romper la lógica de grupo
+                    placeholder="EJ: TURNO A1" 
+                    className={`w-full p-4 rounded-2xl text-xs font-black border-2 border-transparent outline-none uppercase ${isEditing ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-50 focus:border-[#87be00]'}`} 
+                    value={newTurno.nombre_turno} 
+                    onChange={e => setNewTurno({...newTurno, nombre_turno: e.target.value.toUpperCase()})} 
+                />
               </div>
             </div>
 
@@ -160,22 +204,36 @@ const TurnosManager = () => {
                 <input type="time" className="p-4 bg-gray-50 rounded-2xl text-xs font-black outline-none border-2 border-transparent focus:border-[#87be00]" value={newTurno.salida} onChange={e => setNewTurno({...newTurno, salida: e.target.value})} />
               </div>
 
-              <button disabled={submitting} type="submit" className="w-full bg-[#87be00] text-white rounded-[1.5rem] font-black uppercase text-xs h-16 shadow-xl shadow-[#87be00]/20 flex items-center justify-center gap-3">
-                {submitting ? <FiLoader className="animate-spin" /> : "GUARDAR CONFIGURACIÓN"}
+              <button disabled={submitting} type="submit" className="w-full bg-black text-white rounded-[1.5rem] font-black uppercase text-xs h-16 shadow-xl flex items-center justify-center gap-3 hover:bg-[#87be00] transition-colors">
+                {submitting ? <FiLoader className="animate-spin" /> : isEditing ? "ACTUALIZAR CAMBIOS" : "GUARDAR CONFIGURACIÓN"}
               </button>
             </div>
           </div>
         </form>
       )}
 
-      {/* LISTADO CON DÍAS EN VERDE */}
+      {/* LISTADO */}
       {loading ? (
         <div className="flex flex-col items-center justify-center p-20"><FiLoader size={40} className="animate-spin text-[#87be00]" /></div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
           {turnosAgrupados.map((t) => (
             <div key={t.nombre_turno} className="bg-white rounded-[3rem] p-8 border border-gray-100 shadow-sm hover:shadow-2xl transition-all duration-500 group relative">
-              <button onClick={() => deleteGrupo(t.ids)} className="absolute top-8 right-8 text-gray-200 hover:text-red-500 transition-all scale-125"><FiTrash2 size={20}/></button>
+              <div className="absolute top-8 right-8 flex gap-2">
+                {/* 🚩 Botón de Editar */}
+                <button 
+                    onClick={() => handleEdit(t)} 
+                    className="p-2 bg-gray-50 text-gray-400 hover:bg-[#87be00] hover:text-white rounded-xl transition-all"
+                >
+                    <FiEdit3 size={18}/>
+                </button>
+                <button 
+                    onClick={() => deleteGrupo(t.ids)} 
+                    className="p-2 bg-gray-50 text-gray-400 hover:bg-red-500 hover:text-white rounded-xl transition-all"
+                >
+                    <FiTrash2 size={18}/>
+                </button>
+              </div>
               
               <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gray-50 rounded-full mb-6 text-[9px] font-black uppercase text-gray-500 italic">
                  <div className="w-2 h-2 rounded-full bg-[#87be00]"></div> {t.categoria_rol}
@@ -191,7 +249,7 @@ const TurnosManager = () => {
                             key={dia.id} 
                             className={`w-9 h-9 flex items-center justify-center rounded-xl text-[10px] font-black transition-all ${
                                 t.dias.includes(dia.id) 
-                                ? "bg-[#87be00] text-white shadow-lg shadow-[#87be00]/20 scale-110" // 🚩 CAMBIO A VERDE AQUÍ
+                                ? "bg-[#87be00] text-white shadow-lg shadow-[#87be00]/20 scale-110"
                                 : "bg-white text-gray-200 border border-gray-100"
                             }`}
                         >

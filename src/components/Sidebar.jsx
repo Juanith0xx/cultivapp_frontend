@@ -8,7 +8,9 @@ import {
   FiSend, 
   FiBell,  
   FiClock,
-  FiNavigation
+  FiNavigation,
+  FiCalendar,
+  FiMap // 🚩 Importamos FiMap para las rutas
 } from "react-icons/fi"
 import { useNotificationContext } from "../context/NotificationContext"
 
@@ -33,19 +35,15 @@ const Sidebar = () => {
       </div>
 
       <nav className="flex flex-col gap-1.5 overflow-y-auto pr-2 custom-scrollbar">
-        
         <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] mb-2 ml-4">Métricas</p>
         <NavLink to="/root/analytics" className={({ isActive }) => `${linkBase} ${isActive ? linkActive : linkInactive}`}>
           <FiBarChart2 size={18} /> Dashboard
         </NavLink>
 
         <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] mt-6 mb-2 ml-4">Comunicación</p>
-        
-        {/* 🚀 EMITIR ALERTAS: Sincronizado a PLURAL (notifications-manager) */}
         <NavLink to="/root/notifications-manager" className={({ isActive }) => isActive ? actionButton : `${actionButton} opacity-90`}>
           <FiSend size={18} strokeWidth={3} /> Emitir Alertas
         </NavLink>
-
         <NavLink to="/root/notifications" className={({ isActive }) => `${linkBase} ${isActive ? linkActive : linkInactive} mt-1`}>
           <div className="relative">
             <FiBell size={18} />
@@ -59,10 +57,15 @@ const Sidebar = () => {
         </NavLink>
 
         <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] mt-6 mb-2 ml-4">Logística</p>
+      
+        {/* 🚩 NUEVO: RUTAS EN ROOT */}
+        <NavLink to="/root/routes" className={({ isActive }) => `${linkBase} ${isActive ? linkActive : linkInactive}`}>
+          <FiMap size={18} /> Gestión de Rutas
+        </NavLink>
+
         <NavLink to="/root/turnos" className={({ isActive }) => `${linkBase} ${isActive ? linkActive : linkInactive}`}>
           <FiClock size={18} /> Configurar Turnos
         </NavLink>
-
         <NavLink to="/root/gps-monitor" className={({ isActive }) => `${linkBase} ${isActive ? linkActive : linkInactive}`}>
           <FiNavigation size={18} /> Monitoreo GPS
         </NavLink>

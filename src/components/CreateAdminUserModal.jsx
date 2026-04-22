@@ -124,7 +124,7 @@ const CreateAdminUserModal = ({ isOpen, onClose, onCreated }) => {
                   {documentoAchs ? <FiCheck size={24}/> : <FiFileText size={24}/>}
                 </div>
                 <div className="flex-1">
-                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Documento ACHS</p>
+                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Documentos</p>
                   <p className="text-[11px] font-bold text-gray-700 truncate">
                     {documentoAchs ? documentoAchs.name : "Sin archivo seleccionado"}
                   </p>
@@ -144,7 +144,7 @@ const CreateAdminUserModal = ({ isOpen, onClose, onCreated }) => {
             </div>
 
             <div className="space-y-4">
-              <input type="text" placeholder="Cargo (ej: Especialista)" required className="w-full border rounded-xl px-4 py-2 text-sm"
+              <input type="text" placeholder="Cargo (ej: Mercaderista)" required className="w-full border rounded-xl px-4 py-2 text-sm"
                 onChange={e => setForm({...form, position: e.target.value})} />
               
               <div className="grid grid-cols-2 gap-2">
@@ -167,7 +167,7 @@ const CreateAdminUserModal = ({ isOpen, onClose, onCreated }) => {
               <select required className="w-full border rounded-xl px-4 py-2 text-sm bg-white"
                 onChange={e => setForm({...form, role: e.target.value})}>
                 <option value="">Perfil de Sistema</option>
-                <option value="USUARIO">Usuario (Credencial)</option>
+                <option value="USUARIO">Usuario</option>
                 <option value="SUPERVISOR">Supervisor</option>
               </select>
             </div>
