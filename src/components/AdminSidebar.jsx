@@ -9,7 +9,7 @@ import {
   FiSend, 
   FiBell,
   FiClock,
-  FiBriefcase // 💼 Nuevo icono para Empresas
+  FiBriefcase 
 } from "react-icons/fi"
 import { useAuth } from "../context/AuthContext"
 import { useNotificationContext } from "../context/NotificationContext" 
@@ -17,6 +17,15 @@ import { useNotificationContext } from "../context/NotificationContext"
 const AdminSidebar = () => {
   const { user } = useAuth()
   const { unreadCount } = useNotificationContext() 
+
+  // 🚩 CONSTANTE MAESTRA: ID DE CULTIVA
+  const ID_CULTIVA = '0e342e01-d213-4353-b210-39a12ac335cf';
+
+  // 🚀 LÓGICA DE ACCESO ELEVADO
+  // Solo se muestra si el usuario es ROOT o es ADMIN de la empresa Cultiva
+  const canManageCompanies = 
+    user?.role === "ROOT" || 
+    (user?.role === "ADMIN_CLIENTE" && user?.company_id === ID_CULTIVA);
 
   const linkBase =
     "flex items-center gap-3 px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-300"
@@ -109,17 +118,21 @@ const AdminSidebar = () => {
             Mi Bandeja
           </NavLink>
 
-          {/* 🚩 NUEVO: ADMINISTRACIÓN (Para Empresas) */}
-          <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] mt-6 mb-2 ml-4">Administración</p>
-          <NavLink
-            to="/admin/companies"
-            className={({ isActive }) =>
-              `${linkBase} ${isActive ? linkActive : linkInactive}`
-            }
-          >
-            <FiBriefcase size={18} />
-            Empresas
-          </NavLink>
+          {/* 🚩 RENDERIZADO CONDICIONAL: ADMINISTRACIÓN (Solo Cultiva) */}
+          {canManageCompanies && (
+            <>
+              <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] mt-6 mb-2 ml-4">Administración</p>
+              <NavLink
+                to="/admin/companies"
+                className={({ isActive }) =>
+                  `${linkBase} ${isActive ? linkActive : linkInactive}`
+                }
+              >
+                <FiBriefcase size={18} />
+                Empresas
+              </NavLink>
+            </>
+          )}
 
           {/* ESTRUCTURA */}
           <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] mt-6 mb-2 ml-4">Estructura</p>
