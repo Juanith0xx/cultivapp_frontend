@@ -115,20 +115,13 @@ const AdminRoutes = () => {
 
   const groupedRoutes = useMemo(() => {
     if (!Array.isArray(routes)) return [];
-    
     const filteredRoutes = globalSelectedCompany 
       ? routes.filter(r => String(r.company_id) === String(globalSelectedCompany))
       : routes;
-
     const groups = {};
-    
     filteredRoutes.forEach(r => {
-      const identifier = r.origin === 'TURNO' 
-        ? `GRP-${r.schedule_group_id}` 
-        : `IND-${r.id}`;
-        
+      const identifier = r.origin === 'TURNO' ? `GRP-${r.schedule_group_id}` : `IND-${r.id}`;
       const key = `${r.user_id}-${r.local_id}-${identifier}`;
-      
       if (!groups[key]) {
         groups[key] = { 
           ...r, 
@@ -141,7 +134,6 @@ const AdminRoutes = () => {
         groups[key].all_statuses.push(r.status);
       }
     });
-
     return Object.values(groups).map(group => ({
       ...group,
       displayStatus: group.all_statuses.includes('IN_PROGRESS') ? 'IN_PROGRESS' : 
@@ -158,11 +150,7 @@ const AdminRoutes = () => {
       PENDING: { bg: 'bg-amber-50', text: 'text-amber-500', border: 'border-amber-200', icon: <FiAlertCircle/>, label: 'Pendiente' }
     };
     const s = config[status?.toUpperCase()] || { bg: 'bg-red-50', text: 'text-red-500', border: 'border-red-200', icon: <FiXCircle/>, label: 'Pendiente' };
-    return (
-      <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${s.bg} ${s.text} text-[8px] font-black uppercase tracking-widest border ${s.border} shadow-sm`}>
-        {s.icon} {s.label}
-      </span>
-    );
+    return <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${s.bg} ${s.text} text-[8px] font-black uppercase tracking-widest border ${s.border} shadow-sm`}>{s.icon} {s.label}</span>;
   };
 
   return (
@@ -193,10 +181,7 @@ const AdminRoutes = () => {
               {loading ? (
                  <tr><td colSpan="5" className="p-20 text-center text-[10px] font-black text-gray-300 uppercase animate-pulse">Sincronizando...</td></tr>
               ) : groupedRoutes.map((r) => (
-                <tr 
-                   key={`${r.id}-${r.origin}-${r.schedule_group_id || 'manual'}`} 
-                   className="hover:bg-gray-50/50 transition-colors group"
-                >
+                <tr key={`${r.id}-${r.origin}-${r.schedule_group_id || 'manual'}`} className="hover:bg-gray-50/50 transition-colors group">
                   <td className="p-6">
                     <div className="flex items-start gap-3">
                       <div className="mt-1 p-2 bg-gray-50 text-gray-400 rounded-lg"><FiHash size={14}/></div>
@@ -213,11 +198,11 @@ const AdminRoutes = () => {
                           <FiUser size={14} className="text-[#87be00]"/> {r.first_name} {r.last_name}
                         </p>
                         <div className="flex flex-col gap-1.5">
-                           {/* 🚩 ETIQUETA DE ROL */}
-                           <span className="text-[9px] font-black text-gray-400 uppercase tracking-tight italic">
-                             {r.user_role || 'Rol no definido'}
+                           {/* 🚩 ROL DINÁMICO DESDE TIPO_CONTRATO */}
+                           <span className="text-[9px] font-black text-[#87be00] uppercase tracking-tight italic">
+                             {r.user_role || 'Sin Rol'}
                            </span>
-                           {/* 🚩 ETIQUETA DE TURNO */}
+                           {/* 🚩 NOMBRE DEL TURNO PRECISADO */}
                            <span className={`w-fit px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-tighter ${r.origin === 'INDIVIDUAL' ? 'bg-amber-100 text-amber-600 border border-amber-200' : 'bg-blue-100 text-blue-600 border border-blue-200'}`}>
                              {r.origin === 'INDIVIDUAL' ? 'Agendamiento Manual' : (r.nombre_turno || 'Turno Planificado')}
                            </span>
