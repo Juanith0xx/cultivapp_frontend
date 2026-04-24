@@ -4,15 +4,36 @@ const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const API_URL = BASE_URL.replace(/\/+$/, "") + (BASE_URL.includes("/api") ? "" : "/api");
 
 /**
- * 🛡️ OBTENCIÓN SEGURA DEL TOKEN
+ * 🔥 SERIALIZAR BODY (Garantiza que se guarde como OBJETO en la DB)
  */
+const serializeBody = (body) => {
+  if (!body) return null;
+  
+  if (body instanceof FormData) {
+    const serialized = {};
+    for (let [key, value] of body.entries()) {
+      serialized[key] = value;
+    }
+    return { __type: "FormData", data: serialized };
+  }
+  
+  // Si es un string (JSON), lo convertimos a Objeto para que IndexedDB lo guarde limpio
+  if (typeof body === "string") {
+    try {
+      return JSON.parse(body);
+    } catch (e) {
+      return body; // Si no es JSON, lo pasamos tal cual
+    }
+  }
+  return body;
+};
+
 const getToken = () => {
   let token = localStorage.getItem("token");
   if (!token || token === "null" || token === "undefined" || token === "") return null;
   token = token.replace(/^"|"$/g, '');
   const cleanToken = token.startsWith("Bearer ") ? token.split(" ")[1] : token;
-  const finalToken = cleanToken?.trim();
-  return finalToken && finalToken.length > 10 ? finalToken : null;
+  return cleanToken?.trim() || null;
 };
 
 const request = async (endpoint, options = {}) => {
@@ -35,42 +56,19 @@ const request = async (endpoint, options = {}) => {
   try {
     const response = await fetch(finalUrl, config);
 
-    // 🚩 MANEJO CRÍTICO DE SESIÓN INVÁLIDA (401)
     if (response.status === 401) {
-      console.error("❌ [API] Sesión inválida o expirada. Limpiando credenciales...");
-      
       localStorage.removeItem("token");
       localStorage.removeItem("user"); 
-      
-      if (window.location.pathname !== "/") {
-        setTimeout(() => {
-          window.location.href = "/?error=session_expired";
-        }, 500);
-      }
-      
-      throw { status: 401, message: "Sesión no autorizada o mismatch de sesión" };
-    }
-
-    if (response.status === 403) {
-      throw { status: 403, message: "No tienes permisos para esta acción" };
+      if (window.location.pathname !== "/") window.location.href = "/?error=session_expired";
+      throw { status: 401, message: "Sesión expirada" };
     }
 
     const contentType = response.headers.get("content-type");
-    let data = null;
-    
-    if (contentType && contentType.includes("application/json")) {
-      data = await response.json();
-    } else {
-      data = await response.text();
-    }
+    let data = (contentType && contentType.includes("application/json")) 
+               ? await response.json() 
+               : await response.text();
 
-    if (!response.ok) {
-      throw {
-        status: response.status,
-        message: data?.message || data || `Error ${response.status}`,
-        fullError: data
-      };
-    }
+    if (!response.ok) throw { status: response.status, message: data?.message || data };
 
     return data;
 
@@ -79,47 +77,51 @@ const request = async (endpoint, options = {}) => {
     const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(options.method);
 
     if (isNetworkError && isMutation) {
+      console.warn("🌐 [Offline] Guardando en cola...");
+      
+      const routeMatch = endpoint.match(/\/routes\/([^/]+)/);
+      const routeId = routeMatch ? routeMatch[1] : null;
+
+      await addToSyncQueue({
+        type: endpoint.includes("/finish") ? "FINISH" : (endpoint.includes("/photo") ? "PHOTO" : "OTHER"),
+        endpoint: cleanEndpoint,
+        method: options.method,
+        routeId,
+        payload: serializeBody(options.body), // 🚩 GUARDAR SIEMPRE COMO OBJETO
+        createdAt: new Date().toISOString(),
+      });
+
       return { offline: true, message: "Operación guardada localmente" };
     }
     throw error;
   }
 };
 
-/**
- * 🚀 OBJETO API CON MÉTODOS EXPLÍCITOS
- */
 const api = {
   get: (endpoint, config = null) => {
     let url = endpoint;
-    const actualParams = config?.params ? config.params : config;
-
-    if (actualParams && typeof actualParams === "object" && !(actualParams instanceof FormData)) {
-      const cleanParams = Object.fromEntries(
-        Object.entries(actualParams).filter(([_, v]) => v != null && v !== "" && v !== "undefined")
-      );
-
-      const query = new URLSearchParams(cleanParams).toString();
-      if (query) {
-        url += `${url.includes("?") ? "&" : "?"}${query}`;
-      }
+    const params = config?.params || config;
+    if (params && typeof params === "object" && !(params instanceof FormData)) {
+      const query = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([_, v]) => v != null))).toString();
+      if (query) url += `${url.includes("?") ? "&" : "?"}${query}`;
     }
     return request(url, { method: "GET", ...config });
   },
 
+  // 🚩 REGLA DE ORO: Solo aquí se hace el stringify final
   post: (endpoint, body) => request(endpoint, {
       method: "POST",
-      body: body instanceof FormData ? body : JSON.stringify(body),
+      body: body instanceof FormData ? body : (typeof body === "string" ? body : JSON.stringify(body)),
   }),
   
   put: (endpoint, body) => request(endpoint, {
       method: "PUT",
-      body: body instanceof FormData ? body : JSON.stringify(body),
+      body: body instanceof FormData ? body : (typeof body === "string" ? body : JSON.stringify(body)),
   }),
 
-  // Mejora para actualizaciones parciales
   patch: (endpoint, body) => request(endpoint, {
       method: "PATCH",
-      body: body instanceof FormData ? body : JSON.stringify(body),
+      body: body instanceof FormData ? body : (typeof body === "string" ? body : JSON.stringify(body)),
   }),
   
   delete: (endpoint) => request(endpoint, { method: "DELETE" }),
