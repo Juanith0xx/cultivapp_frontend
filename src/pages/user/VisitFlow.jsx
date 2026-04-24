@@ -24,15 +24,16 @@ const VisitFlow = () => {
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
   const [comment, setComment] = useState("");
-  const [commentPhoto, setCommentPhoto] = useState(null); // URL o Blob de la foto final
+  const [commentPhoto, setCommentPhoto] = useState(null); 
 
+  // 🚩 ACTUALIZACIÓN: Keys capitalizadas para coincidir con el mapeo del controlador
   const stepsInfo = {
-    1: { key: "fachada", title: "Foto de Local", sub: "Evidencia de llegada" },
-    2: { key: "gondola_inicio", title: "Góndola Inicial", sub: "Estado previo a reposición" },
+    1: { key: "Fachada", title: "Foto de Local", sub: "Evidencia de llegada" },
+    2: { key: "Góndola Inicio", title: "Góndola Inicial", sub: "Estado previo a reposición" },
     3: { key: "escaneo", title: "Escanear Productos", sub: "Registra los EAN de reposición" },
-    4: { key: "gondola_final", title: "Góndola Final", sub: "Evidencia trabajo terminado" },
+    4: { key: "Góndola Final", title: "Góndola Final", sub: "Evidencia trabajo terminado" },
     5: { key: "preguntas", title: "Gestión Realizada", sub: "Responde el formulario de visita" },
-    6: { key: "comentarios", title: "Cierre de Visita", sub: "Evidencia final y observaciones" }
+    6: { key: "Observaciones", title: "Cierre de Visita", sub: "Evidencia final y observaciones" }
   };
 
   useEffect(() => {
@@ -72,25 +73,27 @@ const VisitFlow = () => {
     const toastId = toast.loading(isOnline ? "Sincronizando foto..." : "Guardando en modo offline...");
 
     const formData = new FormData();
-    // Determinamos si es foto de paso o foto de observación final
-    const tipoEvidencia = step === 6 ? "comentario_final" : stepsInfo[step].key;
-    formData.append("tipo_evidencia", tipoEvidencia);
-    formData.append("foto", file);
+    
+    // 🚩 ACTUALIZACIÓN: Enviamos 'photo_type' y usamos la clave 'foto' para el archivo
+    const tipoEvidencia = stepsInfo[step].key;
+    formData.append("photo_type", tipoEvidencia);
+    formData.append("foto", file); 
 
     try {
-      const response = await api.post(`/routes/${id}/photo`, formData);
+      // 🚩 ACTUALIZACIÓN: Ruta apuntando al módulo de reports con el ID de la visita
+      const response = await api.post(`/reports/${id}/photo`, formData);
       
       const photoUrl = response?.offline ? URL.createObjectURL(file) : response.url;
 
       if (step === 6) {
-        // En el paso 6 solo guardamos la foto para previsualizar, no avanzamos paso
         setCommentPhoto(photoUrl);
         toast.success("Foto de observación añadida", { id: toastId });
       } else {
-        toast.success("Foto sincronizada", { id: toastId });
+        toast.success(isOnline ? "Foto sincronizada" : "Guardada offline", { id: toastId });
         setStep(prev => prev + 1);
       }
     } catch (err) {
+      console.error("Error capturando foto:", err);
       toast.error("Error al procesar imagen", { id: toastId });
     } finally {
       setCapturing(false);
@@ -203,8 +206,6 @@ const VisitFlow = () => {
         {/* PASO 6: CIERRE CON FOTO DE OBSERVACIÓN */}
         {step === 6 && (
            <div className="space-y-5 animate-in slide-in-from-bottom-4 duration-500">
-              
-              {/* LÓGICA DE FOTO DE OBSERVACIÓN */}
               <div className="space-y-3 text-left">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2 flex items-center gap-2">
                   <FiImage className={isOnline ? 'text-[#87be00]' : 'text-orange-500'}/> Foto de observación (Opcional)
@@ -231,7 +232,6 @@ const VisitFlow = () => {
                 )}
               </div>
 
-              {/* TEXTAREA */}
               <div className="text-left space-y-2 px-1">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2 flex items-center gap-2">
                   <FiMessageSquare className={isOnline ? 'text-[#87be00]' : 'text-orange-500'}/> Comentarios Finales
