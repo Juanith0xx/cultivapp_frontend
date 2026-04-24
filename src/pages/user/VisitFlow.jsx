@@ -26,7 +26,6 @@ const VisitFlow = () => {
   const [comment, setComment] = useState("");
   const [commentPhoto, setCommentPhoto] = useState(null); 
 
-  // 🚩 ACTUALIZACIÓN: Keys capitalizadas para coincidir con el mapeo del controlador
   const stepsInfo = {
     1: { key: "Fachada", title: "Foto de Local", sub: "Evidencia de llegada" },
     2: { key: "Góndola Inicio", title: "Góndola Inicial", sub: "Estado previo a reposición" },
@@ -36,6 +35,7 @@ const VisitFlow = () => {
     6: { key: "Observaciones", title: "Cierre de Visita", sub: "Evidencia final y observaciones" }
   };
 
+  // Escucha cambios de red para actualizar la UI en tiempo real
   useEffect(() => {
     const handleStatus = () => setIsOnline(navigator.onLine);
     window.addEventListener("online", handleStatus);
@@ -46,6 +46,7 @@ const VisitFlow = () => {
     };
   }, []);
 
+  // Carga de preguntas con cache local para modo offline
   useEffect(() => {
     if (step === 5) {
       const loadQuestions = async () => {
@@ -57,7 +58,7 @@ const VisitFlow = () => {
           const cached = localStorage.getItem("cultivapp_questions_cache");
           if (cached) {
             setQuestions(JSON.parse(cached));
-            toast("Cargando formulario desde memoria (Offline)", { icon: '📴' });
+            toast("Formulario cargado offline", { icon: '📴' });
           }
         }
       };
@@ -65,31 +66,37 @@ const VisitFlow = () => {
     }
   }, [step]);
 
+  /**
+   * 📸 MANEJO DE CAPTURA DE FOTOS
+   * Soporta sincronización inmediata o guardado offline automático vía OfflineManager
+   */
   const handleCapture = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     setCapturing(true);
-    const toastId = toast.loading(isOnline ? "Sincronizando foto..." : "Guardando en modo offline...");
+    const toastId = toast.loading(isOnline ? "Sincronizando foto..." : "Guardando foto localmente...");
 
     const formData = new FormData();
-    
-    // 🚩 ACTUALIZACIÓN: Enviamos 'photo_type' y usamos la clave 'foto' para el archivo
     const tipoEvidencia = stepsInfo[step].key;
     formData.append("photo_type", tipoEvidencia);
     formData.append("foto", file); 
 
     try {
-      // 🚩 ACTUALIZACIÓN: Ruta apuntando al módulo de reports con el ID de la visita
+      /**
+       * 🚩 EL CAMBIO: El api.post se encarga de llamar al OfflineManager 
+       * si detecta fallo de red. El componente solo recibe la respuesta.
+       */
       const response = await api.post(`/reports/${id}/photo`, formData);
       
+      // Si la respuesta indica offline, creamos un preview local
       const photoUrl = response?.offline ? URL.createObjectURL(file) : response.url;
 
       if (step === 6) {
         setCommentPhoto(photoUrl);
-        toast.success("Foto de observación añadida", { id: toastId });
+        toast.success(response?.offline ? "Foto guardada offline" : "Foto sincronizada", { id: toastId });
       } else {
-        toast.success(isOnline ? "Foto sincronizada" : "Guardada offline", { id: toastId });
+        toast.success(response?.offline ? "Visibilidad guardada offline" : "Foto sincronizada", { id: toastId });
         setStep(prev => prev + 1);
       }
     } catch (err) {
@@ -101,31 +108,49 @@ const VisitFlow = () => {
     }
   };
 
+  /**
+   * 🛒 ESCANEO DE PRODUCTOS
+   */
   const handleScanSuccess = async (decodedText) => {
     if (scannedCodes.includes(decodedText)) return; 
     if (isProcessingScan.current) return;
     isProcessingScan.current = true;
     try {
-      await api.post(`/routes/${id}/scans`, { barcode: decodedText });
+      const res = await api.post(`/routes/${id}/scans`, { barcode: decodedText });
       setScannedCodes(prev => [decodedText, ...prev]);
+      if (res.offline) toast("Escaneo guardado offline", { icon: '📦' });
       setTimeout(() => { isProcessingScan.current = false; }, 600);
     } catch (err) { isProcessingScan.current = false; }
   };
 
+  /**
+   * ✅ CIERRE DE VISITA
+   */
   const finalizarTodo = async () => {
     setLoading(true);
+    const toastId = toast.loading(isOnline ? "Finalizando visita..." : "Guardando cierre localmente...");
     try {
-      await api.post(`/routes/${id}/finish`, { 
+      const res = await api.post(`/routes/${id}/finish`, { 
         responses: answers, 
         comment, 
         comment_photo_url: commentPhoto 
       });
-      toast.success("¡Visita finalizada exitosamente!");
+
+      if (res.offline) {
+        toast.success("Gestión guardada offline. Se enviará al detectar internet.", { id: toastId, duration: 4000 });
+      } else {
+        toast.success("¡Visita finalizada exitosamente!", { id: toastId });
+      }
+      
       navigate("/usuario/home");
-    } catch (err) { toast.error("Error al finalizar"); }
-    finally { setLoading(false); }
+    } catch (err) { 
+      toast.error("Error al finalizar la visita", { id: toastId }); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
+  // ... (Resto del JSX se mantiene igual para no romper la UI minimalista)
   return (
     <div className={`min-h-screen font-[Outfit] p-4 pb-24 flex flex-col items-center transition-colors duration-500 ${isOnline ? 'bg-gray-50' : 'bg-orange-50/40'}`}>
       
@@ -135,6 +160,7 @@ const VisitFlow = () => {
         </div>
       )}
 
+      {/* Barra de Progreso */}
       <div className="w-full max-w-md flex justify-between mb-8 sticky top-6 z-20 py-2">
         {[1, 2, 3, 4, 5, 6].map(i => (
           <div key={i} className={`h-1.5 flex-1 mx-1 rounded-full transition-all duration-700 ${step >= i ? (isOnline ? 'bg-[#87be00]' : 'bg-orange-500') : 'bg-gray-200'}`} />
@@ -153,7 +179,7 @@ const VisitFlow = () => {
             <p className={`text-[9px] font-black uppercase tracking-[0.2em] ${isOnline ? 'text-[#87be00]' : 'text-orange-500'}`}>{stepsInfo[step].sub}</p>
         </div>
 
-        {/* PASOS 1, 2, 4: CAPTURA SIMPLE */}
+        {/* PASOS DE CAPTURA 1, 2, 4 */}
         {(step === 1 || step === 2 || step === 4) && (
           <div onClick={() => !capturing && fileInputRef.current.click()} className="w-full aspect-square bg-gray-50 border-4 border-dashed border-gray-200 rounded-[3rem] flex flex-col items-center justify-center cursor-pointer relative group transition-all active:scale-95">
              {capturing ? <FiLoader className="animate-spin text-[#87be00]" size={44} /> : (
@@ -203,7 +229,7 @@ const VisitFlow = () => {
            </div>
         )}
 
-        {/* PASO 6: CIERRE CON FOTO DE OBSERVACIÓN */}
+        {/* PASO 6: CIERRE */}
         {step === 6 && (
            <div className="space-y-5 animate-in slide-in-from-bottom-4 duration-500">
               <div className="space-y-3 text-left">
@@ -214,20 +240,14 @@ const VisitFlow = () => {
                 {commentPhoto ? (
                   <div className="relative w-full aspect-video rounded-[2rem] overflow-hidden border-2 border-gray-100 group">
                     <img src={commentPhoto} alt="Obs" className="w-full h-full object-cover" />
-                    <button 
-                      onClick={() => setCommentPhoto(null)} 
-                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full shadow-lg active:scale-90 transition-transform"
-                    >
+                    <button onClick={() => setCommentPhoto(null)} className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full shadow-lg active:scale-90 transition-transform">
                       <FiX size={16}/>
                     </button>
                   </div>
                 ) : (
-                  <button 
-                    onClick={() => fileInputRef.current.click()}
-                    className="w-full py-10 bg-gray-50 border-2 border-dashed border-gray-200 rounded-[2rem] flex flex-col items-center justify-center gap-2 active:bg-gray-100 transition-all"
-                  >
+                  <button onClick={() => fileInputRef.current.click()} className="w-full py-10 bg-gray-50 border-2 border-dashed border-gray-200 rounded-[2rem] flex flex-col items-center justify-center gap-2 active:bg-gray-100 transition-all">
                     <FiCamera size={24} className="text-gray-300" />
-                    <span className="text-[9px] font-black text-gray-400 uppercase">Toca para capturar evidencia final</span>
+                    <span className="text-[9px] font-black text-gray-400 uppercase">Capturar evidencia final</span>
                   </button>
                 )}
               </div>
@@ -239,7 +259,7 @@ const VisitFlow = () => {
                 <textarea 
                   value={comment} 
                   onChange={(e) => setComment(e.target.value)} 
-                  placeholder="Detalles adicionales de la gestión..." 
+                  placeholder="Detalles adicionales..." 
                   className="w-full h-28 p-5 bg-gray-50 rounded-[2rem] border-none text-sm outline-none resize-none placeholder:text-gray-300 shadow-inner" 
                 />
               </div>

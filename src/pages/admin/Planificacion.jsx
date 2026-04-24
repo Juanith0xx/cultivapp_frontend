@@ -1,36 +1,50 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
-import { 
-  FiPlus, FiRefreshCw, FiEdit3, 
-  FiCalendar, FiList, FiCheckCircle, FiClock 
-} from "react-icons/fi";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import api from "../../api/apiClient";
 import ManageRoutesModal from "../../components/ManageRoutesModal";
-import WeeklyStatus from "../../components/MiniCalendario"; // Asegúrate de que acepte activeDays (array)
+import AdminCalendarView from "../../components/AdminCalendarView";
+import WeeklyStatus from "../../components/MiniCalendario";
 import toast from "react-hot-toast";
+import { FiPlus, FiEdit2, FiUploadCloud, FiRefreshCw, FiList, FiCalendar } from "react-icons/fi";
+import * as XLSX from "xlsx";
 
 const Planificacion = () => {
-  const [viewMode, setViewMode] = useState("list"); // 'list' o 'calendar'
+  const [viewMode, setViewMode] = useState("list");
   const [routes, setRoutes] = useState([]);
   const [users, setUsers] = useState([]);
   const [locales, setLocales] = useState([]);
+  const [companies, setCompanies] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [selectedRoute, setSelectedRoute] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const fileInputRef = useRef(null);
 
-  // 1. Carga de datos desde el Backend
+  /**
+   * 🔄 Sincronización de datos con el Backend
+   * 🚩 MEJORA: Validación de tipo de dato para evitar "Error de Sincronización"
+   */
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [routesRes, usersRes, localesRes] = await Promise.all([
+      const [resRoutes, resUsers, resLocales, resCompanies] = await Promise.all([
         api.get("/routes"),
         api.get("/users"),
-        api.get("/locales")
+        api.get("/locales"),
+        api.get("/companies")
       ]);
-      setRoutes(Array.isArray(routesRes) ? routesRes : []);
-      setUsers(Array.isArray(usersRes) ? usersRes : []);
-      setLocales(Array.isArray(localesRes) ? localesRes : []);
+
+      // Tu apiClient devuelve directamente el body (data), 
+      // pero forzamos validación de Array para seguridad absoluta
+      setRoutes(Array.isArray(resRoutes) ? resRoutes : []);
+      setUsers(Array.isArray(resUsers) ? resUsers : []);
+      setLocales(Array.isArray(resLocales) ? resLocales : []);
+      setCompanies(Array.isArray(resCompanies) ? resCompanies : []);
+
     } catch (error) {
-      toast.error("Error al sincronizar datos");
+      console.error("❌ Error en fetchData:", error);
+      // Solo mostramos el toast si el error no es por estar offline (manejado por el apiClient)
+      if (!error.offline) {
+        toast.error("Error al sincronizar datos del servidor");
+      }
     } finally {
       setLoading(false);
     }
@@ -38,153 +52,190 @@ const Planificacion = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // 2. LÓGICA DE AGRUPACIÓN: Convierte filas sueltas en una sola fila por local/usuario
+  /**
+   * 🚀 CARGA MASIVA SaaS DINÁMICA
+   * 🚩 MEJORA: Envío envuelto en objeto 'routes' para compatibilidad con el Backend
+   */
+  const handleImportExcel = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    const toastId = toast.loading("Analizando planilla...");
+
+    reader.onload = async (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
+        
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // Convertimos a JSON asegurando que capture encabezados
+        const excelData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+        if (!excelData || excelData.length === 0) {
+          toast.error("El archivo parece estar vacío", { id: toastId });
+          return;
+        }
+
+        console.log("🔍 Filas detectadas antes de enviar:", excelData.length);
+        toast.loading(`Enviando ${excelData.length} filas al servidor...`, { id: toastId });
+
+        /**
+         * Envolvemos en { routes: ... } porque el Backend actualizado busca req.body.routes
+         */
+        const response = await api.post("/routes/bulk-create", { routes: excelData });
+
+        if (response.success) {
+          toast.success(`¡Éxito! ${response.count} rutas planificadas`, { id: toastId });
+          fetchData(); 
+        } else {
+          const errorMsg = response.errors && response.errors.length > 0 
+            ? `${response.message} - ${response.errors[0]}` 
+            : response.message;
+          toast.error(errorMsg, { id: toastId, duration: 6000 });
+        }
+      } catch (err) {
+        console.error("❌ Error en proceso frontend:", err);
+        toast.error("Error al procesar el archivo Excel", { id: toastId });
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+    e.target.value = ""; 
+  };
+
+  /**
+   * 📋 LÓGICA DE AGRUPACIÓN PARA TABLA
+   * 🚩 MEJORA: Filtrado estricto de nulos y duplicados
+   */
   const groupedRoutes = useMemo(() => {
     const groups = {};
     routes.forEach((r) => {
+      if (!r.user_id || !r.local_id) return;
       const key = `${r.user_id}-${r.local_id}`;
       if (!groups[key]) {
         groups[key] = { 
           ...r, 
-          allDays: r.day_of_week !== null ? [r.day_of_week] : [] 
+          allDays: (r.day_of_week !== null && r.day_of_week !== undefined) ? [Number(r.day_of_week)] : [] 
         };
-      } else {
-        if (r.day_of_week !== null && !groups[key].allDays.includes(r.day_of_week)) {
-          groups[key].allDays.push(r.day_of_week);
+      } else if (r.day_of_week !== null && r.day_of_week !== undefined) {
+        const dayNum = Number(r.day_of_week);
+        if (!groups[key].allDays.includes(dayNum)) {
+          groups[key].allDays.push(dayNum);
         }
       }
     });
     return Object.values(groups);
   }, [routes]);
 
-  const handleEdit = (route) => {
-    // Pasamos los días agrupados al modal para que aparezcan marcados
-    setSelectedRoute({ ...route, selectedDays: route.allDays });
-    setIsModalOpen(true);
-  };
+  if (loading) return (
+    <div className="h-screen flex flex-col items-center justify-center space-y-4">
+      <FiRefreshCw className="animate-spin text-[#87be00]" size={42} />
+      <p className="font-black uppercase text-[10px] tracking-[0.2em] text-gray-400 italic text-center px-4">
+        Sincronizando Ecosistema de Rutas...
+      </p>
+    </div>
+  );
 
   return (
-    <div className="p-6 space-y-6 font-[Outfit] animate-in fade-in duration-500">
+    <div className="p-8 font-[Outfit] space-y-10 animate-in fade-in duration-700">
       
-      {/* --- HEADER --- */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+      {/* HEADER DINÁMICO */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-10 rounded-[3rem] shadow-sm border border-gray-100">
         <div>
-          <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Planificación de Rutas</h1>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-1">Gestión de visitas recurrentes y únicas</p>
-          
-          <div className="flex bg-gray-100 p-1 rounded-xl mt-4 w-fit">
+          <h1 className="text-4xl font-black uppercase italic tracking-tighter text-gray-900">
+            Planificación <span className="text-[#87be00]">Mensual</span>
+          </h1>
+          <div className="flex bg-gray-100 p-1.5 rounded-2xl mt-4 w-fit border border-gray-200">
             <button 
-              onClick={() => setViewMode("list")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'}`}
+              onClick={() => setViewMode("list")} 
+              className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 ${viewMode === 'list' ? 'bg-white shadow-md text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
             >
-              <FiList /> Lista Agrupada
+              <FiList /> Vista Lista
             </button>
             <button 
-              onClick={() => setViewMode("calendar")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'calendar' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'}`}
+              onClick={() => setViewMode("calendar")} 
+              className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 ${viewMode === 'calendar' ? 'bg-white shadow-md text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
             >
-              <FiCalendar /> Vista Mensual
+              <FiCalendar /> Calendario
             </button>
           </div>
         </div>
-
-        <div className="flex gap-3">
-          <button onClick={fetchData} className="p-4 bg-gray-50 text-gray-400 rounded-2xl hover:bg-gray-100 transition-all">
-            <FiRefreshCw className={loading ? "animate-spin" : ""} />
+        
+        <div className="flex gap-4">
+          <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleImportExcel} />
+          <button 
+            onClick={() => fileInputRef.current.click()} 
+            className="bg-[#87be00] text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-[#87be00]/20 flex items-center gap-3 hover:bg-black transition-all active:scale-95"
+          >
+            <FiUploadCloud size={18} /> Carga Masiva
           </button>
           <button 
-            onClick={() => { setSelectedRoute(null); setIsModalOpen(true); }}
-            className="bg-black text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-xl flex items-center gap-2"
+            onClick={() => { setSelectedRoute(null); setIsModalOpen(true); }} 
+            className="bg-black text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center gap-3 hover:bg-[#87be00] transition-all active:scale-95"
           >
-            <FiPlus size={16} /> Crear Plan
+            <FiPlus size={18} /> Nueva Visita
           </button>
         </div>
       </div>
 
-      {/* --- CONTENIDO --- */}
-      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50/50 border-b border-gray-100">
-                <th className="p-6 text-[9px] font-black text-gray-400 uppercase tracking-widest">Mercaderista</th>
-                <th className="p-6 text-[9px] font-black text-gray-400 uppercase tracking-widest">Punto de Venta</th>
-                <th className="p-6 text-[9px] font-black text-gray-400 uppercase tracking-widest">Planificación</th>
-                <th className="p-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Estado</th>
-                <th className="p-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Acción</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {loading ? (
-                <tr><td colSpan="5" className="p-20 text-center text-[10px] font-black text-gray-300 uppercase">Cargando planificación...</td></tr>
-              ) : groupedRoutes.map((row) => (
-                <tr key={`${row.user_id}-${row.local_id}`} className="hover:bg-gray-50/30 transition-colors group">
-                  <td className="p-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-[#87be00]/10 text-[#87be00] rounded-xl flex items-center justify-center font-black text-xs uppercase">
-                        {row.first_name?.[0]}{row.last_name?.[0]}
-                      </div>
-                      <span className="text-xs font-black text-gray-800 uppercase">{row.first_name} {row.last_name}</span>
-                    </div>
-                  </td>
-                  
-                  <td className="p-6">
-                    <div className="flex flex-col">
-                      <span className="text-xs font-black text-gray-800 uppercase tracking-tight">{row.cadena}</span>
-                      <span className="text-[10px] text-gray-400 font-bold uppercase">{row.direccion}</span>
-                    </div>
-                  </td>
-
-                  <td className="p-6">
-                    {row.is_recurring ? (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-1.5 text-[9px] font-black text-[#87be00] uppercase tracking-widest">
-                          <FiRefreshCw size={10} /> Recurrente
+      {/* ÁREA PRINCIPAL */}
+      {viewMode === "list" ? (
+        <div className="bg-white rounded-[3.5rem] shadow-2xl overflow-hidden border border-gray-100 animate-in slide-in-from-bottom-6 duration-500">
+          <table className="w-full text-left">
+              <thead>
+                  <tr className="bg-gray-50/50">
+                    <th className="p-8 text-[10px] font-black uppercase text-gray-400 tracking-widest border-b border-gray-100">Local / Cadena</th>
+                    <th className="p-8 text-[10px] font-black uppercase text-gray-400 tracking-widest border-b border-gray-100">Mercaderista</th>
+                    <th className="p-8 text-[10px] font-black uppercase text-gray-400 tracking-widest border-b border-gray-100 text-center">Gestión</th>
+                  </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                  {groupedRoutes.length > 0 ? groupedRoutes.map((row) => (
+                  <tr key={`${row.user_id}-${row.local_id}`} className="hover:bg-gray-50/50 transition-all group">
+                      <td className="p-8">
+                        <p className="font-black text-sm uppercase text-gray-900 tracking-tighter">{row.cadena || 'Sin Local'}</p>
+                        <p className="text-[10px] font-bold text-[#87be00] uppercase tracking-tighter">
+                          {row.codigo_local || row.center_code || 'S/C'}
+                        </p>
+                      </td>
+                      <td className="p-8">
+                        <p className="font-bold text-sm text-gray-700">{row.first_name} {row.last_name}</p>
+                        <div className="mt-2 flex items-center gap-3">
+                           <WeeklyStatus activeDays={row.allDays} />
                         </div>
-                        {/* 🚩 Componente de bolitas con múltiples días */}
-                        <WeeklyStatus activeDays={row.allDays} />
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1.5 text-[9px] font-black text-blue-500 uppercase tracking-widest">
-                          <FiCalendar size={10} /> Fecha Única
-                        </div>
-                        <span className="text-xs font-black text-gray-800">
-                          {new Date(row.visit_date).toLocaleDateString('es-CL', { timeZone: 'UTC' })}
-                        </span>
-                      </div>
-                    )}
-                  </td>
-
-                  <td className="p-6 text-center">
-                    <span className="bg-gray-100 text-gray-400 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest">
-                      {row.status || 'PENDING'}
-                    </span>
-                  </td>
-
-                  <td className="p-6 text-right">
-                    <button 
-                      onClick={() => handleEdit(row)}
-                      className="p-3 text-gray-300 hover:text-[#87be00] hover:bg-[#87be00]/10 rounded-xl transition-all"
-                    >
-                      <FiEdit3 size={18} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+                      </td>
+                      <td className="p-8 text-center">
+                        <button 
+                          onClick={() => { setSelectedRoute({...row, selectedDays: row.allDays}); setIsModalOpen(true); }} 
+                          className="p-4 bg-gray-50 rounded-2xl text-gray-300 group-hover:bg-black group-hover:text-[#87be00] transition-all shadow-sm active:scale-90"
+                        >
+                            <FiEdit2 size={16} />
+                        </button>
+                      </td>
+                  </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan="3" className="p-32 text-center text-gray-300 font-black uppercase italic text-[11px] tracking-widest">
+                         No hay planificación disponible para mostrar
+                      </td>
+                    </tr>
+                  )}
+              </tbody>
           </table>
         </div>
-      </div>
+      ) : (
+        <div className="bg-white p-10 rounded-[3rem] shadow-xl border border-gray-100 animate-in zoom-in-95 duration-300">
+            <AdminCalendarView />
+        </div>
+      )}
 
-      {/* MODAL PARA CREAR/EDITAR */}
       <ManageRoutesModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        users={users} 
-        locales={locales} 
-        onCreated={fetchData} 
-        initialData={selectedRoute} 
+        isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}
+        users={users} locales={locales} companies={companies}
+        initialData={selectedRoute} onCreated={fetchData}
       />
     </div>
   );

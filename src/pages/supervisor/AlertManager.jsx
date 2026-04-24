@@ -109,7 +109,7 @@ const AlertManager = () => {
     }
     setLoading(true);
     try {
-      await api.post("/notifications/bulk", {
+      await api.post("/notifications/send-bulk", {
         ...form,
         company_id: currentUser.company_id,
         title: form.title || (form.type === "URGENTE" ? "ALERTA URGENTE" : "AVISO OPERATIVO"),
