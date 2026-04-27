@@ -4,7 +4,14 @@ import ManageRoutesModal from "../../components/ManageRoutesModal";
 import AdminCalendarView from "../../components/AdminCalendarView";
 import WeeklyStatus from "../../components/MiniCalendario";
 import toast from "react-hot-toast";
-import { FiPlus, FiEdit2, FiUploadCloud, FiRefreshCw, FiList, FiCalendar } from "react-icons/fi";
+import {
+  FiPlus,
+  FiEdit2,
+  FiUploadCloud,
+  FiRefreshCw,
+  FiList,
+  FiCalendar,
+} from "react-icons/fi";
 import * as XLSX from "xlsx";
 
 const Planificacion = () => {
@@ -16,17 +23,21 @@ const Planificacion = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [loading, setLoading] = useState(true);
+
   const fileInputRef = useRef(null);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [resRoutes, resUsers, resLocales, resCompanies] = await Promise.all([
-        api.get("/routes"),
-        api.get("/users"),
-        api.get("/locales"),
-        api.get("/companies")
-      ]);
+
+      const [resRoutes, resUsers, resLocales, resCompanies] =
+        await Promise.all([
+          api.get("/routes"),
+          api.get("/users"),
+          api.get("/locales"),
+          api.get("/companies"),
+        ]);
+
       setRoutes(Array.isArray(resRoutes) ? resRoutes : []);
       setUsers(Array.isArray(resUsers) ? resUsers : []);
       setLocales(Array.isArray(resLocales) ? resLocales : []);
@@ -39,11 +50,15 @@ const Planificacion = () => {
     }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-  /**
-   * 🚀 CARGA MASIVA SaaS (Escaneo Agresivo de Encabezados)
-   */
+  const getWeekOfMonth = (dateStr) => {
+    const date = new Date(dateStr);
+    return Math.ceil(date.getDate() / 7);
+  };
+
   const handleImportExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -56,163 +71,175 @@ const Planificacion = () => {
         const data = new Uint8Array(evt.target.result);
         const workbook = XLSX.read(data, { type: "array" });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        
-        // 1. Leemos como matriz de celdas para encontrar la fila de títulos
-        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
-        
-        const headerRowIndex = rows.findIndex(row => 
-          row.some(cell => {
+
+        const rows = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1,
+          defval: "",
+        });
+
+        console.log("📄 RAW EXCEL ROWS:", rows);
+
+        const headerRowIndex = rows.findIndex((row) =>
+          row.some((cell) => {
             const c = String(cell).toLowerCase().trim();
-            return c.includes("rut") || c.includes("codigo") || c.includes("turno");
+            return (
+              c.includes("rut") ||
+              c.includes("codigo") ||
+              c.includes("turno")
+            );
           })
         );
 
+        console.log("🧠 HEADER ROW INDEX DETECTADO:", headerRowIndex);
+
         if (headerRowIndex === -1) {
-          toast.error("No se encontraron encabezados válidos (RUT o Código)", { id: toastId });
+          toast.error("No se encontraron encabezados válidos", {
+            id: toastId,
+          });
           return;
         }
 
-        // 2. Extraemos los datos a partir de esa fila
-        const rawJson = XLSX.utils.sheet_to_json(worksheet, { 
-          range: headerRowIndex, 
-          defval: "" 
+        const rawJson = XLSX.utils.sheet_to_json(worksheet, {
+          range: headerRowIndex,
+          defval: "",
         });
 
-        // 3. Mapeo Flexible (Fuzzy Mapping)
-        const finalData = rawJson.map(row => {
-          const newRow = {};
-          Object.keys(row).forEach(key => {
-            const cleanKey = key.trim().toLowerCase();
-            const value = String(row[key]).trim();
+        console.log("📦 RAW JSON PARSEADO:", rawJson);
 
-            // Normalización de llaves críticas para el Backend
-            if (cleanKey.includes("rut")) {
-              newRow.Rut_Mercaderista = value;
-            } else if (cleanKey.includes("cod")) {
-              newRow.Codigo = value;
-            } else if (cleanKey.includes("turno") && cleanKey.includes("semana")) {
-              // Mantenemos el nombre de la columna de turno (Semana 1, 2, etc)
-              newRow[key.trim()] = value;
-            } else {
-              newRow[key.trim()] = row[key];
-            }
-          });
-          return newRow;
-        }).filter(f => f.Rut_Mercaderista && f.Codigo);
+        const finalData = rawJson
+          .map((row, index) => {
+            const newRow = {};
 
-        console.log("📊 Datos detectados tras normalización:", finalData);
+            Object.keys(row).forEach((key) => {
+              const cleanKey = key.trim().toLowerCase();
+              const value = String(row[key]).trim();
 
-        if (finalData.length === 0) {
-          toast.error("El archivo tiene datos pero el RUT o el Código no son legibles", { id: toastId });
-          return;
-        }
+              if (cleanKey.includes("rut")) {
+                newRow.Rut_Mercaderista = value;
+              } else if (cleanKey.includes("cod")) {
+                newRow.Codigo = value;
+              } else if (
+                cleanKey.includes("turno") &&
+                cleanKey.includes("semana")
+              ) {
+                newRow[key.trim()] = value;
+              }
+            });
 
-        toast.loading(`Sincronizando ${finalData.length} registros...`, { id: toastId });
+            console.log(`📝 FILA NORMALIZADA ${index + 1}:`, newRow);
 
-        /**
-         * 🚩 SERIALIZACIÓN SEGURA:
-         * Enviamos como objeto JSON limpio. El backend rescatará 'routes'.
-         */
-        const response = await api.post("/routes/bulk-create", { routes: finalData });
+            return newRow;
+          })
+          .filter((f) => f.Rut_Mercaderista && f.Codigo);
+
+        console.log("✅ FINAL DATA FILTRADA:", finalData);
+
+        const today = new Date();
+
+        const payload = {
+          month: today.getMonth() + 1,
+          year: today.getFullYear(),
+          routes: finalData,
+        };
+
+        console.log("🚀 PAYLOAD ENVIADO AL BACKEND:", payload);
+
+        const response = await api.post("/routes/bulk-create", payload);
+
+        console.log("📥 RESPUESTA BACKEND:", response);
 
         if (response.success) {
-          toast.success(`Éxito: ${response.count} rutas planificadas`, { id: toastId });
-          fetchData(); 
+          toast.success(`Éxito: ${response.count} visitas creadas`, {
+            id: toastId,
+          });
+
+          fetchData();
         } else {
-          toast.error(response.message || "Error en el servidor", { id: toastId });
+          toast.error(response.message || "Error en carga masiva", {
+            id: toastId,
+          });
         }
       } catch (err) {
-        console.error("❌ Error XLSX:", err);
+        console.error("❌ ERROR IMPORTANDO EXCEL:", err);
         toast.error("No se pudo procesar el Excel", { id: toastId });
       }
     };
 
     reader.readAsArrayBuffer(file);
-    e.target.value = ""; 
+    e.target.value = "";
   };
 
   const groupedRoutes = useMemo(() => {
     const groups = {};
+
     routes.forEach((r) => {
       if (!r.user_id || !r.local_id) return;
-      const key = `${r.user_id}-${r.local_id}`;
+
+      let key;
+
+      if (r.visit_date) {
+        const date = new Date(r.visit_date);
+
+        key = [
+          r.user_id,
+          r.local_id,
+          date.getFullYear(),
+          date.getMonth(),
+          getWeekOfMonth(r.visit_date),
+        ].join("-");
+      } else {
+        key = `${r.user_id}-${r.local_id}-${r.schedule_group_id || "weekly"}`;
+      }
+
       if (!groups[key]) {
-        groups[key] = { ...r, allDays: (r.day_of_week !== null) ? [Number(r.day_of_week)] : [] };
-      } else if (r.day_of_week !== null) {
-        const dayNum = Number(r.day_of_week);
-        if (!groups[key].allDays.includes(dayNum)) groups[key].allDays.push(dayNum);
+        groups[key] = {
+          ...r,
+          allDays:
+            r.day_of_week !== null && r.day_of_week !== undefined
+              ? [Number(r.day_of_week)]
+              : [],
+          groupedVisits: [],
+        };
+      }
+
+      if (
+        r.day_of_week !== null &&
+        r.day_of_week !== undefined &&
+        !groups[key].allDays.includes(Number(r.day_of_week))
+      ) {
+        groups[key].allDays.push(Number(r.day_of_week));
+      }
+
+      if (r.visit_date) {
+        groups[key].groupedVisits.push(r.visit_date);
       }
     });
+
     return Object.values(groups);
   }, [routes]);
 
-  if (loading) return (
-    <div className="h-screen flex flex-col items-center justify-center space-y-4">
-      <FiRefreshCw className="animate-spin text-[#87be00]" size={42} />
-      <p className="font-black uppercase text-[10px] tracking-[0.2em] text-gray-400 italic text-center px-4">
-        Sincronizando Planificación...
-      </p>
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center space-y-4">
+        <FiRefreshCw className="animate-spin text-[#87be00]" size={42} />
+        <p>Sincronizando Planificación...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-8 font-[Outfit] space-y-10 animate-in fade-in duration-700">
-      
-      {/* HEADER DINÁMICO */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-10 rounded-[3rem] shadow-sm border border-gray-100">
-        <div>
-          <h1 className="text-4xl font-black uppercase italic tracking-tighter text-gray-900">
-            Planificación <span className="text-[#87be00]">Mensual</span>
-          </h1>
-          <div className="flex bg-gray-100 p-1.5 rounded-2xl mt-4 w-fit border border-gray-200">
-            <button onClick={() => setViewMode("list")} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 ${viewMode === 'list' ? 'bg-white shadow-md text-gray-900' : 'text-gray-400'}`}><FiList /> Vista Lista</button>
-            <button onClick={() => setViewMode("calendar")} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 ${viewMode === 'calendar' ? 'bg-white shadow-md text-gray-900' : 'text-gray-400'}`}><FiCalendar /> Calendario</button>
-          </div>
-        </div>
-        <div className="flex gap-4">
-          <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleImportExcel} />
-          <button onClick={() => fileInputRef.current.click()} className="bg-[#87be00] text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center gap-3 hover:bg-black transition-all active:scale-95"><FiUploadCloud size={18} /> Carga Masiva</button>
-          <button onClick={() => { setSelectedRoute(null); setIsModalOpen(true); }} className="bg-black text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center gap-3 hover:bg-[#87be00] transition-all active:scale-95"><FiPlus size={18} /> Nueva Visita</button>
-        </div>
-      </div>
+    <div>
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        accept=".xlsx, .xls"
+        onChange={handleImportExcel}
+      />
 
-      {/* ÁREA DE CONTENIDO */}
-      {viewMode === "list" ? (
-        <div className="bg-white rounded-[3.5rem] shadow-2xl overflow-hidden border border-gray-100">
-          <table className="w-full text-left">
-              <thead>
-                  <tr className="bg-gray-50/50">
-                    <th className="p-8 text-[10px] font-black uppercase text-gray-400 tracking-widest border-b">Local / Cadena</th>
-                    <th className="p-8 text-[10px] font-black uppercase text-gray-400 tracking-widest border-b">Mercaderista</th>
-                    <th className="p-8 text-[10px] font-black uppercase text-gray-400 tracking-widest border-b text-center">Gestión</th>
-                  </tr>
-              </thead>
-              <tbody className="divide-y">
-                  {groupedRoutes.length > 0 ? groupedRoutes.map((row) => (
-                  <tr key={`${row.user_id}-${row.local_id}`} className="hover:bg-gray-50/50 transition-all group">
-                      <td className="p-8">
-                        <p className="font-black text-sm uppercase text-gray-900">{row.cadena || 'Sin Local'}</p>
-                        <p className="text-[10px] font-bold text-[#87be00] uppercase">{row.codigo_local || '---'}</p>
-                      </td>
-                      <td className="p-8">
-                        <p className="font-bold text-sm text-gray-700">{row.first_name} {row.last_name}</p>
-                        <div className="mt-2"><WeeklyStatus activeDays={row.allDays} /></div>
-                      </td>
-                      <td className="p-8 text-center">
-                        <button onClick={() => { setSelectedRoute({...row, selectedDays: row.allDays}); setIsModalOpen(true); }} className="p-4 bg-gray-50 rounded-2xl text-gray-300 group-hover:bg-black group-hover:text-[#87be00] transition-all active:scale-90"><FiEdit2 size={16} /></button>
-                      </td>
-                  </tr>
-                  )) : (
-                    <tr><td colSpan="3" className="p-32 text-center text-gray-300 font-black uppercase italic text-[11px]">No hay rutas planificadas para mostrar.</td></tr>
-                  )}
-              </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="bg-white p-10 rounded-[3rem] shadow-xl border border-gray-100"><AdminCalendarView /></div>
-      )}
-
-      <ManageRoutesModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} users={users} locales={locales} companies={companies} initialData={selectedRoute} onCreated={fetchData} />
+      <button onClick={() => fileInputRef.current.click()}>
+        Importar Excel
+      </button>
     </div>
   );
 };

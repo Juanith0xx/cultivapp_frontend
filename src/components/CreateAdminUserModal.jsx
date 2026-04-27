@@ -78,7 +78,7 @@ const CreateAdminUserModal = ({ isOpen, onClose, onCreated }) => {
       if (foto) formData.append("foto", foto);
       if (documentoAchs) formData.append("documento_achs", documentoAchs); // Enviamos el PDF
 
-      await api.post("/api/users", formData);
+      await api.post("/users", formData);
 
       onCreated();
       onClose();
