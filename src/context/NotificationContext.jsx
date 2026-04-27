@@ -12,6 +12,8 @@ export const NotificationProvider = ({ children }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const processedIds = useRef(new Set());
+
+  // ✅ BroadcastChannel para sincronizar pestañas del mismo usuario
   const broadcastRef = useRef(null);
 
   const fetchNotifs = useCallback(async () => {
@@ -34,17 +36,21 @@ export const NotificationProvider = ({ children }) => {
 
   useEffect(() => { fetchNotifs(); }, [fetchNotifs]);
 
-  // BroadcastChannel: coordina múltiples pestañas del mismo usuario
+  // ✅ BroadcastChannel: inicializar y escuchar claims de otras pestañas
   useEffect(() => {
     if (!user?.id) return;
+
     const bc = new BroadcastChannel(`notif-lock-${user.id}`);
     broadcastRef.current = bc;
+
     bc.onmessage = (e) => {
       if (e.data?.type === 'CLAIM') {
+        // Otra pestaña ya procesó esta notificación → la marcamos localmente para bloquear el toast
         processedIds.current.add(e.data.id);
-        console.log("📡 [BroadcastChannel] Reclamada por otra pestaña:", e.data.id);
+        console.log("📡 [BroadcastChannel] Notificación reclamada por otra pestaña:", e.data.id);
       }
     };
+
     return () => {
       bc.close();
       broadcastRef.current = null;
@@ -63,6 +69,8 @@ export const NotificationProvider = ({ children }) => {
       try {
         await supabase.auth.setSession({ access_token: token, refresh_token: token });
 
+        // ✅ Sin filter en el canal (evita problema de RLS/índices en Supabase)
+        // El filtrado por usuario se hace manualmente dentro del handler
         channel = supabase
           .channel('db-changes-notifications')
           .on('postgres_changes',
@@ -72,42 +80,36 @@ export const NotificationProvider = ({ children }) => {
               table: 'notifications'
             },
             (payload) => {
+              console.log("📥 [REALTIME] ¡Algo llegó a la DB!", payload);
+
               const n = payload.new;
 
-              console.log("📥 [REALTIME] payload.new completo:", JSON.stringify(n, null, 2));
-
-              // Guardia: si no hay user.id válido, salir
-              if (!user?.id) {
-                console.log("⚠️ user.id no disponible, ignorando evento");
-                return;
-              }
-
-              // Guardia: evitar reprocesamiento
+              // ✅ Verificar si esta pestaña (u otra) ya procesó la notificación
               if (processedIds.current.has(n.id)) {
-                console.log("⏭️ Ya procesada:", n.id);
+                console.log("⏭️ Notificación ya procesada (duplicado o reclamada por otra pestaña):", n.id);
                 return;
               }
 
-              // Normalización estricta
-              const notifUserId = String(n.user_id ?? "").toLowerCase().trim();
-              const currentUserId = String(user.id ?? "").toLowerCase().trim();
+              // NORMALIZACIÓN DE IDs (Muy importante)
+              const cleanNotifUser = String(n.target_user_id || n.user_id || "").toLowerCase().trim();
+              const cleanUserId = String(user.id || "").toLowerCase().trim();
+              const cleanNotifTenant = String(n.tenant_id || "").toLowerCase().trim();
+              const cleanUserTenant = String(user.company_id || "").toLowerCase().trim();
 
-              console.log(`🧐 Comparando user_id: [${notifUserId}] con [${currentUserId}]`);
+              // DEBUG EN CONSOLA (Para que veas por qué no entra el IF)
+              console.log(`🧐 Comparando Usuario: [${cleanNotifUser}] con [${cleanUserId}]`);
+              console.log(`🧐 Comparando Empresa: [${cleanNotifTenant}] con [${cleanUserTenant}]`);
 
-              // Guardia: si alguno está vacío, no hay match posible
-              if (!notifUserId || !currentUserId) {
-                console.log("⚠️ Uno de los IDs está vacío, ignorando");
-                return;
-              }
-
-              const esParaMi = notifUserId === currentUserId;
+              const esParaMi = cleanNotifUser === cleanUserId;
 
               if (esParaMi) {
                 console.log("✅ ¡Es para mí! Disparando Toast.");
 
-                // Reclamar antes de procesar para bloquear otras pestañas
+                // ✅ Reclamar ANTES de procesar para bloquear otras pestañas
                 processedIds.current.add(n.id);
-                broadcastRef.current?.postMessage({ type: 'CLAIM', id: n.id });
+                if (broadcastRef.current) {
+                  broadcastRef.current.postMessage({ type: 'CLAIM', id: n.id });
+                }
 
                 toast('¡Tienes una nueva notificación!', {
                   icon: '🔔',
@@ -127,7 +129,7 @@ export const NotificationProvider = ({ children }) => {
                 setNotifications(prev => [n, ...prev]);
                 setUnreadCount(c => c + 1);
               } else {
-                console.log("⏭️ No es para este usuario, ignorando.");
+                console.log("⏭️ Notificación ignorada (no es para este usuario/empresa)");
               }
             }
           )
@@ -150,22 +152,20 @@ export const NotificationProvider = ({ children }) => {
     };
   }, [user?.id, user?.company_id]);
 
-  const onMarkRead = async (id) => {
-    try {
-      await service.markAsRead(id);
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
-      setUnreadCount(c => Math.max(0, c - 1));
-    } catch (err) {
-      console.error("❌ [Error al marcar leído]:", err);
-    }
-  };
-
   return (
     <NotificationContext.Provider value={{
       notifications,
       unreadCount,
       loading,
-      onMarkRead,
+      onMarkRead: async (id) => {
+        try {
+          await service.markAsRead(id);
+          setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+          setUnreadCount(c => Math.max(0, c - 1));
+        } catch (err) {
+          console.error("❌ [Error al marcar leído]:", err);
+        }
+      },
       refresh: fetchNotifs
     }}>
       {children}
@@ -173,6 +173,4 @@ export const NotificationProvider = ({ children }) => {
   );
 };
 
-export function useNotificationContext() {
-  return useContext(NotificationContext);
-}
+export const useNotificationContext = () => useContext(NotificationContext);

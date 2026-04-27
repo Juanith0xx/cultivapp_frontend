@@ -14,7 +14,7 @@ const AlertManager = () => {
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [searchLocal, setSearchLocal] = useState(""); // Nuevo: búsqueda para locales
+  const [searchLocal, setSearchLocal] = useState("");
 
   const [users, setUsers] = useState([]);
   const [chains, setChains] = useState([]);
@@ -26,12 +26,11 @@ const AlertManager = () => {
     type: "OPERATIVA",
     scope: "TODOS",
     chainId: "",
-    localId: "", // Se mantiene para compatibilidad con el envío
+    localId: "",
     selectedZone: "",
     selectedTargets: [] 
   });
 
-  // 1. CARGA INICIAL: Usuarios y Cartera Completa del Supervisor
   useEffect(() => {
     const loadInitialData = async () => {
       if (!currentUser?.company_id || !currentUser?.id) return;
@@ -59,14 +58,12 @@ const AlertManager = () => {
     loadInitialData();
   }, [currentUser]);
 
-  // Filtro de Usuarios
   const filteredUsers = useMemo(() => {
     return users.filter(u => 
       `${u.first_name} ${u.last_name}`.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [users, searchTerm]);
 
-  // Filtro de Locales (Cartera)
   const filteredLocales = useMemo(() => {
     return allMyLocales.filter(l => 
       l.cadena?.toLowerCase().includes(searchLocal.toLowerCase()) || 
@@ -89,19 +86,36 @@ const AlertManager = () => {
     if (!form.message) return toast.error("El mensaje es obligatorio");
     if (form.scope === 'individual' && form.selectedTargets.length === 0) return toast.error("Selecciona destinatarios");
     if (form.scope === 'local' && !form.localId) return toast.error("Selecciona un Punto de Venta");
+    if (form.scope === 'ZONA' && !form.selectedZone) return toast.error("Selecciona una zona");
 
     setLoading(true);
     try {
+      // ✅ Mapeo correcto de campos hacia el backend
       await api.post("/notifications/send-bulk", {
-        ...form,
-        company_id: currentUser.company_id,
-        title: form.title || (form.type === "URGENTE" ? "ALERTA URGENTE" : "AVISO OPERATIVO"),
+        title:     form.title || (form.type === "URGENTE" ? "ALERTA URGENTE" : "AVISO OPERATIVO"),
+        message:   form.message,
+        type:      form.type,
+        scope:     form.scope,
+        companyId: currentUser.company_id,   // ✅ camelCase que espera el backend
+        localId:   form.localId || null,
+        targetIds: form.selectedTargets,     // ✅ nombre correcto que espera el backend
       });
+
       toast.success("Instrucción emitida con éxito");
-      setForm(prev => ({ ...prev, title: "", message: "", selectedTargets: [], chainId: "", localId: "", selectedZone: "" }));
+      setForm(prev => ({ 
+        ...prev, 
+        title: "", 
+        message: "", 
+        selectedTargets: [], 
+        chainId: "", 
+        localId: "", 
+        selectedZone: "" 
+      }));
     } catch (error) {
       toast.error("Error al emitir notificación");
-    } finally { setLoading(false); }
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   return (
@@ -131,7 +145,7 @@ const AlertManager = () => {
 
       <form onSubmit={handleSend} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* IZQUIERDA: MENSAJE Y SELECCIÓN TIPO USUARIO/LOCAL */}
+        {/* IZQUIERDA */}
         <div className="lg:col-span-8 space-y-6">
           <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm space-y-6">
             
@@ -151,7 +165,6 @@ const AlertManager = () => {
               />
             </div>
 
-            {/* LISTADO DINÁMICO (USUARIOS O LOCALES) */}
             {(form.scope === 'individual' || form.scope === 'local') && (
               <div className="space-y-4 pt-6 border-t border-gray-100 animate-in fade-in slide-in-from-top-4">
                 <div className="flex justify-between items-center px-2">
@@ -217,7 +230,7 @@ const AlertManager = () => {
           </div>
         </div>
 
-        {/* DERECHA: CONFIGURACIÓN DE ALCANCE Y PRIORIDAD */}
+        {/* DERECHA */}
         <div className="lg:col-span-4 space-y-6">
           <div className="bg-white p-7 rounded-[3rem] border border-gray-100 shadow-sm space-y-6">
             <p className="text-[9px] font-black uppercase text-[#87be00] tracking-[0.2em] italic text-center">Configuración de Alcance</p>
