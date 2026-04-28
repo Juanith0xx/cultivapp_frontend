@@ -26,6 +26,7 @@ const UserCredential = () => {
       try {
         setLoading(true);
         const data = await api.get(`users/public/verify/${id}`);
+        console.log("🔍 Datos recibidos del backend:", data);
         setUser(data);
       } catch (err) {
         console.error("Error:", err);
@@ -141,7 +142,7 @@ const UserCredential = () => {
             <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 flex items-center gap-4">
               <div className="bg-white p-2.5 rounded-xl shadow-sm text-[#87be00]"><FiBriefcase size={18} /></div>
               <div>
-                <p className="text-[9px] text-gray-400 font-black uppercase mb-1">Servicio</p>
+                <p className="text-[9px] text-gray-400 font-black uppercase mb-1">Prestando Servicios para:</p>
                 <p className="text-sm font-bold text-gray-700">{user.empresa_cliente || "CULTIVA S.A."}</p>
               </div>
             </div>
@@ -170,7 +171,7 @@ const UserCredential = () => {
             >
                 <div className="flex items-center gap-3">
                     <FiDownload size={18} className="group-hover:animate-bounce" />
-                    <span>Descargar Certificado ACHS</span>
+                    <span>Descargar Documentos</span>
                 </div>
                 <FiExternalLink className="opacity-40 group-hover:opacity-100" />
             </button>

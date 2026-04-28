@@ -13,6 +13,9 @@ import ChangePassword from "./pages/auth/ChangePassword"
 import ForgotPassword from "./pages/auth/ForgotPassword"
 import ResetPassword from "./pages/auth/ResetPassword"
 
+// 🚩 IMPORTACIÓN DE CREDENCIALES (PARA EL QR)
+import UserCredential from "./components/UserCredential"
+
 // --- COMPONENTES GLOBALES ---
 import ProtectedRoute from "./components/ProtectedRoute"
 import NotificationsLayout from "./components/NotificationsLayout" 
@@ -85,6 +88,10 @@ function App() {
             <Route path="/" element={<Login />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            
+            {/* 🚩 RUTA PÚBLICA PARA CREDENCIAL QR (FUERA DE PROTECTED) */}
+            <Route path="/verify/:id" element={<UserCredential />} />
+
             <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
 
             {/* 👑 SECCIÓN ROOT */}

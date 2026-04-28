@@ -13,7 +13,9 @@ const CreateAdminUserModal = ({ isOpen, onClose, onCreated }) => {
     role: "",
     rut: "",
     position: "",
-    fecha_contrato: "",
+    // 🚩 CAMBIO: Eliminamos fecha_contrato antigua y agregamos las nuevas
+    fecha_inicio_contrato: "", 
+    fecha_termino_contrato: "",
     tipo_contrato: "",
     supervisor_nombre: "",
     supervisor_telefono: "",
@@ -22,7 +24,7 @@ const CreateAdminUserModal = ({ isOpen, onClose, onCreated }) => {
   const [form, setForm] = useState(initialForm);
   const [foto, setFoto] = useState(null);
   const [preview, setPreview] = useState(null);
-  const [documentoAchs, setDocumentoAchs] = useState(null); // Nuevo estado para ACHS
+  const [documentoAchs, setDocumentoAchs] = useState(null);
   const [companyStats, setCompanyStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -55,7 +57,6 @@ const CreateAdminUserModal = ({ isOpen, onClose, onCreated }) => {
     }
   };
 
-  // Manejador para el PDF de la ACHS
   const handleAchsChange = (e) => {
     const file = e.target.files[0];
     if (file) setDocumentoAchs(file);
@@ -76,7 +77,7 @@ const CreateAdminUserModal = ({ isOpen, onClose, onCreated }) => {
       formData.append("company_id", userAdmin.company_id);
       
       if (foto) formData.append("foto", foto);
-      if (documentoAchs) formData.append("documento_achs", documentoAchs); // Enviamos el PDF
+      if (documentoAchs) formData.append("documento_achs", documentoAchs);
 
       await api.post("/users", formData);
 
@@ -148,15 +149,26 @@ const CreateAdminUserModal = ({ isOpen, onClose, onCreated }) => {
                 onChange={e => setForm({...form, position: e.target.value})} />
               
               <div className="grid grid-cols-2 gap-2">
-                <select required className="border rounded-xl px-2 py-2 text-xs bg-white"
+                <select required className="border rounded-xl px-2 py-2 text-xs bg-white col-span-2"
                   onChange={e => setForm({...form, tipo_contrato: e.target.value})}>
                   <option value="">Tipo Contrato</option>
                   <option value="Indefinido">Indefinido</option>
                   <option value="Plazo Fijo">Plazo Fijo</option>
                   <option value="Part-Time">Part-Time</option>
                 </select>
-                <input type="date" className="border rounded-xl px-2 py-2 text-xs"
-                  onChange={e => setForm({...form, fecha_contrato: e.target.value})} />
+
+                {/* 🚩 NUEVAS COLUMNAS DE FECHA */}
+                <div className="flex flex-col">
+                  <label className="text-[9px] font-bold text-gray-400 uppercase mb-1 ml-1">Inicio Contrato</label>
+                  <input type="date" required className="border rounded-xl px-2 py-2 text-xs"
+                    onChange={e => setForm({...form, fecha_inicio_contrato: e.target.value})} />
+                </div>
+                
+                <div className="flex flex-col">
+                  <label className="text-[9px] font-bold text-gray-400 uppercase mb-1 ml-1">Término Contrato</label>
+                  <input type="date" className="border rounded-xl px-2 py-2 text-xs"
+                    onChange={e => setForm({...form, fecha_termino_contrato: e.target.value})} />
+                </div>
               </div>
 
               <input type="email" placeholder="Email" required className="w-full border rounded-xl px-4 py-2 text-sm"

@@ -10,7 +10,9 @@ const EditAdminUserModal = ({ isOpen, onClose, onUpdated, user, stats }) => {
     role: "",
     rut: "",
     position: "",
-    fecha_contrato: "",
+    // 🚩 CAMBIO: Nuevos campos de fecha
+    fecha_inicio_contrato: "",
+    fecha_termino_contrato: "",
     tipo_contrato: "",
     supervisor_nombre: "",
     supervisor_telefono: "",
@@ -31,7 +33,9 @@ const EditAdminUserModal = ({ isOpen, onClose, onUpdated, user, stats }) => {
         role: user.role || "",
         rut: user.rut || "",
         position: user.position || "",
-        fecha_contrato: user.fecha_contrato ? user.fecha_contrato.split('T')[0] : "",
+        // 🚩 Sincronización de las nuevas fechas (formateo para input date)
+        fecha_inicio_contrato: user.fecha_inicio_contrato ? user.fecha_inicio_contrato.split('T')[0] : "",
+        fecha_termino_contrato: user.fecha_termino_contrato ? user.fecha_termino_contrato.split('T')[0] : "",
         tipo_contrato: user.tipo_contrato || "Plazo Fijo",
         supervisor_nombre: user.supervisor_nombre || "",
         supervisor_telefono: user.supervisor_telefono || "",
@@ -49,7 +53,6 @@ const EditAdminUserModal = ({ isOpen, onClose, onUpdated, user, stats }) => {
     const counts = stats.counts || {}
     const limits = stats.limits || {}
     if (role === user.role) return false
-
     if (role === "SUPERVISOR") return counts.SUPERVISOR >= limits.max_supervisors
     if (role === "USUARIO") return counts.USUARIO >= limits.max_users
     if (role === "VIEW") return counts.VIEW >= limits.max_view
@@ -63,20 +66,13 @@ const EditAdminUserModal = ({ isOpen, onClose, onUpdated, user, stats }) => {
 
     try {
       const formData = new FormData()
-      
-      // 1. Campos básicos del formulario
       Object.keys(form).forEach(key => formData.append(key, form[key]))
-      
-      // 🚩 2. Campo clave para la estructura de carpetas en el Backend
-      // Esto permite que el middleware cree la carpeta /doc_achs/nombre_apellido/
       formData.append("user_full_name", `${form.first_name} ${form.last_name}`)
 
-      // 3. Adjuntar archivos
       if (foto) formData.append("foto", foto)
       if (documentoAchs) formData.append("documento_achs", documentoAchs)
 
       await api.put(`/users/${user.id}`, formData)
-
       onUpdated()
       onClose()
     } catch (err) {
@@ -90,7 +86,6 @@ const EditAdminUserModal = ({ isOpen, onClose, onUpdated, user, stats }) => {
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 font-[Outfit]">
       <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         
-        {/* HEADER */}
         <div className="p-6 border-b flex justify-between items-center bg-gray-50/50">
           <div>
             <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight">Editar Colaborador</h3>
@@ -105,16 +100,11 @@ const EditAdminUserModal = ({ isOpen, onClose, onUpdated, user, stats }) => {
           {error && <div className="bg-red-50 text-red-500 p-4 rounded-2xl text-xs font-bold border border-red-100">{error}</div>}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            
-            {/* IZQUIERDA: Identidad y Foto */}
             <div className="space-y-4">
               <div className="flex flex-col items-center p-6 border-2 border-dashed border-gray-100 rounded-[2rem] bg-gray-50/30">
                 <div className="relative group">
-                  <img 
-                    src={preview || "https://via.placeholder.com/150"} 
-                    className="w-28 h-28 rounded-[2rem] object-cover border-4 border-white shadow-lg transition-transform group-hover:scale-105" 
-                  />
-                  <label className="absolute bottom-0 right-0 bg-[#87be00] p-2 rounded-xl text-white shadow-lg cursor-pointer hover:scale-110 transition">
+                  <img src={preview || "https://via.placeholder.com/150"} className="w-28 h-28 rounded-[2rem] object-cover border-4 border-white shadow-lg" />
+                  <label className="absolute bottom-0 right-0 bg-[#87be00] p-2 rounded-xl text-white shadow-lg cursor-pointer">
                     <FiCamera size={18} />
                     <input type="file" className="hidden" accept="image/*" onChange={(e) => {
                       const file = e.target.files[0]
@@ -125,39 +115,44 @@ const EditAdminUserModal = ({ isOpen, onClose, onUpdated, user, stats }) => {
                     }} />
                   </label>
                 </div>
-                <p className="text-[10px] font-black text-gray-400 mt-4 uppercase tracking-tighter">Imagen de Perfil</p>
               </div>
 
               <div className="space-y-3">
-                <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Nombre y RUT</label>
-                <input type="text" value={form.first_name} placeholder="Nombres" required className="w-full border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 text-sm focus:ring-2 ring-[#87be00]/20 outline-none transition"
+                <input type="text" value={form.first_name} placeholder="Nombres" required className="w-full border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 text-sm"
                   onChange={e => setForm({...form, first_name: e.target.value})} />
-                <input type="text" value={form.last_name} placeholder="Apellidos" required className="w-full border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 text-sm focus:ring-2 ring-[#87be00]/20 outline-none transition"
+                <input type="text" value={form.last_name} placeholder="Apellidos" required className="w-full border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 text-sm"
                   onChange={e => setForm({...form, last_name: e.target.value})} />
                 <input type="text" value={form.rut} placeholder="RUT" required className="w-full border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 text-sm font-bold"
                   onChange={e => setForm({...form, rut: e.target.value})} />
               </div>
             </div>
 
-            {/* DERECHA: Contrato y Archivos */}
             <div className="space-y-4">
               <div className="bg-[#87be00]/5 p-5 rounded-[2rem] border border-[#87be00]/10 space-y-3">
-                <label className="text-[10px] font-black text-[#87be00] uppercase tracking-widest">Gestión de Contrato</label>
                 <input type="text" value={form.position} placeholder="Cargo" className="w-full border-white bg-white rounded-xl px-4 py-2 text-sm shadow-sm"
                   onChange={e => setForm({...form, position: e.target.value})} />
                 
                 <div className="grid grid-cols-2 gap-2">
-                  <select value={form.tipo_contrato} className="bg-white border-none rounded-xl px-3 py-2 text-xs shadow-sm"
+                  <select value={form.tipo_contrato} className="bg-white border-none rounded-xl px-3 py-2 text-xs shadow-sm col-span-2"
                     onChange={e => setForm({...form, tipo_contrato: e.target.value})}>
                     <option value="Indefinido">Indefinido</option>
                     <option value="Plazo Fijo">Plazo Fijo</option>
                     <option value="Part-Time">Part-Time</option>
                   </select>
-                  <input type="date" value={form.fecha_contrato} className="bg-white border-none rounded-xl px-3 py-2 text-xs shadow-sm font-bold"
-                    onChange={e => setForm({...form, fecha_contrato: e.target.value})} />
+
+                  {/* 🚩 NUEVAS COLUMNAS DE FECHA EN EDICIÓN */}
+                  <div className="flex flex-col">
+                    <label className="text-[8px] font-black text-gray-400 uppercase mb-1 ml-1">Inicio</label>
+                    <input type="date" value={form.fecha_inicio_contrato} required className="bg-white border-none rounded-xl px-2 py-2 text-[10px] shadow-sm font-bold"
+                      onChange={e => setForm({...form, fecha_inicio_contrato: e.target.value})} />
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="text-[8px] font-black text-gray-400 uppercase mb-1 ml-1">Término</label>
+                    <input type="date" value={form.fecha_termino_contrato} className="bg-white border-none rounded-xl px-2 py-2 text-[10px] shadow-sm font-bold"
+                      onChange={e => setForm({...form, fecha_termino_contrato: e.target.value})} />
+                  </div>
                 </div>
 
-                {/* ADJUNTAR ACHS */}
                 <div className={`mt-2 flex items-center justify-between p-3 rounded-xl border-2 border-dashed transition-colors ${documentoAchs ? 'border-[#87be00] bg-white' : 'border-gray-200 bg-gray-50/50'}`}>
                   <div className="flex items-center gap-2">
                     {documentoAchs ? <FiCheck className="text-[#87be00]" /> : <FiFileText className="text-gray-400" />}
@@ -173,7 +168,6 @@ const EditAdminUserModal = ({ isOpen, onClose, onUpdated, user, stats }) => {
               </div>
 
               <div className="space-y-3">
-                <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Configuración de Cuenta</label>
                 <input type="email" value={form.email} placeholder="Email" required className="w-full border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 text-sm"
                   onChange={e => setForm({...form, email: e.target.value})} />
                 <select value={form.role} className="w-full border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 text-sm"
@@ -186,20 +180,19 @@ const EditAdminUserModal = ({ isOpen, onClose, onUpdated, user, stats }) => {
             </div>
           </div>
 
-          {/* SUPERVISOR */}
           <div className="bg-gray-900 p-6 rounded-[2rem] text-white flex flex-col md:flex-row gap-4 items-center">
-            <div className="flex-1">
-               <p className="text-[9px] font-black text-[#87be00] uppercase tracking-[0.2em] mb-2">Contacto de Emergencia</p>
+            <div className="flex-1 w-full">
+               <p className="text-[9px] font-black text-[#87be00] uppercase tracking-[0.2em] mb-2">Contacto Supervisor</p>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                 <input type="text" value={form.supervisor_nombre} placeholder="Nombre Supervisor" className="bg-white/10 border-none rounded-xl px-4 py-2 text-sm text-white placeholder:text-gray-500 focus:bg-white/20 transition"
+                 <input type="text" value={form.supervisor_nombre} placeholder="Nombre" className="bg-white/10 border-none rounded-xl px-4 py-2 text-sm text-white w-full"
                   onChange={e => setForm({...form, supervisor_nombre: e.target.value})} />
-                 <input type="text" value={form.supervisor_telefono} placeholder="Teléfono (+56...)" className="bg-white/10 border-none rounded-xl px-4 py-2 text-sm text-white placeholder:text-gray-500 focus:bg-white/20 transition"
+                 <input type="text" value={form.supervisor_telefono} placeholder="Teléfono" className="bg-white/10 border-none rounded-xl px-4 py-2 text-sm text-white w-full"
                   onChange={e => setForm({...form, supervisor_telefono: e.target.value})} />
                </div>
             </div>
           </div>
 
-          <button type="submit" disabled={loading} className="w-full bg-[#87be00] text-white py-4 rounded-[1.5rem] font-black uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl shadow-[#87be00]/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50">
+          <button type="submit" disabled={loading} className="w-full bg-[#87be00] text-white py-4 rounded-[1.5rem] font-black uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl transition-all">
             {loading ? "Actualizando..." : <><FiSave size={20}/> Actualizar Colaborador</>}
           </button>
         </form>

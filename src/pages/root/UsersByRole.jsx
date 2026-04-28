@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { FiPlus, FiTrash2, FiEdit2, FiKey, FiUsers, FiUserCheck, FiUserX, FiBriefcase, FiMail, FiShield } from "react-icons/fi"
+import { FiPlus, FiTrash2, FiEdit2, FiKey, FiUsers, FiUserCheck, FiUserX, FiBriefcase, FiMail, FiShield, FiCalendar, FiClock } from "react-icons/fi"
 import { useAuth } from "../../context/AuthContext"
 import { toast } from "react-hot-toast"
 
@@ -99,25 +99,32 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
     inactivos: users.filter(u => !u.is_active).length
   }
 
+  // 🚩 FUNCIÓN PARA FORMATEAR FECHAS DE CONTRATO
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "---";
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: '2-digit' }).replace('.', '');
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700 font-[Outfit]">
       
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-4">
         <div>
-          <h2 className="text-4xl font-black text-gray-800 tracking-tighter uppercase italic leading-none">
+          <h2 className="text-5xl font-black text-gray-800 tracking-tighter uppercase italic leading-none">
             {title}
           </h2>
-          <p className="text-[10px] font-bold text-[#87be00] uppercase tracking-[0.3em] mt-2">
-            Gestión de equipo y permisos
+          <p className="text-[10px] font-black text-[#87be00] uppercase tracking-[0.4em] mt-3">
+            Gestión de equipo, vigencias y permisos
           </p>
         </div>
 
         <button
           onClick={() => setOpenModal(true)}
-          className="flex items-center gap-2 bg-[#87be00] hover:bg-[#76a500] text-white px-6 py-3 rounded-2xl font-black uppercase text-[11px] tracking-widest transition-all shadow-lg shadow-[#87be00]/20"
+          className="flex items-center gap-3 bg-[#87be00] hover:bg-[#76a500] text-white px-8 py-4 rounded-[1.5rem] font-black uppercase text-[11px] tracking-[0.2em] transition-all shadow-xl shadow-[#87be00]/30 hover:scale-[1.02] active:scale-95"
         >
-          <FiPlus size={18} />
+          <FiPlus size={20} />
           {buttonLabel}
         </button>
       </div>
@@ -126,17 +133,17 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
       <div className="flex flex-col lg:flex-row gap-6">
         <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-4">
           <StatCard label="Total Equipo" value={stats.total} icon={<FiUsers />} />
-          <StatCard label="En Terreno" value={stats.activos} icon={<FiUserCheck />} color="text-[#87be00]" />
-          <StatCard label="Inactivos" value={stats.inactivos} icon={<FiUserX />} color="text-red-400" />
+          <StatCard label="Activos" value={stats.activos} icon={<FiUserCheck />} color="text-[#87be00]" />
+          <StatCard label="Inactivos" value={stats.inactivos} icon={<FiUserX />} color="text-red-500" />
         </div>
 
         {loggedUser?.role === "ROOT" && !role && (
-          <div className="lg:w-72">
-            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2 mb-1 block">Filtrar por Empresa</label>
+          <div className="lg:w-80">
+            <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.3em] ml-4 mb-2 block italic">Filtrar por Organización</label>
             <select
               value={selectedCompany}
               onChange={(e) => setSelectedCompany(e.target.value)}
-              className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-4 text-xs font-bold outline-none focus:ring-2 focus:ring-[#87be00]/20 shadow-sm"
+              className="w-full bg-white border border-gray-100 rounded-[1.5rem] px-6 py-4 text-[11px] font-black uppercase tracking-wider outline-none focus:ring-4 focus:ring-[#87be00]/10 shadow-sm transition-all"
             >
               <option value="">Todas las empresas</option>
               {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -146,87 +153,116 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
       </div>
 
       {/* TABLA DE USUARIOS */}
-      <div className="bg-white rounded-[3rem] shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-gray-50/50 border-b border-gray-50">
-              <th className="p-6 text-[10px] font-black uppercase text-gray-400 tracking-widest">Colaborador</th>
-              {!role && <th className="p-6 text-[10px] font-black uppercase text-gray-400 tracking-widest">Organización</th>}
-              <th className="p-6 text-[10px] font-black uppercase text-gray-400 tracking-widest text-center">Estado</th>
-              <th className="p-6 text-[10px] font-black uppercase text-gray-400 tracking-widest text-right">Acciones</th>
-            </tr>
-          </thead>
+      <div className="bg-white rounded-[3.5rem] shadow-2xl shadow-gray-200/60 border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[900px]">
+            <thead>
+              <tr className="bg-gray-50/70 border-b border-gray-100">
+                <th className="p-8 text-[10px] font-black uppercase text-gray-400 tracking-[0.2em]">Colaborador</th>
+                <th className="p-8 text-[10px] font-black uppercase text-gray-400 tracking-[0.2em]">Vigencia de Contrato</th>
+                {!role && <th className="p-8 text-[10px] font-black uppercase text-gray-400 tracking-[0.2em]">Organización</th>}
+                <th className="p-8 text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] text-center">Estado</th>
+                <th className="p-8 text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] text-right">Acciones</th>
+              </tr>
+            </thead>
 
-          <tbody className="divide-y divide-gray-50">
-            {loading ? (
-              <tr><td colSpan="5" className="p-20 text-center"><div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-[#87be00] border-t-transparent" /></td></tr>
-            ) : users.length === 0 ? (
-              <tr><td colSpan="5" className="p-20 text-center text-gray-400 font-bold uppercase text-xs">Sin registros</td></tr>
-            ) : (
-              users.map(u => (
-                <tr key={u.id} className="hover:bg-gray-50/50 transition-colors group">
-                  <td className="p-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400 font-black text-xs uppercase group-hover:bg-[#87be00] group-hover:text-white transition-all">
-                        {u.first_name?.charAt(0)}
-                      </div>
-                      <div>
-                        <p className="text-sm font-black text-gray-800 uppercase tracking-tighter leading-none">{u.first_name}</p>
-                        <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1 font-bold tracking-tight italic">
-                          <FiMail size={10}/> {u.email}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-
-                  {!role && (
-                    <td className="p-6">
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1">
-                            <FiBriefcase size={10}/> {u.company_name || 'Cultivapp Core'}
-                          </span>
+            <tbody className="divide-y divide-gray-50">
+              {loading ? (
+                <tr><td colSpan="5" className="p-32 text-center"><div className="inline-block animate-spin rounded-full h-10 w-10 border-[6px] border-[#87be00] border-t-transparent" /></td></tr>
+              ) : users.length === 0 ? (
+                <tr><td colSpan="5" className="p-32 text-center text-gray-400 font-black uppercase text-[10px] tracking-widest italic">Sin registros en esta categoría</td></tr>
+              ) : (
+                users.map(u => (
+                  <tr key={u.id} className="hover:bg-gray-50/50 transition-all group">
+                    <td className="p-8">
+                      <div className="flex items-center gap-5">
+                        <div className="w-14 h-14 rounded-2xl bg-gray-100 border border-gray-50 flex items-center justify-center text-gray-400 font-black text-sm uppercase group-hover:bg-gray-900 group-hover:text-[#87be00] transition-all shadow-sm">
+                          {u.foto_url ? (
+                            <img src={u.foto_url} className="w-full h-full object-cover rounded-2xl" />
+                          ) : u.first_name?.charAt(0)}
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="bg-gray-100 text-gray-500 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1">
-                            <FiShield size={10}/> {u.role}
+                        <div>
+                          <p className="text-base font-black text-gray-900 uppercase tracking-tighter leading-none italic">{u.first_name} {u.last_name}</p>
+                          <p className="text-[10px] text-gray-400 mt-2 flex items-center gap-2 font-bold tracking-tight">
+                            <FiMail className="text-[#87be00]" size={12}/> {u.email}
+                          </p>
+                          <p className="text-[9px] text-gray-500 mt-1 font-black uppercase tracking-widest">{u.rut}</p>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* 🚩 COLUMNA DE VIGENCIA DE CONTRATO */}
+                    <td className="p-8">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <FiClock className="text-[#87be00]" size={12} />
+                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Inicio:</span>
+                          <span className="text-[10px] font-bold text-gray-700 italic">{formatDate(u.fecha_inicio_contrato)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <FiCalendar className={u.fecha_termino_contrato ? "text-red-400" : "text-[#87be00]"} size={12} />
+                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Término:</span>
+                          <span className={`text-[10px] font-bold italic ${u.fecha_termino_contrato ? "text-red-500" : "text-gray-700"}`}>
+                            {formatDate(u.fecha_termino_contrato) === "---" ? "INDEFINIDO" : formatDate(u.fecha_termino_contrato)}
                           </span>
                         </div>
                       </div>
                     </td>
-                  )}
 
-                  <td className="p-6 text-center">
-                    <button
-                      onClick={() => toggleUser(u.id)}
-                      className={`relative inline-flex h-6 w-12 items-center rounded-full transition-all duration-300 ${
-                        u.is_active ? "bg-[#87be00]" : "bg-gray-200"
-                      }`}
-                    >
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-all duration-300 ${u.is_active ? "translate-x-7" : "translate-x-1"}`} />
-                    </button>
-                  </td>
+                    {!role && (
+                      <td className="p-8">
+                        <div className="flex flex-col gap-2">
+                          <span className="bg-gray-900 text-[#87be00] px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.1em] w-fit shadow-lg shadow-black/10">
+                            {u.company_name || 'MASTER CORE'}
+                          </span>
+                          <span className="bg-[#87be00]/10 text-[#87be00] px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] w-fit italic">
+                            {u.role}
+                          </span>
+                        </div>
+                      </td>
+                    )}
 
-                  <td className="p-6">
-                    <div className="flex justify-end gap-2 opacity-40 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => { setSelectedUser(u); setOpenEdit(true); }} className="p-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-all shadow-sm">
-                        <FiEdit2 size={16} />
+                    <td className="p-8 text-center">
+                      <button
+                        onClick={() => toggleUser(u.id)}
+                        className={`relative inline-flex h-7 w-14 items-center rounded-full transition-all duration-500 shadow-inner ${
+                          u.is_active ? "bg-[#87be00]" : "bg-gray-200"
+                        }`}
+                      >
+                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-all duration-500 ${u.is_active ? "translate-x-8" : "translate-x-1"}`} />
                       </button>
-                      <button onClick={() => { setSelectedUser(u); setOpenReset(true); }} className="p-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-yellow-50 hover:text-yellow-600 transition-all shadow-sm">
-                        <FiKey size={16} />
-                      </button>
-                      {canDeleteUser(u) && (
-                        <button onClick={() => deleteUser(u.id)} className="p-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-red-50 hover:text-red-600 transition-all shadow-sm">
-                          <FiTrash2 size={16} />
+                    </td>
+
+                    <td className="p-8 text-right">
+                      <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all transform translate-x-4 group-hover:translate-x-0">
+                        <button 
+                          onClick={() => { setSelectedUser(u); setOpenEdit(true); }} 
+                          className="p-3 bg-gray-50 text-gray-800 rounded-2xl hover:bg-gray-900 hover:text-[#87be00] transition-all shadow-sm border border-gray-100"
+                        >
+                          <FiEdit2 size={18} />
                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                        <button 
+                          onClick={() => { setSelectedUser(u); setOpenReset(true); }} 
+                          className="p-3 bg-gray-50 text-gray-800 rounded-2xl hover:bg-gray-900 hover:text-yellow-400 transition-all shadow-sm border border-gray-100"
+                        >
+                          <FiKey size={18} />
+                        </button>
+                        {canDeleteUser(u) && (
+                          <button 
+                            onClick={() => deleteUser(u.id)} 
+                            className="p-3 bg-gray-50 text-gray-800 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-sm border border-gray-100"
+                          >
+                            <FiTrash2 size={18} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* MODALES */}
@@ -237,14 +273,14 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
   )
 }
 
-const StatCard = ({ label, value, icon, color = "text-gray-800" }) => (
-  <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-50 flex items-center gap-4">
-    <div className={`w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-xl ${color}`}>
+const StatCard = ({ label, value, icon, color = "text-gray-900" }) => (
+  <div className="bg-white p-8 rounded-[3rem] shadow-xl shadow-gray-200/40 border border-gray-50 flex items-center gap-6 group hover:scale-[1.02] transition-all">
+    <div className={`w-16 h-16 rounded-[1.5rem] bg-gray-50 flex items-center justify-center text-2xl group-hover:bg-gray-900 group-hover:text-[#87be00] transition-all ${color}`}>
       {icon}
     </div>
     <div>
-      <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] leading-none mb-1">{label}</p>
-      <p className={`text-2xl font-black italic tracking-tighter ${color}`}>{value}</p>
+      <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] leading-none mb-2">{label}</p>
+      <p className={`text-4xl font-black italic tracking-tighter leading-none ${color}`}>{value}</p>
     </div>
   </div>
 )
