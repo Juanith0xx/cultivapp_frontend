@@ -131,31 +131,31 @@ const PhotoValidation = () => {
   };
 
   return (
-    <div className="space-y-8 font-[Outfit] pb-10">
-      {/* HEADER */}
-      <div className="flex justify-between items-center px-2">
-        <div>
-          <h2 className="text-2xl font-black text-gray-900 uppercase italic tracking-tighter">
+    <div className="space-y-6 md:space-y-8 font-[Outfit] pb-10">
+      {/* HEADER RESPONSIVO */}
+      <div className="flex flex-row justify-between items-start sm:items-center px-2 md:px-4 gap-4">
+        <div className="flex-1">
+          <h2 className="text-xl md:text-2xl font-black text-gray-900 uppercase italic tracking-tighter leading-none">
             Validación de Ejecución
           </h2>
-          <div className="flex items-center gap-2 mt-1">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+          <div className="flex items-center gap-2 mt-1.5 md:mt-2">
+            <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-tight">
               Sincronización de Evidencias en Tiempo Real
             </p>
           </div>
         </div>
-        <div className="bg-black p-4 rounded-2xl shadow-xl">
-            <FiCamera className="text-[#87be00]" size={24} />
+        <div className="bg-black p-3 md:p-4 rounded-xl md:rounded-2xl shadow-xl shrink-0">
+            <FiCamera className="text-[#87be00] text-xl md:text-2xl" />
         </div>
       </div>
 
-      {/* FILTROS */}
-      <section className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-50 mx-2">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* FILTROS RESPONSIVOS */}
+      <section className="bg-white p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-gray-50 mx-2 md:mx-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <div className="relative">
             <FiFilter className="absolute left-4 top-1/2 -translate-y-1/2 text-[#87be00]" />
             <select 
-              className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[1.5rem] text-[10px] font-black uppercase outline-none"
+              className="w-full pl-10 md:pl-12 pr-4 py-3 md:py-4 bg-gray-50 rounded-xl md:rounded-[1.5rem] text-[9px] md:text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-[#87be00]/20 transition-all"
               value={filters.cadena}
               onChange={(e) => setFilters({...filters, cadena: e.target.value, codigo: ""})}
             >
@@ -167,7 +167,7 @@ const PhotoValidation = () => {
           <div className="relative">
             <FiHash className="absolute left-4 top-1/2 -translate-y-1/2 text-[#87be00]" />
             <select 
-              className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[1.5rem] text-[10px] font-black uppercase outline-none"
+              className="w-full pl-10 md:pl-12 pr-4 py-3 md:py-4 bg-gray-50 rounded-xl md:rounded-[1.5rem] text-[9px] md:text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-[#87be00]/20 transition-all"
               value={filters.codigo}
               onChange={(e) => setFilters({...filters, codigo: e.target.value})}
             >
@@ -180,7 +180,7 @@ const PhotoValidation = () => {
             <FiCalendar className="absolute left-4 top-1/2 -translate-y-1/2 text-[#87be00]" />
             <input 
               type="date"
-              className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[1.5rem] text-[10px] font-black outline-none"
+              className="w-full pl-10 md:pl-12 pr-4 py-3 md:py-4 bg-gray-50 rounded-xl md:rounded-[1.5rem] text-[9px] md:text-[10px] font-black outline-none focus:ring-2 focus:ring-[#87be00]/20 transition-all"
               value={filters.fecha}
               onChange={(e) => setFilters({...filters, fecha: e.target.value})}
             />
@@ -191,7 +191,7 @@ const PhotoValidation = () => {
             <input 
               type="text"
               placeholder="BUSCAR..."
-              className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[1.5rem] text-[10px] font-black uppercase outline-none"
+              className="w-full pl-10 md:pl-12 pr-4 py-3 md:py-4 bg-gray-50 rounded-xl md:rounded-[1.5rem] text-[9px] md:text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-[#87be00]/20 transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -199,57 +199,58 @@ const PhotoValidation = () => {
         </div>
       </section>
 
-      {/* GRID */}
+      {/* GRID RESPONSIVO */}
       {isLoadingPhotos ? (
         <div className="py-20 text-center text-[10px] font-black uppercase italic animate-pulse text-gray-400">
             Cargando imágenes...
         </div>
       ) : filteredPhotos.length === 0 ? (
-        <div className="py-32 text-center bg-white rounded-[3.5rem] border border-dashed border-gray-100 mx-2">
-           <FiImage className="mx-auto text-gray-100 mb-4" size={50} />
-           <p className="text-[10px] font-black text-gray-300 uppercase italic">Sin registros</p>
+        <div className="py-20 md:py-32 text-center bg-white rounded-[2rem] md:rounded-[3.5rem] border border-dashed border-gray-100 mx-2 md:mx-4">
+           <FiImage className="mx-auto text-gray-200 mb-3 md:mb-4" size={40} />
+           <p className="text-[10px] md:text-xs font-black text-gray-300 uppercase italic tracking-widest">Sin registros</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 px-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 px-2 md:px-4">
           {filteredPhotos.map((item) => {
-            // 🚩 PASAMOS EL OBJETO COMPLETO PARA REPARAR LA RUTA
             const currentUrl = getImageUrl(item);
             
             return (
-              <div key={item.id} className="bg-white rounded-[2rem] overflow-hidden shadow-sm border border-gray-50 group hover:shadow-xl transition-all">
-                <div className="relative h-60 overflow-hidden bg-gray-50">
+              <div key={item.id} className="bg-white rounded-[1.5rem] md:rounded-[2rem] overflow-hidden shadow-sm border border-gray-50 group hover:shadow-xl transition-all flex flex-col">
+                <div className="relative h-48 md:h-60 overflow-hidden bg-gray-50 shrink-0">
                   <img 
                     src={currentUrl} 
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
                     alt="Evidencia" 
                     onError={(e) => { e.target.src = "https://via.placeholder.com/400x300?text=No+Encontrada"; }}
                   />
-                  <div className="absolute top-4 left-4 bg-black/80 text-[#87be00] text-[8px] font-black px-3 py-1.5 rounded-full uppercase italic">
+                  <div className="absolute top-3 left-3 md:top-4 md:left-4 bg-black/80 text-[#87be00] text-[8px] font-black px-2.5 py-1 md:px-3 md:py-1.5 rounded-full uppercase italic shadow-md">
                     {item.photo_type || 'Evidencia'}
                   </div>
                 </div>
                 
-                <div className="p-5">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 bg-black rounded-2xl flex items-center justify-center text-[#87be00] font-black text-xs italic">
+                <div className="p-4 md:p-5 flex-1 flex flex-col justify-between">
+                  <div className="flex items-center gap-2.5 md:gap-3 mb-4">
+                    <div className="w-8 h-8 md:w-10 md:h-10 shrink-0 bg-black rounded-xl md:rounded-2xl flex items-center justify-center text-[#87be00] font-black text-[10px] md:text-xs italic">
                       {item.user_name?.substring(0,2).toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[11px] font-black text-gray-900 uppercase italic truncate">{item.user_name}</p>
-                      <p className="text-[9px] font-bold text-gray-400 uppercase truncate">
+                      <p className="text-[10px] md:text-[11px] font-black text-gray-900 uppercase italic truncate leading-tight">
+                        {item.user_name}
+                      </p>
+                      <p className="text-[8px] md:text-[9px] font-bold text-gray-400 uppercase truncate mt-0.5">
                         {item.cadena} • {item.local_nombre}
                       </p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2 mt-auto">
                       <a href={currentUrl} target="_blank" rel="noreferrer" 
-                        className="py-3 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 hover:bg-black hover:text-[#87be00] transition-all">
-                        <FiExternalLink size={18}/>
+                        className="py-2.5 md:py-3 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 hover:bg-black hover:text-[#87be00] transition-all shadow-sm">
+                        <FiExternalLink size={16} className="md:w-[18px] md:h-[18px]" />
                       </a>
                       <button onClick={() => handleDownload(currentUrl, `evidencia_${item.user_name}.jpg`)}
-                        className="py-3 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 hover:bg-[#87be00] hover:text-white transition-all">
-                        <FiDownload size={18}/>
+                        className="py-2.5 md:py-3 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 hover:bg-[#87be00] hover:text-white transition-all shadow-sm">
+                        <FiDownload size={16} className="md:w-[18px] md:h-[18px]" />
                       </button>
                   </div>
                 </div>

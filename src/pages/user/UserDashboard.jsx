@@ -23,20 +23,29 @@ const UserDashboard = () => {
   const shareUrl = user ? `${window.location.origin}/verify/${user.id}` : ""
 
   /**
-   * 🚩 EXTRACCIÓN DE INICIALES (JE)
-   * Basado en las columnas: first_name y last_name
+   * 🚩 EXTRACCIÓN DE INICIALES CORREGIDA
+   * Segura, dinámica y a prueba de datos nulos.
    */
   const getInitials = () => {
-    const fName = user?.first_name?.trim() || "";
-    const lName = user?.last_name?.trim() || "";
+    // 1. Si el usuario aún no carga en el contexto, devolvemos un placeholder visual
+    if (!user) return "--";
+
+    // 2. Forzamos a que sean Strings para que .trim() y .charAt() nunca fallen
+    const fName = String(user.first_name || "").trim();
+    const lName = String(user.last_name || "").trim();
     
+    // 3. Si tenemos ambos, tomamos la primera letra de cada uno
     if (fName && lName) {
       return `${fName.charAt(0)}${lName.charAt(0)}`.toUpperCase();
     }
-    // Fallback: Si last_name está vacío, intenta tomar 2 letras de first_name
-    if (fName) return fName.substring(0, 2).toUpperCase();
     
-    return "JE"; 
+    // 4. Si solo tiene nombre, tomamos sus primeras dos letras
+    if (fName) {
+      return fName.substring(0, 2).toUpperCase();
+    }
+    
+    // 5. Fallback final si la base de datos devuelve un usuario sin nombre ni apellido
+    return "US"; // (User)
   };
 
   return (
@@ -50,14 +59,14 @@ const UserDashboard = () => {
         <div className="flex justify-between items-center mb-8 shrink-0 bg-white p-4 rounded-[2rem] shadow-sm border border-gray-50">
           
           <div className="flex items-center gap-4 pl-4">
-            {/* 🎨 Avatar Estilo JE solicitado */}
-            <div className="h-12 w-12 rounded-[1.2rem] bg-[#87be00]/10 flex items-center justify-center text-[#87be00] font-black text-xs border border-[#87be00]/20 shadow-sm overflow-hidden">
+            {/* 🎨 Avatar Dinámico */}
+            <div className="h-12 w-12 rounded-[1.2rem] bg-[#87be00]/10 flex items-center justify-center text-[#87be00] font-black text-xs border border-[#87be00]/20 shadow-sm overflow-hidden transition-all">
               {getInitials()}
             </div>
 
             <div>
               <p className="text-[11px] font-black text-gray-900 uppercase italic leading-none">
-                Hola, {user?.first_name}
+                Hola, {user?.first_name || 'Colaborador'}
               </p>
               <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">
                 Panel de Colaborador

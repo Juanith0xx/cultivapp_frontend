@@ -42,7 +42,9 @@ const Notifications = () => {
   };
 
   return (
+    // 🚩 relative estricto aquí para que en Desktop el modal se ancle a esta campana
     <div className="relative font-[Outfit]">
+      
       {/* 🔔 BOTÓN CAMPANA */}
       <button 
         onClick={() => setIsOpen(!isOpen)} 
@@ -66,6 +68,7 @@ const Notifications = () => {
       <AnimatePresence>
         {isOpen && (
           <>
+            {/* FONDO OSCURO (OVERLAY) */}
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -74,24 +77,30 @@ const Notifications = () => {
               onClick={() => setIsOpen(false)}
             ></motion.div>
             
+            {/* PANEL DE NOTIFICACIONES */}
             <motion.div 
               initial={{ opacity: 0, y: 100 }} 
               animate={{ opacity: 1, y: 0 }} 
               exit={{ opacity: 0, y: 100 }}
               className={`
-                fixed bottom-0 left-0 right-0 z-[110] bg-white rounded-t-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.2)]
-                md:absolute md:bottom-auto md:top-full md:left-auto md:right-0 md:mt-4 md:w-85 md:rounded-[2.5rem] md:shadow-2xl
-                overflow-hidden flex flex-col max-h-[90vh] md:max-h-[500px]
+                /* 📱 VISTA MÓVIL: Bottom Sheet (Fijado abajo, ancho total, esquinas redondas solo arriba) */
+                fixed bottom-0 left-0 right-0 w-full z-[110] bg-white rounded-t-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.2)]
+                
+                /* 💻 VISTA DESKTOP: Popover (Flotante bajo la campana, ancho limitado, todas las esquinas redondas) */
+                md:absolute md:bottom-auto md:top-full md:left-auto md:right-0 md:mt-4 md:w-[22rem] md:rounded-[2.5rem] md:shadow-2xl
+                
+                overflow-hidden flex flex-col max-h-[85vh] md:max-h-[500px]
               `}
             >
-              <div className="w-12 h-1 bg-gray-200 rounded-full mx-auto mt-3 mb-1 md:hidden"></div>
+              {/* Pillilla gris (Handle) en móviles para indicar arrastre/cierre */}
+              <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mt-3 mb-1 md:hidden"></div>
 
               {/* HEADER */}
-              <div className="p-6 bg-gray-900 text-white flex justify-between items-center relative overflow-hidden shrink-0">
+              <div className="p-5 md:p-6 bg-gray-900 text-white flex justify-between items-center relative overflow-hidden shrink-0">
                 <div className="absolute top-0 right-0 w-24 h-24 bg-[#87be00]/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
                 <div className="relative">
-                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#87be00] italic">Centro de</span>
-                  <h3 className="text-lg font-black uppercase italic leading-none">Avisos</h3>
+                  <span className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-[#87be00] italic">Centro de</span>
+                  <h3 className="text-base md:text-lg font-black uppercase italic leading-none">Avisos</h3>
                 </div>
                 <button onClick={() => setIsOpen(false)} className="bg-white/10 p-2 rounded-xl hover:bg-white/20 transition-colors">
                   <X size={18} className="text-white"/>
@@ -99,26 +108,26 @@ const Notifications = () => {
               </div>
 
               {/* LISTA */}
-              <div className="flex-1 overflow-y-auto p-4 bg-[#F8FAFC]">
+              <div className="flex-1 overflow-y-auto p-4 bg-[#F8FAFC] custom-scrollbar">
                 {notifications.length === 0 ? (
                   <div className="py-20 flex flex-col items-center justify-center gap-3 opacity-20">
                     <BellRing size={40} strokeWidth={1} />
                     <span className="text-[10px] font-black uppercase tracking-widest italic">Bandeja Vacía</span>
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-3 pb-10 md:pb-0">
+                  <div className="flex flex-col gap-3 pb-8 md:pb-0">
                     {notifications.map(n => (
                       <motion.div 
                         layout
                         key={n.id} 
-                        className={`p-5 rounded-[1.8rem] transition-all relative border ${
+                        className={`p-4 md:p-5 rounded-[1.5rem] md:rounded-[1.8rem] transition-all relative border ${
                           !n.is_read 
                           ? 'bg-white border-green-100 shadow-md shadow-green-900/5' 
                           : 'bg-white/40 border-transparent opacity-70'
                         }`}
                       >
                         <div className="flex justify-between items-start mb-2 gap-3">
-                          <div className="flex flex-col">
+                          <div className="flex flex-col pr-2">
                             {!n.is_read ? (
                                 <span className="text-[8px] font-black text-[#87be00] uppercase tracking-tighter mb-1">Pendiente</span>
                             ) : (
@@ -126,7 +135,7 @@ const Notifications = () => {
                                     <Check size={10} strokeWidth={3} /> Visto
                                 </span>
                             )}
-                            <h4 className={`text-[11px] font-black uppercase leading-tight italic ${
+                            <h4 className={`text-[10px] md:text-[11px] font-black uppercase leading-tight italic ${
                               !n.is_read ? 'text-gray-900' : 'text-gray-400'
                             }`}>
                               {n.title}
@@ -136,14 +145,14 @@ const Notifications = () => {
                           {!n.is_read && (
                             <button 
                               onClick={() => handleMarkAsRead(n.id)} 
-                              className="shrink-0 bg-[#87be00] p-2.5 rounded-xl text-white active:scale-95 transition-all shadow-lg shadow-[#87be00]/20 hover:bg-[#76a600]"
+                              className="shrink-0 bg-[#87be00] p-2 md:p-2.5 rounded-xl text-white active:scale-95 transition-all shadow-lg shadow-[#87be00]/20 hover:bg-[#76a600]"
                             >
                               <Check size={14} strokeWidth={4} />
                             </button>
                           )}
                         </div>
 
-                        <p className={`text-[11px] font-medium leading-relaxed mb-3 ${!n.is_read ? 'text-gray-600' : 'text-gray-400'}`}>
+                        <p className={`text-[10px] md:text-[11px] font-medium leading-relaxed mb-3 ${!n.is_read ? 'text-gray-600' : 'text-gray-400'}`}>
                           {n.message}
                         </p>
 
@@ -157,6 +166,8 @@ const Notifications = () => {
                   </div>
                 )}
               </div>
+              
+              {/* Relleno visual en móviles para que los últimos avisos no queden debajo de las barras de navegación de iOS/Android */}
               <div className="h-6 md:hidden bg-[#F8FAFC]"></div>
             </motion.div>
           </>
