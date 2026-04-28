@@ -74,7 +74,8 @@ const GpsMonitor = () => {
       pitch: 45,
     });
 
-    map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
+    // Desactivamos el compass en móviles para ahorrar espacio
+    map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
 
     map.current.on("load", () => {
       fetchActiveGps();
@@ -87,11 +88,9 @@ const GpsMonitor = () => {
   useEffect(() => {
     if (!map.current || !map.current.isStyleLoaded()) return;
 
-    // 1. Limpiar Marcadores
     markers.current.forEach((m) => m.remove());
     markers.current = [];
 
-    // 2. Limpiar Capas de Círculos previas
     activeRoutes.forEach((_, index) => {
       if (map.current.getLayer(`circle-fill-${index}`)) map.current.removeLayer(`circle-fill-${index}`);
       if (map.current.getLayer(`circle-outline-${index}`)) map.current.removeLayer(`circle-outline-${index}`);
@@ -107,15 +106,13 @@ const GpsMonitor = () => {
       const lat = parseFloat(route.lat_in);
       const userColor = stringToColor(route.user_id || "default");
 
-      // --- 🟢 DIBUJAR RADIO DE 300 MTS ---
-      const circleGeoJSON = createGeoJSONCircle([lng, lat], 0.3); // 0.3 km = 300m
+      const circleGeoJSON = createGeoJSONCircle([lng, lat], 0.3);
 
       map.current.addSource(`circle-source-${index}`, {
         type: "geojson",
         data: circleGeoJSON,
       });
 
-      // Relleno Verde (como la imagen)
       map.current.addLayer({
         id: `circle-fill-${index}`,
         type: "fill",
@@ -126,7 +123,6 @@ const GpsMonitor = () => {
         },
       });
 
-      // Borde Verde
       map.current.addLayer({
         id: `circle-outline-${index}`,
         type: "line",
@@ -138,20 +134,20 @@ const GpsMonitor = () => {
         },
       });
 
-      // --- ⏹️ DIBUJAR MARCADOR CUADRADO ---
       const el = document.createElement("div");
       el.className = "custom-marker";
-      el.style.width = "42px";
-      el.style.height = "42px";
+      el.style.width = window.innerWidth < 768 ? "36px" : "42px";
+      el.style.height = window.innerWidth < 768 ? "36px" : "42px";
       el.style.backgroundColor = userColor;
-      el.style.borderRadius = "12px";
+      el.style.borderRadius = "10px";
       el.style.border = "3px solid white";
       el.style.display = "flex";
       el.style.alignItems = "center";
       el.style.justifyContent = "center";
       el.style.cursor = "pointer";
+      el.style.boxShadow = "0 8px 15px rgba(0,0,0,0.1)";
       el.innerHTML = `
-        <span style="color: white; font-family: 'Outfit'; font-size: 14px; font-weight: 900;">
+        <span style="color: white; font-family: 'Outfit'; font-size: ${window.innerWidth < 768 ? '12px' : '14px'}; font-weight: 900;">
           ${route.first_name?.[0]}${route.last_name?.[0]}
         </span>
       `;
@@ -162,39 +158,48 @@ const GpsMonitor = () => {
     });
 
     if (activeRoutes.length > 0) {
-      map.current.fitBounds(bounds, { padding: 100, maxZoom: 15, duration: 1500 });
+      // 🚩 AJUSTE DINÁMICO DE PADDING: Evita errores de renderizado en pantallas pequeñas
+      const paddingValue = window.innerWidth < 768 ? 40 : 100;
+      map.current.fitBounds(bounds, { padding: paddingValue, maxZoom: 15, duration: 1500 });
     }
   }, [activeRoutes]);
 
   return (
-    <div className="p-6 h-[calc(100vh-80px)] flex flex-col font-[Outfit]">
-      {/* HEADER IDÉNTICO AL ANTERIOR */}
-      <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 mb-6 flex justify-between items-center">
-        <div className="flex items-center gap-5">
-          <div className="bg-black p-4 rounded-2xl shadow-xl">
-            <FiNavigation className="text-[#87be00]" size={24} />
+    // 🚩 h-full para adaptarse al Dashboard contenedor y px reducidos
+    <div className="h-full flex flex-col font-[Outfit] p-2 md:p-6 min-h-[500px]">
+      
+      {/* HEADER RESPONSIVO (Pasa de fila a columna en móviles pequeños) */}
+      <div className="bg-white p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-gray-100 mb-4 md:mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex items-center gap-3 md:gap-5 w-full sm:w-auto">
+          <div className="bg-black p-3 md:p-4 rounded-xl md:rounded-2xl shadow-xl shrink-0">
+            <FiNavigation className="text-[#87be00]" size={20} />
           </div>
-          <div>
-            <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tighter leading-none">Monitoreo Live</h1>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-1.5 flex items-center gap-2">
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#87be00]"></span>
-                Seguimiento Georeferencial (Radio 300m)
+          <div className="min-w-0">
+            <h1 className="text-xl md:text-2xl font-black text-gray-800 uppercase tracking-tighter leading-none truncate">Monitoreo Live</h1>
+            <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-1 md:mt-1.5 flex items-center gap-1.5">
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 md:h-2 md:w-2 bg-[#87be00]"></span>
+                <span className="truncate">Radio 300m</span>
             </p>
           </div>
         </div>
-        <div className="px-6 py-3 bg-green-50 rounded-2xl border border-green-100 flex items-center gap-3">
-            <FiActivity className="text-[#87be00]" />
-            <span className="text-xs font-black uppercase text-[#87be00]">{activeRoutes.length} En Sala</span>
+        
+        {/* Badge de actividad escalado */}
+        <div className="px-4 md:px-6 py-2 md:py-3 bg-green-50 rounded-xl md:rounded-2xl border border-green-100 flex items-center gap-2 md:gap-3 w-full sm:w-auto justify-center">
+            <FiActivity className="text-[#87be00] shrink-0" />
+            <span className="text-[10px] md:text-xs font-black uppercase text-[#87be00]">
+              {activeRoutes.length} <span className="xs:inline">En Sala</span>
+            </span>
         </div>
       </div>
 
-      <div className="flex-1 bg-white rounded-[3.5rem] p-2 shadow-2xl border border-gray-50 relative overflow-hidden">
+      {/* MAP CONTAINER RESPONSIVO */}
+      <div className="flex-1 bg-white rounded-[1.5rem] md:rounded-[3.5rem] p-1 md:p-2 shadow-2xl border border-gray-50 relative overflow-hidden">
         {loading && (
            <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/40 backdrop-blur-md">
-             <div className="w-10 h-10 border-4 border-gray-100 border-t-[#87be00] rounded-full animate-spin"></div>
+             <div className="w-8 h-8 md:w-10 md:h-10 border-4 border-gray-100 border-t-[#87be00] rounded-full animate-spin"></div>
            </div>
         )}
-        <div ref={mapContainer} className="w-full h-full rounded-[3rem]" />
+        <div ref={mapContainer} className="w-full h-full rounded-[1.2rem] md:rounded-[3rem]" />
       </div>
     </div>
   );
