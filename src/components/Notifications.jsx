@@ -1,11 +1,37 @@
-import { useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, X, Check, BellRing } from 'lucide-react'; // 🚩 Quitamos FiCheckCircle de aquí
+import { Bell, X, Check, BellRing } from 'lucide-react';
 import { useNotificationContext } from '../context/NotificationContext';
+
+// 🚩 Importación del archivo desde tu carpeta de assets
+import soundFile from '../assets/sound/notificacion.mp3';
 
 const Notifications = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { notifications, unreadCount, onMarkRead } = useNotificationContext();
+  
+  // 🚩 Referencia para el reproductor usando el archivo importado
+  const audioPlayer = useRef(new Audio(soundFile));
+  // 🚩 Referencia para el conteo previo
+  const prevCount = useRef(unreadCount);
+
+  useEffect(() => {
+    // Solo suena si el nuevo conteo es mayor (llegó una nueva notificación)
+    if (unreadCount > prevCount.current) {
+      playNotificationSound();
+    }
+    prevCount.current = unreadCount;
+  }, [unreadCount]);
+
+  const playNotificationSound = () => {
+    try {
+      audioPlayer.current.currentTime = 0;
+      audioPlayer.current.play();
+    } catch (error) {
+      // Los navegadores bloquean el audio automático hasta la primera interacción del usuario
+      console.warn("Audio bloqueado por el navegador hasta interacción del usuario.");
+    }
+  };
 
   const handleMarkAsRead = async (id) => {
     try {
