@@ -1,13 +1,19 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { useOutletContext } from "react-router-dom";
-import { 
-  FiPlus, FiRefreshCw, FiEdit3, FiCalendar, FiList, FiClock, 
-  FiCheckCircle, FiAlertCircle, FiXCircle, FiPlayCircle, FiBriefcase,
-  FiUploadCloud, FiHash, FiUser 
-} from "react-icons/fi";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useOutletContext } from "react-router-dom"; // Añadido para el globalSelectedCompany si lo usas
 import api from "../../api/apiClient";
 import ManageRoutesModal from "../../components/ManageRoutesModal";
 import toast from "react-hot-toast";
+import {
+  FiPlus,
+  FiRefreshCw,
+  FiEdit3,
+  FiUploadCloud,
+  FiCheckCircle,
+  FiAlertCircle,
+  FiPlayCircle,
+  FiHash,
+  FiUser
+} from "react-icons/fi";
 import * as XLSX from "xlsx";
 
 /**
@@ -27,7 +33,6 @@ const MonthlyStatus = ({ scheduledDays = [] }) => {
           <span className="text-[7px] font-black text-gray-300 w-3 tracking-tighter">S{week}</span>
           <div className="flex gap-1">
             {days.map((d) => {
-              // Verificamos si existe la ruta en la semana y día específicos
               const isActive = scheduledDays.some(
                 (item) => parseInt(item.day) === d.id && parseInt(item.week) === week
               );
@@ -51,118 +56,198 @@ const MonthlyStatus = ({ scheduledDays = [] }) => {
   );
 };
 
-const AdminRoutes = () => {
-  const context = useOutletContext();
-  const globalSelectedCompany = context?.selectedCompany || "";
-  const fileInputRef = useRef(null);
-
+const Planificacion = () => {
+  const [viewMode, setViewMode] = useState("list");
   const [routes, setRoutes] = useState([]);
   const [users, setUsers] = useState([]);
   const [locales, setLocales] = useState([]);
-  const [companies, setCompanies] = useState([]); 
+  const [companies, setCompanies] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [selectedRoute, setSelectedRoute] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const fileInputRef = useRef(null);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [routesRes, usersRes, localesRes] = await Promise.all([
-        api.get("/routes"), 
-        api.get("/users"), 
-        api.get("/locales")
+
+      const [resRoutes, resUsers, resLocales, resCompanies] = await Promise.all([
+        api.get("/routes"),
+        api.get("/users"),
+        api.get("/locales"),
+        api.get("/companies"),
       ]);
-      setRoutes(Array.isArray(routesRes.data) ? routesRes.data : routesRes || []);
-      setUsers(Array.isArray(usersRes.data) ? usersRes.data : usersRes || []);
-      setLocales(Array.isArray(localesRes.data) ? localesRes.data : localesRes || []);
-      try {
-        const companiesRes = await api.get("/companies");
-        setCompanies(Array.isArray(companiesRes.data) ? companiesRes.data : companiesRes || []);
-      } catch (err) { setCompanies([]); }
+
+      setRoutes(Array.isArray(resRoutes.data ? resRoutes.data : resRoutes) ? (resRoutes.data || resRoutes) : []);
+      setUsers(Array.isArray(resUsers.data ? resUsers.data : resUsers) ? (resUsers.data || resUsers) : []);
+      setLocales(Array.isArray(resLocales.data ? resLocales.data : resLocales) ? (resLocales.data || resLocales) : []);
+      setCompanies(Array.isArray(resCompanies.data ? resCompanies.data : resCompanies) ? (resCompanies.data || resCompanies) : []);
     } catch (error) {
-      toast.error("Error al sincronizar datos");
-    } finally { setLoading(false); }
+      console.error("❌ Error en fetchData:", error);
+      if (!error.offline) toast.error("Error al sincronizar datos");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-  /**
-   * 📤 IMPORTACIÓN: Limpia nombres de columnas y envía al backend
-   */
+  // 🧠 CALCULADOR DE FECHAS PARA EL FRONTEND (Guía Visual S1-S4)
+  const weekRanges = useMemo(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth(); 
+    
+    let firstDay = new Date(year, month, 1);
+    let dayOfWeek = firstDay.getDay() === 0 ? 7 : firstDay.getDay();
+    
+    let firstMonday = new Date(firstDay);
+    if (dayOfWeek !== 1) {
+      firstMonday.setDate(1 + (8 - dayOfWeek));
+    }
+
+    const ranges = [];
+    const mesesAbr = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+    for(let i=0; i<4; i++) {
+      let start = new Date(firstMonday);
+      start.setDate(firstMonday.getDate() + (i * 7));
+      let end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      
+      ranges.push({
+        label: `S${i+1}`,
+        dates: `${start.getDate()} ${mesesAbr[start.getMonth()]} - ${end.getDate()} ${mesesAbr[end.getMonth()]}`
+      });
+    }
+    return ranges;
+  }, []);
+
+  const getWeekOfMonth = (dateStr) => {
+    const date = new Date(dateStr);
+    return Math.ceil(date.getDate() / 7);
+  };
+
   const handleImportExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
+    const toastId = toast.loading("Analizando estructura del archivo...");
+
     reader.onload = async (evt) => {
-      const toastId = toast.loading("Procesando planificación mensual...");
       try {
         const data = new Uint8Array(evt.target.result);
-        const wb = XLSX.read(data, { type: "array" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const excelData = XLSX.utils.sheet_to_json(ws);
+        const workbook = XLSX.read(data, { type: "array" });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
 
-        if (!excelData?.length) throw new Error("El archivo está vacío");
-
-        // Limpieza de nombres de columnas (espacios en blanco)
-        const cleanData = excelData.map(row => {
-          const newRow = {};
-          Object.keys(row).forEach(key => {
-            newRow[key.trim()] = row[key];
-          });
-          return newRow;
+        const rows = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1,
+          defval: "",
         });
 
-        const response = await api.post("/routes/bulk-create", { 
-          routes: cleanData 
+        const headerRowIndex = rows.findIndex((row) =>
+          row.some((cell) => {
+            const c = String(cell).toLowerCase().trim();
+            return (
+              c.includes("rut") ||
+              c.includes("codigo") ||
+              c.includes("turno")
+            );
+          })
+        );
+
+        if (headerRowIndex === -1) {
+          toast.error("No se encontraron encabezados válidos", { id: toastId });
+          return;
+        }
+
+        const rawJson = XLSX.utils.sheet_to_json(worksheet, {
+          range: headerRowIndex,
+          defval: "",
         });
 
+        const finalData = rawJson
+          .map((row, index) => {
+            const newRow = {};
+
+            Object.keys(row).forEach((key) => {
+              const cleanKey = key.trim().toLowerCase();
+              const value = String(row[key]).trim();
+
+              if (cleanKey.includes("rut")) {
+                newRow.Rut_Mercaderista = value;
+              } else if (cleanKey.includes("cod")) {
+                newRow.Codigo = value;
+              } else if (
+                cleanKey.includes("turno") &&
+                cleanKey.includes("semana")
+              ) {
+                newRow[key.trim()] = value;
+              }
+            });
+            return newRow;
+          })
+          .filter((f) => f.Rut_Mercaderista && f.Codigo);
+
+        const today = new Date();
+
+        // 🚩 Mantengo exactamente tu payload estructurado
+        const payload = {
+          month: today.getMonth() + 1,
+          year: today.getFullYear(),
+          routes: finalData,
+        };
+
+        const response = await api.post("/routes/bulk-create", payload);
+
+        // Ajustado para leer response.data o response directo según Axios
         const resData = response.data || response;
-        if (resData.success) {
-          toast.success(`Carga exitosa: ${resData.count} rutas creadas`, { id: toastId });
+
+        if (resData.success || (Array.isArray(resData) && resData.length > 0)) {
+          toast.success(`Éxito en carga masiva`, { id: toastId });
           fetchData();
         } else {
-          throw new Error(resData.message || "Error al procesar");
+          toast.error(resData.message || "Error en carga masiva", { id: toastId });
         }
       } catch (err) {
-        console.error(err);
-        toast.error(`Error: ${err.message}`, { id: toastId });
-      } finally {
-        if (fileInputRef.current) fileInputRef.current.value = "";
+        console.error("❌ ERROR IMPORTANDO EXCEL:", err);
+        toast.error("No se pudo procesar el Excel", { id: toastId });
       }
     };
+
     reader.readAsArrayBuffer(file);
+    e.target.value = "";
   };
 
-  /**
-   * 🧠 AGRUPACIÓN: Organiza rutas por Usuario-Local y Semana
-   */
+  // 🧠 AGRUPACIÓN OPTIMIZADA: Combina tu lógica con el soporte visual S1-S4
   const groupedRoutes = useMemo(() => {
-    if (!Array.isArray(routes)) return [];
-    
-    const filteredRoutes = globalSelectedCompany 
-      ? routes.filter(r => String(r.company_id) === String(globalSelectedCompany))
-      : routes;
-
     const groups = {};
-    
-    filteredRoutes.forEach(r => {
+
+    routes.forEach((r) => {
+      if (!r.user_id || !r.local_id) return;
+
       const key = `${r.user_id}-${r.local_id}`;
-      const weekNum = r.week_number || 1; 
+      const weekNum = r.week_number || 1; // 🚩 Capturamos la semana para el UI
 
       if (!groups[key]) {
-        groups[key] = { 
-          ...r, 
-          scheduled_items: [{ day: r.day_of_week, week: weekNum }], 
-          all_statuses: [r.status]
+        groups[key] = {
+          ...r,
+          scheduled_items: r.day_of_week !== null ? [{ day: r.day_of_week, week: weekNum }] : [],
+          all_statuses: [r.status],
         };
       } else {
-        // Evitar duplicados visuales en el mismo día/semana
-        const exists = groups[key].scheduled_items.some(
-          item => item.day === r.day_of_week && item.week === weekNum
-        );
-        if (!exists) {
-          groups[key].scheduled_items.push({ day: r.day_of_week, week: weekNum });
+        // Evitamos duplicar la visualización del mismo día en la misma semana
+        if (r.day_of_week !== null) {
+          const exists = groups[key].scheduled_items.some(
+            item => parseInt(item.day) === parseInt(r.day_of_week) && parseInt(item.week) === parseInt(weekNum)
+          );
+          if (!exists) {
+            groups[key].scheduled_items.push({ day: r.day_of_week, week: weekNum });
+          }
         }
         groups[key].all_statuses.push(r.status);
       }
@@ -174,7 +259,7 @@ const AdminRoutes = () => {
                      group.all_statuses.every(s => s === 'COMPLETED' || s === 'OK') ? 'COMPLETED' : 
                      group.all_statuses.some(s => s === 'COMPLETED' || s === 'OK') ? 'PARTIAL' : 'PENDING'
     }));
-  }, [routes, globalSelectedCompany]);
+  }, [routes]);
 
   const getStatusBadge = (status) => {
     const config = {
@@ -187,23 +272,49 @@ const AdminRoutes = () => {
     return <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${s.bg} ${s.text} text-[8px] font-black uppercase tracking-widest border ${s.border} shadow-sm`}>{s.icon} {s.label}</span>;
   };
 
+  if (loading) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center space-y-4">
+        <FiRefreshCw className="animate-spin text-[#87be00]" size={42} />
+        <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em]">Sincronizando Planificación...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 space-y-6 font-[Outfit]">
-      {/* Header Personalizado */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
+      {/* Header Personalizado con Guía de Fechas */}
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
         <div>
           <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tight italic leading-none">Planificación Mensual</h1>
           <p className="text-[10px] text-gray-400 font-bold uppercase mt-2 tracking-widest italic">Visualización de cobertura 4 semanas (S1-S4)</p>
+          
+          {/* GUÍA VISUAL DE FECHAS */}
+          <div className="flex flex-wrap gap-2 mt-4">
+            {weekRanges.map((w, idx) => (
+              <div key={idx} className="flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
+                <span className="text-[9px] font-black text-[#87be00]">{w.label}</span>
+                <span className="text-[9px] font-bold text-gray-500 uppercase">{w.dates}</span>
+              </div>
+            ))}
+          </div>
         </div>
+
         <div className="flex flex-wrap items-center gap-3">
           <button onClick={fetchData} className="p-4 bg-gray-50 text-gray-400 rounded-2xl hover:text-[#87be00] transition-all"><FiRefreshCw className={loading ? "animate-spin" : ""}/></button>
+          
           <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleImportExcel} />
-          <button onClick={() => fileInputRef.current.click()} className="bg-[#87be00] text-white px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center gap-2 hover:scale-105 transition-all"><FiUploadCloud size={16}/> Cargar Excel S1-S4</button>
-          <button onClick={() => { setSelectedRoute(null); setIsModalOpen(true); }} className="bg-black text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl flex items-center gap-2 hover:scale-105 transition-all"><FiPlus size={16}/> Nueva Ruta</button>
+          <button onClick={() => fileInputRef.current.click()} className="bg-[#87be00] text-white px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center gap-2 hover:scale-105 transition-all">
+            <FiUploadCloud size={16}/> Cargar Excel S1-S4
+          </button>
+          
+          <button onClick={() => { setSelectedRoute(null); setIsModalOpen(true); }} className="bg-black text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl flex items-center gap-2 hover:scale-105 transition-all">
+            <FiPlus size={16}/> Nueva Ruta
+          </button>
         </div>
       </div>
 
-      {/* Tabla Glassmorphism */}
+      {/* Tabla Principal */}
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -217,9 +328,7 @@ const AdminRoutes = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 text-[11px]">
-              {loading ? (
-                 <tr><td colSpan="5" className="p-20 text-center text-[10px] font-black text-gray-300 uppercase animate-pulse tracking-[0.3em]">Sincronizando Planificación...</td></tr>
-              ) : groupedRoutes.length === 0 ? (
+              {groupedRoutes.length === 0 ? (
                  <tr><td colSpan="5" className="p-20 text-center text-gray-300 font-black uppercase tracking-widest italic">No hay rutas cargadas para este mes</td></tr>
               ) : groupedRoutes.map((r) => (
                 <tr key={`${r.user_id}-${r.local_id}`} className="hover:bg-gray-50/50 transition-colors group">
@@ -249,7 +358,6 @@ const AdminRoutes = () => {
                     </div>
                   </td>
                   <td className="p-6">
-                    {/* 🕒 Visualizador de 4 filas de semanas */}
                     <MonthlyStatus scheduledDays={r.scheduled_items} />
                   </td>
                   <td className="p-6 text-center">{getStatusBadge(r.displayStatus)}</td>
@@ -267,6 +375,7 @@ const AdminRoutes = () => {
           </table>
         </div>
       </div>
+      
       <ManageRoutesModal 
         isOpen={isModalOpen} 
         onClose={() => { setIsModalOpen(false); setSelectedRoute(null); }} 
@@ -280,4 +389,4 @@ const AdminRoutes = () => {
   );
 };
 
-export default AdminRoutes;
+export default Planificacion;

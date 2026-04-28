@@ -3,21 +3,22 @@ import { motion } from "framer-motion";
 import { FiClock, FiAlertCircle, FiSearch, FiRefreshCw, FiCalendar } from "react-icons/fi";
 import api from "../../api/apiClient";
 
+// Función segura para obtener la fecha local YYYY-MM-DD (Evita bugs de zona horaria)
+const getLocalISODate = () => {
+  const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+  return new Date(Date.now() - tzOffset).toISOString().split('T')[0];
+};
+
 const AttendanceControl = () => {
   const [attendance, setAttendance] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState(""); // Para el input
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [searchTerm, setSearchTerm] = useState(""); 
+  const [selectedDate, setSelectedDate] = useState(getLocalISODate());
 
   const fetchAttendance = async () => {
     try {
       setLoading(true);
       
-      /**
-       * 🚩 MEJORA BUSCADOR: 
-       * Si hay algo en searchTerm, lo enviamos al backend para que busque en TODO el historial.
-       * Si no hay nada, filtra normalmente por la fecha seleccionada.
-       */
       const params = searchTerm.length > 2 
         ? { search: searchTerm } 
         : { date: selectedDate };
@@ -33,24 +34,29 @@ const AttendanceControl = () => {
     }
   };
 
-  // Se dispara al cambiar fecha o al terminar de escribir en el buscador
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
       fetchAttendance();
-    }, 500); // Espera 500ms para no saturar la API mientras escribes
+    }, 500); 
 
     return () => clearTimeout(delayDebounce);
   }, [selectedDate, searchTerm]);
 
-  // Auto-refresco solo si es hoy y no hay búsqueda activa
   useEffect(() => {
-    const isToday = selectedDate === new Date().toISOString().split('T')[0];
+    const isToday = selectedDate === getLocalISODate();
     let interval;
     if (isToday && searchTerm === "") {
       interval = setInterval(fetchAttendance, 30000);
     }
     return () => { if (interval) clearInterval(interval); };
   }, [selectedDate, searchTerm]);
+
+  // Utilidad para formatear la fecha correctamente DD-MM-YYYY
+  const formatDate = (dateString) => {
+    if (!dateString) return '--/--/--';
+    const [y, m, d] = dateString.split('T')[0].split('-');
+    return `${d}-${m}-${y}`;
+  };
 
   return (
     <div className="space-y-6 font-[Outfit]">
@@ -74,7 +80,7 @@ const AttendanceControl = () => {
               className="pl-10 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-[#87be00]/20 shadow-sm"
               value={selectedDate}
               onChange={(e) => {
-                setSearchTerm(""); // Limpiar búsqueda al cambiar fecha
+                setSearchTerm(""); 
                 setSelectedDate(e.target.value);
               }}
             />
@@ -121,6 +127,10 @@ const AttendanceControl = () => {
               ) : (
                 attendance.map((row, idx) => {
                   const isLate = row.check_in && row.diff > 0;
+                  
+                  // 🚩 FIX FECHA: Si es recurrente (visit_date null), mostramos la fecha que se está buscando.
+                  const displayDate = row.visit_date ? row.visit_date : selectedDate;
+
                   return (
                     <motion.tr 
                       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}
@@ -143,10 +153,9 @@ const AttendanceControl = () => {
                         <p className="text-[9px] text-[#87be00] font-black uppercase italic">Cod: {row.local_code || 'N/A'}</p>
                       </td>
 
-                      {/* 📅 NUEVA COLUMNA: FECHA DE VISITA */}
                       <td className="px-6 py-5 text-center">
                         <span className="text-[10px] font-black text-gray-900 uppercase">
-                          {row.visit_date ? new Date(row.visit_date).toLocaleDateString('es-CL') : '--/--/--'}
+                          {formatDate(displayDate)}
                         </span>
                       </td>
 

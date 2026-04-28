@@ -31,10 +31,55 @@ const ManageRoutesModal = ({ isOpen, onClose, users = [], locales = [], companie
   const [manualTask, setManualTask] = useState({
     user_id: "", local_id: "", company_id: currentUser?.company_id || "",
     selectedDays: [], start_time: "08:00", end_time: "16:00", turno_id: "",
-    visit_date: new Date().toISOString().split('T')[0] // 🚩 Fecha por defecto
+    visit_date: new Date().toISOString().split('T')[0]
   });
 
-  // ... (fetchTurnos y turnosAgrupados se mantienen igual)
+  // 🚩 EFECTO 1: Pre-cargar los datos básicos cuando abrimos en modo "Edición"
+  useEffect(() => {
+    if (isOpen) {
+      if (initialData) {
+        const isManual = initialData.origin === 'INDIVIDUAL' || !initialData.is_recurring;
+        
+        let vDate = new Date().toISOString().split('T')[0];
+        if (initialData.visit_date) {
+           try { vDate = new Date(initialData.visit_date).toISOString().split('T')[0]; } catch(e) {}
+        }
+
+        // Rescatamos los días si es una ruta recurrente (Turno)
+        let days = [];
+        if (initialData.scheduled_items) {
+          days = [...new Set(initialData.scheduled_items.map(item => Number(item.day)))];
+        } else if (initialData.allDays) {
+          days = initialData.allDays;
+        } else if (initialData.day_of_week != null) {
+          days = [Number(initialData.day_of_week)];
+        }
+
+        setManualTask({
+          user_id: initialData.user_id || "",
+          local_id: initialData.local_id || "",
+          company_id: initialData.company_id || currentUser?.company_id || "",
+          start_time: initialData.start_time ? initialData.start_time.slice(0, 5) : "08:00",
+          end_time: "16:00", // Lo calcularemos exacto en el Efecto 2
+          turno_id: isManual ? "INDIVIDUAL" : (initialData.nombre_turno || ""),
+          visit_date: vDate,
+          selectedDays: days
+        });
+
+        if (isManual) setSelectedRol("INDIVIDUAL");
+      } else {
+        // Limpiamos todo si es una "Nueva Planificación"
+        setManualTask({
+          user_id: "", local_id: "", company_id: currentUser?.company_id || "",
+          selectedDays: [], start_time: "08:00", end_time: "16:00", turno_id: "",
+          visit_date: new Date().toISOString().split('T')[0]
+        });
+        setSelectedRol("");
+        setFilters({ region: "", comuna: "", cadena: "" });
+      }
+    }
+  }, [isOpen, initialData, currentUser?.company_id]);
+
   const fetchTurnos = async (companyId) => {
     try {
       const targetId = companyId || (isRoot ? manualTask.company_id : currentUser?.company_id);
@@ -52,6 +97,23 @@ const ManageRoutesModal = ({ isOpen, onClose, users = [], locales = [], companie
   useEffect(() => { 
     if (isOpen) fetchTurnos(manualTask.company_id);
   }, [isOpen, manualTask.company_id]);
+
+  // 🚩 EFECTO 2: Sincronizar el "Rol" y la "Hora de Salida" cruzando la info con los turnos traídos del backend
+  useEffect(() => {
+    if (isOpen && initialData && turnosRaw.length > 0) {
+      const isManual = initialData.origin === 'INDIVIDUAL' || !initialData.is_recurring;
+      if (!isManual && initialData.nombre_turno) {
+        const turnoObj = turnosRaw.find(t => t.nombre_turno === initialData.nombre_turno);
+        if (turnoObj && selectedRol !== turnoObj.categoria_rol) {
+           setSelectedRol(turnoObj.categoria_rol);
+           setManualTask(prev => ({
+              ...prev,
+              end_time: turnoObj.salida ? turnoObj.salida.slice(0, 5) : "16:00"
+           }));
+        }
+      }
+    }
+  }, [isOpen, initialData, turnosRaw, selectedRol]);
 
   const turnosAgrupados = useMemo(() => {
     if (!selectedRol || selectedRol === "INDIVIDUAL") return [];
@@ -95,7 +157,6 @@ const ManageRoutesModal = ({ isOpen, onClose, users = [], locales = [], companie
     }));
   };
 
-  // ... (Filtros se mantienen igual)
   const filteredUsers = useMemo(() => {
     let pool = users.filter(u => u.role?.toUpperCase() === 'USUARIO');
     if (isRoot && manualTask.company_id) pool = pool.filter(u => u.company_id === manualTask.company_id);
@@ -121,14 +182,17 @@ const ManageRoutesModal = ({ isOpen, onClose, users = [], locales = [], companie
       return toast.error("Selecciona los días para el turno");
     }
 
+    if (!manualTask.user_id || !manualTask.local_id) {
+       return toast.error("Asegúrate de elegir Reponedor y Local");
+    }
+
     setLoading(true);
     try {
       const data = { 
         ...manualTask, 
         categoria_rol: selectedRol, 
         is_recurring: !isManual,
-        // Si es manual, nos aseguramos de que el día de la semana sea el de la fecha elegida
-        day_of_week: isManual ? new Date(manualTask.visit_date + "T12:00:00").getDay() : null,
+        visit_date: isManual ? manualTask.visit_date : null,
         origin: isManual ? 'INDIVIDUAL' : 'TURNO'
       };
 
@@ -137,23 +201,24 @@ const ManageRoutesModal = ({ isOpen, onClose, users = [], locales = [], companie
       
       onCreated();
       onClose();
-      toast.success(isManual ? "Visita individual agendada" : "Turno planificado correctamente");
+      toast.success(isManual ? "Visita agendada correctamente" : "Planificación actualizada");
     } catch (error) { 
-      toast.error("Error al guardar"); 
+      console.error("Detalle del Error:", error);
+      toast.error(error.response?.data?.message || "Error interno al guardar la ruta"); 
     } finally { 
       setLoading(false); 
     }
   };
 
   const handleDelete = async () => {
-    if (!window.confirm("¿Estás seguro?")) return;
+    if (!window.confirm("¿Estás seguro de eliminar esta planificación?")) return;
     setIsDeleting(true);
     try {
       await api.delete(`/routes/${initialData.id}`);
       onCreated();
       onClose();
-      toast.success("Eliminado");
-    } catch (error) { toast.error("Error"); }
+      toast.success("Ruta eliminada correctamente");
+    } catch (error) { toast.error("Error al eliminar"); }
     finally { setIsDeleting(false); }
   };
 
@@ -203,7 +268,7 @@ const ManageRoutesModal = ({ isOpen, onClose, users = [], locales = [], companie
                 </div>
             </div>
 
-            {/* 🚩 SELECTOR DE FECHA (Solo si es Individual) */}
+            {/* SELECTOR DE FECHA (Solo si es Individual) */}
             {selectedRol === "INDIVIDUAL" && (
               <div className="space-y-1 animate-in fade-in slide-in-from-left-2">
                 <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest ml-1 flex items-center gap-2">
