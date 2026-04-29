@@ -57,6 +57,15 @@ import UserAgenda from "./pages/user/UserAgenda"
 import QuestionsManager from "./pages/admin/QuestionsManager"
 
 import "./App.css"
+import { useAuth } from "./context/AuthContext"
+
+// 🚩 ROUTER: Admin de Cultiva ve Locales.jsx (acceso elevado), resto ve AdminLocales.jsx
+const ID_CULTIVA = '0e342e01-d213-4353-b210-39a12ac335cf';
+const AdminLocalesRouter = () => {
+  const { user } = useAuth();
+  const isCultivaAdmin = user?.company_id === ID_CULTIVA;
+  return isCultivaAdmin ? <Locales /> : <AdminLocales />;
+};
 
 const OfflineMonitor = () => {
   const { isOnline, syncing } = useOfflineSync();
@@ -138,7 +147,9 @@ function App() {
             <Route path="/admin" element={<ProtectedRoute roles={["ADMIN_CLIENTE", "ROOT"]}><AdminDashboard /></ProtectedRoute>}>
               <Route index element={<Analytics />} />
               <Route path="users" element={<AdminUsers />} />
-              <Route path="locales" element={<AdminLocales />} />
+
+              {/* 🚩 FIX: Admin Cultiva ve Locales.jsx, resto ve AdminLocales.jsx */}
+              <Route path="locales" element={<AdminLocalesRouter />} />
               
               {/* 🚩 NUEVA RUTA AGREGADA PARA EMPRESAS EN PANEL ADMIN */}
               <Route path="companies" element={<Companies />} />

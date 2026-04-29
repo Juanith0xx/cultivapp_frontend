@@ -1,16 +1,16 @@
 import { useEffect, useState, useMemo } from "react"
 import { FiPlus, FiUpload, FiTrash2, FiEdit, FiEye, FiEyeOff } from "react-icons/fi"
 import toast from "react-hot-toast"
-
 import CreateLocalModal from "../../components/CreateLocalModal"
 import UploadLocalesModal from "../../components/UploadLocalesModal"
 import EditLocalModal from "../../components/EditLocalModal"
 import LocalesMap from "../../components/LocalesMap"
-
-// ✅ MEJORA: Importamos el cliente ya configurado
 import api from "../../api/apiClient" 
+import { useAuth } from "../../context/AuthContext" // 🚩 Integración de Auth
 
 const Locales = () => {
+  const { user } = useAuth(); // 🛡️ Obtener usuario
+  console.log("USER EN LOCALES:", user);
   const [locales, setLocales] = useState([])
   const [companies, setCompanies] = useState([])
   const [selectedCompany, setSelectedCompany] = useState("")
@@ -20,21 +20,25 @@ const Locales = () => {
   const [openUpload, setOpenUpload] = useState(false)
   const [openEdit, setOpenEdit] = useState(false)
   const [selectedLocal, setSelectedLocal] = useState(null)
-
   const [mapSelectedId, setMapSelectedId] = useState(null)
+
+  // 🚩 LÓGICA DE ACCESO ELEVADO
+  const ID_CULTIVA = '0e342e01-d213-4353-b210-39a12ac335cf';
+  const hasElevatedAccess = user?.role === "ROOT" || user?.company_id === ID_CULTIVA;
 
   useEffect(() => {
     fetchCompanies()
   }, [])
 
   useEffect(() => {
+    console.log("🚀 useEffect fetchCompanies - user:", user);
     fetchLocales()
   }, [selectedCompany])
 
   const fetchCompanies = async () => {
     try {
-      // ✅ MEJORA: Quitamos "/api". El cliente ya lo incluye.
       const data = await api.get("/companies")
+        console.log("🏢 COMPANIES RESPONSE:", JSON.stringify(data)); // 🔍
       setCompanies(data || [])
     } catch (error) {
       toast.error("Error al cargar empresas")
@@ -43,7 +47,6 @@ const Locales = () => {
 
   const fetchLocales = async () => {
     try {
-      // ✅ MEJORA: URL Limpia
       let url = "/locales"
       if (selectedCompany) url += `?company_id=${selectedCompany}`
       
@@ -56,7 +59,6 @@ const Locales = () => {
 
   const toggleLocal = async (id) => {
     try {
-      // ✅ MEJORA: Usamos el método patch del cliente
       await api.patch(`/locales/${id}/toggle`)
       setLocales(prev => prev.map(l => 
         l.id === id ? { ...l, is_active: !l.is_active } : l
@@ -70,7 +72,6 @@ const Locales = () => {
   const deleteLocal = async (id) => {
     if (!window.confirm("¿Estás seguro de eliminar este local?")) return
     try {
-      // ✅ MEJORA: Usamos el método delete del cliente
       await api.delete(`/locales/${id}`)
       setLocales(prev => prev.filter(l => l.id !== id))
       toast.success("Local eliminado")
@@ -79,7 +80,6 @@ const Locales = () => {
     }
   }
 
-  // ... (Resto de la lógica de filtrado useMemo igual)
   const visibleLocales = useMemo(() => {
     return locales.filter(l => showInactive || l.is_active)
   }, [locales, showInactive])
@@ -95,7 +95,6 @@ const Locales = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 font-[Outfit]">
-      {/* HEADER PRINCIPAL */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-gray-800 tracking-tight uppercase">Gestión de Locales</h2>
@@ -120,21 +119,28 @@ const Locales = () => {
         </div>
       </div>
 
-      {/* FILTROS Y VISTA DE MAPA */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-12 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm">
-             <div className="flex items-center gap-4">
-                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Filtrar por empresa:</span>
-                <select
-                  value={selectedCompany}
-                  onChange={(e) => setSelectedCompany(e.target.value)}
-                  className="bg-gray-50 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-[#87be00]/20 transition min-w-[200px]"
-                >
-                  <option value="">Todas las empresas</option>
-                  {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-             </div>
+             
+             {/* 🚩 FILTRO: Solo visible para ROOT o ADMIN CULTIVA */}
+             {hasElevatedAccess ? (
+               <div className="flex items-center gap-4">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Filtrar por empresa:</span>
+                  <select
+                    value={selectedCompany}
+                    onChange={(e) => setSelectedCompany(e.target.value)}
+                    className="bg-gray-50 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-[#87be00]/20 transition min-w-[200px]"
+                  >
+                    <option value="">Todas las empresas</option>
+                    {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+               </div>
+             ) : (
+               <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest italic">
+                  Visualizando locales de {user?.company_name}
+               </div>
+             )}
 
              <button 
               onClick={() => setShowInactive(!showInactive)}
@@ -153,7 +159,6 @@ const Locales = () => {
         </div>
       </div>
 
-      {/* TABLA DE LOCALES (Diseño optimizado para el Sprint) */}
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -168,40 +173,22 @@ const Locales = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {visibleLocales.length === 0 ? (
-                <tr>
-                  <td colSpan="6" className="p-20 text-center">
-                    <p className="text-gray-300 font-bold italic text-sm">No hay locales registrados en esta selección.</p>
-                  </td>
-                </tr>
-              ) : (
-                visibleLocales.map(local => (
+              {visibleLocales.map(local => (
                   <tr 
                     key={local.id} 
                     className={`group hover:bg-gray-50/80 transition-colors cursor-pointer ${mapSelectedId === local.id ? 'bg-[#87be00]/5' : ''} ${!local.is_active ? 'opacity-60 grayscale-[0.5]' : ''}`}
                     onClick={() => setMapSelectedId(local.id)}
                   >
-                    <td className="p-5">
-                      <span className="font-black text-gray-800 uppercase tracking-tight">
-                        {local.cadena}
-                      </span>
-                    </td>
-                    <td className="p-5">
-                      <div className="flex flex-col">
+                    <td className="p-5 font-black text-gray-800 uppercase tracking-tight">{local.cadena}</td>
+                    <td className="p-5 flex flex-col">
                         <span className="text-xs font-bold text-gray-700">{local.region}</span>
                         <span className="text-[9px] font-black text-[#87be00] uppercase tracking-tighter">{local.comuna}</span>
-                      </div>
                     </td>
-                    <td className="p-5 text-xs text-gray-500 font-medium">
-                      {local.direccion}
-                    </td>
-                    <td className="p-5">
-                      <div className="flex flex-col">
+                    <td className="p-5 text-xs text-gray-500 font-medium">{local.direccion}</td>
+                    <td className="p-5 flex flex-col">
                         <span className="text-[11px] font-black text-gray-800 uppercase leading-none mb-1">{local.gerente}</span>
                         <span className="text-[10px] text-gray-400 font-bold">{local.telefono}</span>
-                      </div>
                     </td>
-
                     <td className="p-5 text-center" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => toggleLocal(local.id)}
@@ -212,7 +199,6 @@ const Locales = () => {
                         <span className={`h-3 w-3 transform rounded-full bg-white transition-transform ${local.is_active ? "translate-x-6" : "translate-x-1"}`} />
                       </button>
                     </td>
-
                     <td className="p-5" onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => openEditModal(local)} className="p-2 text-gray-400 hover:text-[#87be00] hover:bg-[#87be00]/5 rounded-xl transition">
@@ -225,7 +211,7 @@ const Locales = () => {
                     </td>
                   </tr>
                 ))
-              )}
+              }
             </tbody>
           </table>
         </div>

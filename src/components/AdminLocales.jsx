@@ -263,7 +263,7 @@ const AdminLocales = () => {
         </div>
       </div>
 
-      <CreateLocalModal isOpen={openCreate} onClose={() => setOpenCreate(false)} onCreated={fetchLocales} companies={[{ id: user.company_id }]} autoCompanyId={user.company_id} />
+      <CreateLocalModal isOpen={openCreate} onClose={() => setOpenCreate(false)} onCreated={fetchLocales} companies={[{ id: user.company_id ,  name: user.company_name  }]} autoCompanyId={user.company_id} />
       <UploadLocalesModal isOpen={openUpload} onClose={() => setOpenUpload(false)} onUploaded={fetchLocales} companyId={user.company_id} />
       {selectedLocal && (
         <EditLocalModal isOpen={openEdit} onClose={() => { setOpenEdit(false); setSelectedLocal(null); }} onUpdated={fetchLocales} local={selectedLocal} companies={[{ id: user.company_id, name: user.company_name }]} />
