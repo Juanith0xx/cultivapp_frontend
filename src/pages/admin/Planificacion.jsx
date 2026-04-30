@@ -166,6 +166,9 @@ const Planificacion = () => {
     e.target.value = "";
   };
 
+  /**
+   * 🚀 MEJORA: Agrupación de rutas enriquecida con Horarios para el Tooltip
+   */
   const groupedRoutes = useMemo(() => {
     const groups = {};
 
@@ -191,21 +194,33 @@ const Planificacion = () => {
       if (!groups[key]) {
         groups[key] = {
           ...r,
+          // Cambiamos el array simple por un array de objetos con info de horario
           allDays:
             r.day_of_week !== null &&
             r.day_of_week !== undefined
-              ? [Number(r.day_of_week)]
+              ? [{ 
+                  day: Number(r.day_of_week), 
+                  time: r.start_time, 
+                  turno: r.nombre_turno 
+                }]
               : [],
           groupedVisits: [],
         };
-      }
-
-      if (
-        r.day_of_week !== null &&
-        r.day_of_week !== undefined &&
-        !groups[key].allDays.includes(Number(r.day_of_week))
-      ) {
-        groups[key].allDays.push(Number(r.day_of_week));
+      } else {
+        // Si el grupo ya existe, verificamos si el día ya fue agregado
+        if (
+          r.day_of_week !== null &&
+          r.day_of_week !== undefined
+        ) {
+          const exists = groups[key].allDays.some(d => d.day === Number(r.day_of_week));
+          if (!exists) {
+            groups[key].allDays.push({ 
+              day: Number(r.day_of_week), 
+              time: r.start_time, 
+              turno: r.nombre_turno 
+            });
+          }
+        }
       }
 
       if (r.visit_date) {
@@ -235,9 +250,47 @@ const Planificacion = () => {
         onChange={handleImportExcel}
       />
 
-      <button onClick={() => fileInputRef.current.click()}>
-        Importar Excel
-      </button>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-bold">Gestión de Rutas</h2>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => fileInputRef.current.click()}
+            className="flex items-center gap-2 bg-[#87be00] text-white px-4 py-2 rounded-lg hover:bg-[#76a600] transition-all"
+          >
+            <FiUploadCloud /> Cargar Excel
+          </button>
+          <button 
+            onClick={() => { setSelectedRoute(null); setIsModalOpen(true); }}
+            className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-all"
+          >
+            <FiPlus /> Nueva Ruta
+          </button>
+        </div>
+      </div>
+
+      {/* Aquí iría el resto de tu UI que consume groupedRoutes */}
+      {viewMode === "list" && (
+        <div className="grid gap-4">
+          {groupedRoutes.map((route, idx) => (
+             <div key={idx} className="p-4 bg-white rounded-xl shadow-sm border border-gray-100">
+                {/* 
+                  Importante: Tu componente WeeklyStatus o el que use los días 
+                  ahora recibirá un array de objetos en 'allDays' en lugar de solo números.
+                */}
+                <WeeklyStatus allDays={route.allDays} />
+             </div>
+          ))}
+        </div>
+      )}
+
+      {isModalOpen && (
+        <ManageRoutesModal 
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onCreated={fetchData}
+          initialData={selectedRoute}
+        />
+      )}
     </div>
   );
 };
