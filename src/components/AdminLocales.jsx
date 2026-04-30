@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { 
   FiPlus, FiUpload, FiTrash2, FiEdit, FiMapPin, 
-  FiHash, FiEye, FiEyeOff, FiSearch, FiPhone, FiUser 
+  FiHash, FiEye, FiEyeOff, FiSearch, FiPhone, FiUser, FiBriefcase 
 } from "react-icons/fi"; 
 import api from "../api/apiClient";
 import toast from "react-hot-toast";
@@ -11,10 +11,11 @@ import CreateLocalModal from "../components/CreateLocalModal";
 import UploadLocalesModal from "../components/UploadLocalesModal";
 import EditLocalModal from "../components/EditLocalModal";
 import LocalesMap from "../components/LocalesMap";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 const AdminLocales = () => {
   const [locales, setLocales] = useState([]);
+  const [companies, setCompanies] = useState([]); // Para el filtro de empresa
   const [showInactive, setShowInactive] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   
@@ -25,19 +26,50 @@ const AdminLocales = () => {
   const [mapSelectedId, setMapSelectedId] = useState(null);
 
   const user = JSON.parse(localStorage.getItem("user"));
+  // Estado para la empresa seleccionada (inicializa con la del usuario)
+  const [selectedCompanyId, setSelectedCompanyId] = useState(user.company_id);
 
-  useEffect(() => {
-    fetchLocales();
-  }, []);
-
-  const fetchLocales = async () => {
+  // 1. Cargar empresas (Solo si es ROOT o para llenar el selector)
+  const fetchCompanies = async () => {
     try {
-      const data = await api.get(`/locales?company_id=${user.company_id}`);
+      const data = await api.get("/companies");
+      setCompanies(data || []);
+    } catch (error) {
+      console.error("Error cargando empresas");
+    }
+  };
+
+  // 2. Cargar locales basado en la empresa seleccionada
+  const fetchLocales = useCallback(async () => {
+    try {
+      // 🚩 El filtro por empresa ahora usa selectedCompanyId
+      const data = await api.get(`/locales?company_id=${selectedCompanyId}`);
       setLocales(data || []);
     } catch (error) {
       toast.error("Error al cargar locales");
     }
-  };
+  }, [selectedCompanyId]);
+
+  useEffect(() => {
+    if (user.role === "ROOT") fetchCompanies();
+    fetchLocales();
+  }, [fetchLocales, user.role]);
+
+  // 3. Lógica de búsqueda optimizada (Código + Cadena)
+  const filteredLocales = useMemo(() => {
+    return locales.filter(l => {
+      const matchesActive = showInactive || l.is_active;
+      const term = searchTerm.toLowerCase().trim();
+      
+      const matchesSearch = 
+        l.cadena?.toLowerCase().includes(term) ||
+        l.codigo_local?.toString().includes(term) || // Búsqueda por código
+        l.comuna?.toLowerCase().includes(term) ||
+        l.direccion?.toLowerCase().includes(term);
+
+      return matchesActive && matchesSearch;
+    });
+  }, [locales, showInactive, searchTerm]);
 
   const handleEdit = (local) => {
     setSelectedLocal(local);
@@ -67,17 +99,6 @@ const AdminLocales = () => {
     }
   };
 
-  const filteredLocales = useMemo(() => {
-    return locales.filter(l => {
-      const matchesActive = showInactive || l.is_active;
-      const matchesSearch = 
-        l.cadena?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        l.comuna?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        l.codigo_local?.toString().includes(searchTerm);
-      return matchesActive && matchesSearch;
-    });
-  }, [locales, showInactive, searchTerm]);
-
   const activeSelectedLocal = useMemo(() => {
     return filteredLocales.find(l => l.id === mapSelectedId);
   }, [mapSelectedId, filteredLocales]);
@@ -85,174 +106,145 @@ const AdminLocales = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500 font-[Outfit] pb-10 px-2 sm:px-4 md:px-0">
       
-      {/* HEADER RESPONSIVO */}
+      {/* HEADER */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 px-1">
         <div>
-          <h2 className="text-2xl md:text-3xl font-black text-gray-800 tracking-tight uppercase leading-none italic">
+          <h2 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tighter uppercase leading-none italic">
             Gestión de Locales
           </h2>
-          <p className="text-[10px] md:text-xs font-bold text-[#87be00] uppercase tracking-widest mt-2 md:mt-3">
-            Administración de puntos y geocercas • {user.company_name}
+          <p className="text-[10px] md:text-xs font-black text-[#87be00] uppercase tracking-[0.3em] mt-3">
+            Administración de puntos y geocercas
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2 md:gap-3 w-full lg:w-auto">
           <button
             onClick={() => setOpenUpload(true)}
-            className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-white border border-gray-200 hover:bg-gray-50 px-4 py-3 md:py-3.5 rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black uppercase tracking-widest transition shadow-sm"
+            className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-white border border-gray-200 hover:bg-gray-50 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm"
           >
-            <FiUpload size={16} className="text-gray-500" />
+            <FiUpload size={16} className="text-gray-400" />
             Carga Masiva
           </button>
           <button
             onClick={() => setOpenCreate(true)}
-            className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-gray-900 text-white px-5 py-3 md:py-3.5 rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black uppercase tracking-widest hover:bg-[#87be00] transition shadow-xl shadow-gray-200 active:scale-95"
+            className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-[#87be00] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#76a500] transition shadow-xl shadow-[#87be00]/20 active:scale-95"
           >
-            <FiPlus size={16} />
+            <FiPlus size={18} />
             Crear Local
           </button>
         </div>
       </div>
 
-      {/* FILTROS Y MAPA */}
-      <div className="grid grid-cols-1 gap-4 md:gap-6">
-        <div className="space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 md:p-5 rounded-[1.5rem] md:rounded-[2.5rem] border border-gray-100 shadow-sm">
-             <div className="relative w-full md:max-w-md">
-                <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input 
-                  type="text"
-                  placeholder="Buscar por cadena, comuna o código..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-gray-50 border-none rounded-xl pl-11 pr-4 py-3 text-xs font-bold outline-none focus:ring-2 focus:ring-[#87be00]/20 transition shadow-inner"
-                />
-             </div>
+      {/* FILTROS Y SELECTOR DE EMPRESA */}
+      <div className="bg-white p-5 md:p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
+        <div className="flex flex-col xl:flex-row gap-4">
+          
+          {/* SELECTOR DE EMPRESA (🚩 Ahora funcional) */}
+          {user.role === "ROOT" && (
+            <div className="relative min-w-[250px]">
+              <FiBriefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-[#87be00]" />
+              <select
+                value={selectedCompanyId}
+                onChange={(e) => setSelectedCompanyId(e.target.value)}
+                className="w-full bg-gray-50 border-none rounded-xl pl-11 pr-4 py-3.5 text-xs font-black uppercase tracking-wider outline-none focus:ring-2 focus:ring-[#87be00]/20 transition shadow-inner appearance-none"
+              >
+                {companies.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
-             <button 
-              onClick={() => setShowInactive(!showInactive)}
-              className={`w-full md:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-[9px] md:text-[10px] font-black tracking-widest transition-all ${
-                showInactive ? "bg-orange-50 text-orange-600 border border-orange-100" : "bg-gray-50 text-gray-400 border border-gray-100"
-              }`}
-             >
-               {showInactive ? <FiEye size={14}/> : <FiEyeOff size={14}/>}
-               {showInactive ? "MOSTRANDO INACTIVOS" : "OCULTANDO INACTIVOS"}
-             </button>
+          {/* BUSCADOR POR CÓDIGO O CADENA */}
+          <div className="relative flex-1">
+            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input 
+              type="text"
+              placeholder="Buscar por código (#) o nombre de cadena..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-gray-50 border-none rounded-xl pl-11 pr-4 py-3.5 text-xs font-bold outline-none focus:ring-2 focus:ring-[#87be00]/20 transition shadow-inner"
+            />
           </div>
 
-          <div className="h-[300px] md:h-[400px] w-full rounded-[2rem] md:rounded-[3rem] overflow-hidden border border-gray-100 shadow-inner bg-gray-50 relative">
-             <LocalesMap locales={filteredLocales} selectedLocal={activeSelectedLocal} />
-          </div>
+          <button 
+            onClick={() => setShowInactive(!showInactive)}
+            className={`flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-[10px] font-black tracking-widest transition-all ${
+              showInactive ? "bg-orange-50 text-orange-600 border border-orange-100" : "bg-gray-50 text-gray-400 border border-gray-100"
+            }`}
+          >
+            {showInactive ? <FiEye size={14}/> : <FiEyeOff size={14}/>}
+            {showInactive ? "MOSTRANDO INACTIVOS" : "OCULTAR INACTIVOS"}
+          </button>
+        </div>
+
+        {/* MAPA */}
+        <div className="h-[350px] md:h-[450px] w-full rounded-[2.5rem] overflow-hidden border border-gray-100 shadow-inner bg-gray-50 relative">
+           <LocalesMap locales={filteredLocales} selectedLocal={activeSelectedLocal} />
         </div>
       </div>
 
-      {/* 🚩 VISTA MÓVIL: CARDS (Oculta en md) */}
-      <div className="md:hidden space-y-4 px-1">
-        {filteredLocales.length === 0 ? (
-          <div className="bg-white rounded-3xl p-10 text-center border border-dashed border-gray-200 text-gray-300 font-bold uppercase text-[10px]">Sin resultados</div>
-        ) : (
-          filteredLocales.map((local, idx) => (
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}
-              key={local.id}
-              onClick={() => setMapSelectedId(local.id)}
-              className={`bg-white p-5 rounded-[1.8rem] border-2 transition-all relative overflow-hidden ${mapSelectedId === local.id ? 'border-[#87be00] shadow-md' : 'border-transparent shadow-sm'}`}
-            >
-              <div className="flex justify-between items-start mb-3">
-                <span className="flex items-center gap-1.5 font-black text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg text-[9px]">
-                  <FiHash className="text-[#87be00]" /> {local.codigo_local || 'S/C'}
-                </span>
-                <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                   <button onClick={() => handleEdit(local)} className="p-2 bg-gray-50 text-gray-400 rounded-lg"><FiEdit size={14}/></button>
-                   <button onClick={() => deleteLocal(local.id)} className="p-2 bg-red-50 text-red-400 rounded-lg"><FiTrash2 size={14}/></button>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div>
-                  <h3 className="text-sm font-black text-gray-800 uppercase italic">{local.cadena}</h3>
-                  <div className="flex items-center gap-1.5 text-[9px] font-black text-[#87be00] uppercase mt-0.5">
-                    {local.comuna_name || local.comuna} <span className="text-gray-300">•</span> {local.region_name || local.region}
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2 bg-gray-50 p-3 rounded-xl">
-                  <FiMapPin size={12} className="text-[#87be00] shrink-0 mt-0.5" />
-                  <p className="text-[10px] font-bold text-gray-500 leading-tight">{local.direccion}</p>
-                </div>
-
-                <div className="flex justify-between items-center pt-2 border-t border-gray-50">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400"><FiUser size={12}/></div>
-                    <div className="flex flex-col">
-                      <span className="text-[9px] font-black text-gray-800 uppercase leading-none">{local.gerente || 'S/N'}</span>
-                      <span className="text-[8px] font-bold text-gray-400">{local.telefono || 'Sin tel'}</span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); toggleLocal(local.id); }}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${local.is_active ? "bg-[#87be00]" : "bg-gray-200"}`}
-                  >
-                    <span className={`h-3 w-3 transform rounded-full bg-white transition-transform ${local.is_active ? "translate-x-5" : "translate-x-1"}`} />
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          ))
-        )}
-      </div>
-
-      {/* 🚩 VISTA DESKTOP: TABLA (Oculta en móvil) */}
+      {/* VISTA DESKTOP: TABLA UNIFICADA */}
       <div className="hidden md:block bg-white rounded-[3rem] shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100">
-                <th className="p-6 text-left font-black text-gray-400 uppercase text-[9px] tracking-widest">Código</th>
-                <th className="p-6 text-left font-black text-gray-400 uppercase text-[9px] tracking-widest">Cadena</th>
-                <th className="p-6 text-left font-black text-gray-400 uppercase text-[9px] tracking-widest">Ubicación</th>
-                <th className="p-6 text-left font-black text-gray-400 uppercase text-[9px] tracking-widest">Dirección</th>
-                <th className="p-6 text-left font-black text-gray-400 uppercase text-[9px] tracking-widest">Contacto</th>
-                <th className="p-6 text-center font-black text-gray-400 uppercase text-[9px] tracking-widest">Estado</th>
-                <th className="p-6 text-center font-black text-gray-400 uppercase text-[9px] tracking-widest">Acciones</th>
+                <th className="p-8 text-left font-black text-gray-400 uppercase text-[9px] tracking-[0.2em]">Local / Cadena</th>
+                <th className="p-8 text-left font-black text-gray-400 uppercase text-[9px] tracking-[0.2em]">Ubicación</th>
+                <th className="p-8 text-left font-black text-gray-400 uppercase text-[9px] tracking-[0.2em]">Dirección</th>
+                <th className="p-8 text-left font-black text-gray-400 uppercase text-[9px] tracking-[0.2em]">Contacto</th>
+                <th className="p-8 text-center font-black text-gray-400 uppercase text-[9px] tracking-[0.2em]">Estado</th>
+                <th className="p-8 text-right font-black text-gray-400 uppercase text-[9px] tracking-[0.2em]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filteredLocales.length === 0 ? (
-                <tr><td colSpan="7" className="p-20 text-center font-bold italic text-gray-300">No se encontraron locales.</td></tr>
+                <tr><td colSpan="6" className="p-24 text-center font-black italic text-gray-300 uppercase text-xs tracking-widest">No se encontraron locales en esta empresa</td></tr>
               ) : (
                 filteredLocales.map(local => (
                   <tr 
                     key={local.id} 
-                    className={`group hover:bg-gray-50/80 transition-colors cursor-pointer ${mapSelectedId === local.id ? 'bg-[#87be00]/5' : ''} ${!local.is_active ? 'opacity-60 grayscale-[0.5]' : ''}`}
+                    className={`group hover:bg-gray-50/80 transition-all cursor-pointer ${mapSelectedId === local.id ? 'bg-[#87be00]/5' : ''} ${!local.is_active ? 'opacity-50 grayscale' : ''}`}
                     onClick={() => setMapSelectedId(local.id)}
                   >
-                    <td className="p-6"><span className="flex items-center gap-2 font-black text-gray-400 bg-gray-100 px-3 py-1 rounded-lg w-fit text-[10px]"><FiHash className="text-[#87be00]" /> {local.codigo_local || 'S/C'}</span></td>
-                    <td className="p-6 font-black text-gray-800 uppercase tracking-tight">{local.cadena}</td>
-                    <td className="p-6">
-                      <div className="flex flex-col">
-                        <span className="text-xs font-bold text-gray-700">{local.comuna_name || local.comuna}</span>
-                        <span className="text-[9px] font-black text-[#87be00] uppercase tracking-tighter">{local.region_name || local.region}</span>
+                    <td className="p-8">
+                      <div className="flex items-center gap-4">
+                        {/* 🚩 CÓDIGO A LA IZQUIERDA DE CADENA */}
+                        <div className="bg-gray-900 text-[#87be00] w-12 h-12 rounded-2xl flex flex-col items-center justify-center shadow-lg shadow-gray-200">
+                          <span className="text-[7px] font-black leading-none opacity-50 mb-0.5">ID</span>
+                          <span className="text-[11px] font-black leading-none">{local.codigo_local || '—'}</span>
+                        </div>
+                        <div>
+                          <p className="font-black text-gray-900 uppercase tracking-tighter italic text-base leading-none">{local.cadena}</p>
+                          <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase">Punto de Venta</p>
+                        </div>
                       </div>
                     </td>
-                    <td className="p-6 text-[11px] text-gray-500 font-medium">
+                    <td className="p-8">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-black text-gray-800 uppercase italic leading-none">{local.comuna_name || local.comuna}</span>
+                        <span className="text-[9px] font-black text-[#87be00] uppercase tracking-widest mt-1.5">{local.region_name || local.region}</span>
+                      </div>
+                    </td>
+                    <td className="p-8 text-[11px] text-gray-500 font-bold max-w-[200px]">
                       <div className="flex items-center gap-2"><FiMapPin size={12} className="text-[#87be00] shrink-0" /> {local.direccion}</div>
                     </td>
-                    <td className="p-6">
+                    <td className="p-8">
                       <div className="flex flex-col">
-                        <span className="text-[11px] font-black text-gray-800 uppercase leading-none mb-1">{local.gerente || 'No asignado'}</span>
-                        <span className="text-[10px] text-gray-400 font-bold">{local.telefono}</span>
+                        <span className="text-[11px] font-black text-gray-800 uppercase leading-none mb-1.5 italic">{local.gerente || 'S/G'}</span>
+                        <span className="text-[10px] text-gray-400 font-bold flex items-center gap-1.5"><FiPhone size={10}/> {local.telefono || '---'}</span>
                       </div>
                     </td>
-                    <td className="p-6 text-center" onClick={(e) => e.stopPropagation()}>
-                      <button onClick={() => toggleLocal(local.id)} className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors ${local.is_active ? "bg-[#87be00]" : "bg-gray-200"}`}>
-                        <span className={`h-3 w-3 transform rounded-full bg-white transition-transform ${local.is_active ? "translate-x-6" : "translate-x-1"}`} />
+                    <td className="p-8 text-center" onClick={(e) => e.stopPropagation()}>
+                      <button onClick={() => toggleLocal(local.id)} className={`relative inline-flex h-6 w-12 items-center rounded-full transition-all shadow-inner ${local.is_active ? "bg-[#87be00]" : "bg-gray-200"}`}>
+                        <span className={`h-4 w-4 transform rounded-full bg-white shadow-md transition-transform ${local.is_active ? "translate-x-7" : "translate-x-1"}`} />
                       </button>
                     </td>
-                    <td className="p-6" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleEdit(local)} className="p-2 text-gray-400 hover:text-[#87be00] hover:bg-[#87be00]/5 rounded-xl transition"><FiEdit size={16} /></button>
-                        <button onClick={() => deleteLocal(local.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition"><FiTrash2 size={16} /></button>
+                    <td className="p-8 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+                        <button onClick={() => handleEdit(local)} className="p-3 bg-gray-50 text-gray-400 hover:text-gray-900 rounded-xl transition shadow-sm border border-gray-100"><FiEdit size={16} /></button>
+                        <button onClick={() => deleteLocal(local.id)} className="p-3 bg-gray-50 text-gray-400 hover:text-red-500 rounded-xl transition shadow-sm border border-gray-100"><FiTrash2 size={16} /></button>
                       </div>
                     </td>
                   </tr>
@@ -263,10 +255,53 @@ const AdminLocales = () => {
         </div>
       </div>
 
-      <CreateLocalModal isOpen={openCreate} onClose={() => setOpenCreate(false)} onCreated={fetchLocales} companies={[{ id: user.company_id ,  name: user.company_name  }]} autoCompanyId={user.company_id} />
-      <UploadLocalesModal isOpen={openUpload} onClose={() => setOpenUpload(false)} onUploaded={fetchLocales} companyId={user.company_id} />
+      {/* VISTA MÓVIL (Mismo diseño pero condensado) */}
+      <div className="md:hidden space-y-4 px-1">
+        {filteredLocales.map((local, idx) => (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03 }}
+            key={local.id}
+            onClick={() => setMapSelectedId(local.id)}
+            className={`bg-white p-5 rounded-[2rem] border-2 transition-all relative overflow-hidden ${mapSelectedId === local.id ? 'border-[#87be00] shadow-md' : 'border-transparent shadow-sm'}`}
+          >
+            <div className="flex items-center gap-4 mb-4">
+              <div className="bg-gray-900 text-[#87be00] w-12 h-12 rounded-2xl flex flex-col items-center justify-center shrink-0">
+                <span className="text-[6px] font-black leading-none opacity-50 mb-0.5 uppercase">ID</span>
+                <span className="text-[12px] font-black leading-none">{local.codigo_local || '—'}</span>
+              </div>
+              <div className="min-w-0">
+                 <h3 className="text-sm font-black text-gray-900 uppercase italic truncate">{local.cadena}</h3>
+                 <p className="text-[9px] font-black text-[#87be00] uppercase tracking-widest">{local.comuna}</p>
+              </div>
+            </div>
+            
+            <div className="bg-gray-50 p-4 rounded-2xl space-y-2 mb-4">
+               <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500 italic">
+                  <FiMapPin className="text-[#87be00] shrink-0"/> {local.direccion}
+               </div>
+               <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500">
+                  <FiUser className="text-[#87be00] shrink-0"/> {local.gerente || 'Sin Gerente'}
+               </div>
+            </div>
+
+            <div className="flex justify-between items-center" onClick={(e) => e.stopPropagation()}>
+               <div className="flex gap-2">
+                 <button onClick={() => handleEdit(local)} className="p-3 bg-gray-50 text-gray-400 rounded-xl border border-gray-100"><FiEdit size={16}/></button>
+                 <button onClick={() => deleteLocal(local.id)} className="p-3 bg-red-50 text-red-400 rounded-xl border border-red-50"><FiTrash2 size={16}/></button>
+               </div>
+               <button onClick={() => toggleLocal(local.id)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all ${local.is_active ? "bg-[#87be00]" : "bg-gray-200"}`}>
+                  <span className={`h-4 w-4 transform rounded-full bg-white transition-transform ${local.is_active ? "translate-x-6" : "translate-x-1"}`} />
+               </button>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* MODALES */}
+      <CreateLocalModal isOpen={openCreate} onClose={() => setOpenCreate(false)} onCreated={fetchLocales} autoCompanyId={selectedCompanyId} />
+      <UploadLocalesModal isOpen={openUpload} onClose={() => setOpenUpload(false)} onUploaded={fetchLocales} companyId={selectedCompanyId} />
       {selectedLocal && (
-        <EditLocalModal isOpen={openEdit} onClose={() => { setOpenEdit(false); setSelectedLocal(null); }} onUpdated={fetchLocales} local={selectedLocal} companies={[{ id: user.company_id, name: user.company_name }]} />
+        <EditLocalModal isOpen={openEdit} onClose={() => { setOpenEdit(false); setSelectedLocal(null); }} onUpdated={fetchLocales} local={selectedLocal} />
       )}
     </div>
   );

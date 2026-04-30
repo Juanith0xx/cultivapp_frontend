@@ -6,6 +6,8 @@ import { toast } from "react-hot-toast"
 import CreateUserModal from "../../components/CreateUserModal"
 import EditUserContactModal from "../../components/EditUserContactModal"
 import ResetPasswordModal from "../../components/ResetPasswordModal"
+// 🚩 IMPORTANTE: Importamos el componente reutilizable
+import UserQuickView from "../../components/UserQuickView" 
 
 const API_URL = import.meta.env.VITE_API_URL
 
@@ -21,6 +23,9 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
 
   const [companies, setCompanies] = useState([])
   const [selectedCompany, setSelectedCompany] = useState("")
+
+  // 🚩 ESTADO PARA COORDINAR EL QUICK VIEW
+  const [activePopover, setActivePopover] = useState(null)
 
   const fetchCompanies = async () => {
     try {
@@ -99,7 +104,6 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
     inactivos: users.filter(u => !u.is_active).length
   }
 
-  // 🚩 FUNCIÓN PARA FORMATEAR FECHAS DE CONTRATO
   const formatDate = (dateStr) => {
     if (!dateStr) return "---";
     const date = new Date(dateStr);
@@ -107,7 +111,8 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-700 font-[Outfit]">
+    // 🚩 Al hacer click en el fondo cerramos cualquier QuickView abierto
+    <div className="space-y-8 animate-in fade-in duration-700 font-[Outfit]" onClick={() => setActivePopover(null)}>
       
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-4">
@@ -176,11 +181,14 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
                   <tr key={u.id} className="hover:bg-gray-50/50 transition-all group">
                     <td className="p-8">
                       <div className="flex items-center gap-5">
-                        <div className="w-14 h-14 rounded-2xl bg-gray-100 border border-gray-50 flex items-center justify-center text-gray-400 font-black text-sm uppercase group-hover:bg-gray-900 group-hover:text-[#87be00] transition-all shadow-sm">
-                          {u.foto_url ? (
-                            <img src={u.foto_url} className="w-full h-full object-cover rounded-2xl" />
-                          ) : u.first_name?.charAt(0)}
-                        </div>
+                        
+                        {/* 🚩 REEMPLAZO DEL AVATAR POR EL COMPONENTE UserQuickView */}
+                        <UserQuickView 
+                          user={u} 
+                          isActive={activePopover === u.id}
+                          onToggle={() => setActivePopover(activePopover === u.id ? null : u.id)}
+                        />
+
                         <div>
                           <p className="text-base font-black text-gray-900 uppercase tracking-tighter leading-none italic">{u.first_name} {u.last_name}</p>
                           <p className="text-[10px] text-gray-400 mt-2 flex items-center gap-2 font-bold tracking-tight">
@@ -191,7 +199,6 @@ const UsersByRole = ({ role = null, title, buttonLabel }) => {
                       </div>
                     </td>
 
-                    {/* 🚩 COLUMNA DE VIGENCIA DE CONTRATO */}
                     <td className="p-8">
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2">

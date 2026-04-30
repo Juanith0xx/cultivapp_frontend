@@ -149,7 +149,7 @@ function App() {
               <Route path="users" element={<AdminUsers />} />
 
               {/* 🚩 FIX: Admin Cultiva ve Locales.jsx, resto ve AdminLocales.jsx */}
-              <Route path="locales" element={<AdminLocalesRouter />} />
+              <Route path="locales" element={<AdminLocales />} />
               
               {/* 🚩 NUEVA RUTA AGREGADA PARA EMPRESAS EN PANEL ADMIN */}
               <Route path="companies" element={<Companies />} />
