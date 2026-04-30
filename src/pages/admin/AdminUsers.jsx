@@ -13,7 +13,7 @@ import {
   FiUploadCloud,
   FiMoreVertical,
   FiCheckCircle,
-  FiPhone // Añadido para el icono de teléfono
+  FiPhone 
 } from "react-icons/fi"
 import { toast } from "react-hot-toast"
 import api from "../../api/apiClient"
@@ -22,7 +22,9 @@ import CreateAdminUserModal from "../../components/CreateAdminUserModal"
 import EditAdminUserModal from "../../components/EditAdminUserModal"
 import ResetPasswordAdminModal from "../../components/ResetPasswordAdminModal"
 import AssignLocalesModal from "./AssignLocalesModal" 
-import { motion } from "framer-motion"
+// 🚩 IMPORTANTE: Importamos el nuevo componente
+import UserQuickView from "../../components/UserQuickView" 
+import { motion, AnimatePresence } from "framer-motion"
 
 const AdminUsers = () => {
   const [users, setUsers] = useState([])
@@ -33,6 +35,9 @@ const AdminUsers = () => {
   const [assignSupervisor, setAssignSupervisor] = useState(null)
   const [loading, setLoading] = useState(true)
   const [bulkLoading, setBulkLoading] = useState(false)
+
+  // 🚩 ESTADO PARA COORDINAR EL QUICK VIEW
+  const [activePopover, setActivePopover] = useState(null)
 
   const fileInputRef = useRef(null)
   const userLocal = JSON.parse(localStorage.getItem("user"))
@@ -148,7 +153,8 @@ const AdminUsers = () => {
   }
 
   return (
-    <div className="space-y-6 md:space-y-10 animate-in fade-in duration-700 font-[Outfit] pb-20 px-2 sm:px-0">
+    // 🚩 Al hacer click en el fondo cerramos cualquier popover abierto
+    <div className="space-y-6 md:space-y-10 animate-in fade-in duration-700 font-[Outfit] pb-20 px-2 sm:px-0" onClick={() => setActivePopover(null)}>
       
       {/* HEADER */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 px-2 md:px-4">
@@ -235,7 +241,7 @@ const AdminUsers = () => {
         ))}
       </div>
 
-      {/* VISTA DESKTOP - ACTUALIZADA CON TELÉFONO Y CORREO */}
+      {/* VISTA DESKTOP - INTEGRADA CON UserQuickView */}
       <div className="hidden md:block bg-white rounded-[3.5rem] shadow-2xl shadow-gray-200/50 border border-gray-100 overflow-hidden mx-2 lg:mx-0">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -254,9 +260,14 @@ const AdminUsers = () => {
                 <tr key={user.id} className="hover:bg-gray-50/50 transition-all group">
                   <td className="p-8">
                     <div className="flex items-center gap-5">
-                      <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-400 font-black text-sm group-hover:bg-gray-900 group-hover:text-[#87be00] transition-all shrink-0">
-                        {user.first_name?.charAt(0)}
-                      </div>
+                      
+                      {/* 🚩 REEMPLAZADO: Avatar estático por el componente UserQuickView */}
+                      <UserQuickView 
+                        user={user} 
+                        isActive={activePopover === user.id} 
+                        onToggle={() => setActivePopover(activePopover === user.id ? null : user.id)}
+                      />
+
                       <div className="min-w-0">
                         <p className="text-base font-black text-gray-900 uppercase tracking-tighter leading-none italic truncate">{user.first_name} {user.last_name}</p>
                       </div>
@@ -267,13 +278,11 @@ const AdminUsers = () => {
                       {user.role}
                     </span>
                   </td>
-                  {/* NUEVA COLUMNA TELÉFONO */}
                   <td className="p-8 text-center">
                     <p className="text-[11px] font-bold text-gray-500 flex items-center justify-center gap-2">
                       <FiPhone className="text-[#87be00]/50" size={12} /> {user.phone || '—'}
                     </p>
                   </td>
-                  {/* NUEVA COLUMNA CORREO */}
                   <td className="p-8 text-center">
                     <p className="text-[11px] font-bold text-gray-500 flex items-center justify-center gap-2">
                       <FiFileText className="text-[#87be00]/50" size={12} /> {user.email}
