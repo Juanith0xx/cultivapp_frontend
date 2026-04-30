@@ -12,7 +12,8 @@ import {
   FiFileText,
   FiUploadCloud,
   FiMoreVertical,
-  FiCheckCircle
+  FiCheckCircle,
+  FiPhone // Añadido para el icono de teléfono
 } from "react-icons/fi"
 import { toast } from "react-hot-toast"
 import api from "../../api/apiClient"
@@ -123,10 +124,6 @@ const AdminUsers = () => {
   const maxUsers = safe(stats.limits?.max_users)
   const maxView = safe(stats.limits?.max_view)
 
-  const totalUsed = usedSupervisors + usedUsers + usedView
-  const totalMax = maxSupervisors + maxUsers + maxView
-  const isCompanyFull = totalMax > 0 && totalUsed >= totalMax
-
   const ProgressCard = ({ title, used, max, color, icon }) => {
     const percentage = max > 0 ? (used / max) * 100 : 0
     return (
@@ -153,7 +150,7 @@ const AdminUsers = () => {
   return (
     <div className="space-y-6 md:space-y-10 animate-in fade-in duration-700 font-[Outfit] pb-20 px-2 sm:px-0">
       
-      {/* HEADER RESPONSIVO */}
+      {/* HEADER */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 px-2 md:px-4">
         <div>
           <h1 className="text-3xl md:text-5xl font-black text-gray-900 tracking-tighter uppercase italic leading-none">
@@ -167,7 +164,7 @@ const AdminUsers = () => {
         <div className="flex flex-wrap items-center gap-2 md:gap-3">
           <button
             onClick={() => fileInputRef.current?.click()}
-            disabled={bulkLoading || isCompanyFull}
+            disabled={bulkLoading}
             className="flex-1 lg:flex-none flex items-center justify-center gap-2 md:gap-3 bg-gray-900 text-[#87be00] px-4 md:px-6 py-3.5 md:py-4 rounded-xl md:rounded-2xl font-black uppercase text-[9px] md:text-[10px] tracking-widest transition-all hover:bg-black shadow-xl shadow-gray-200 disabled:opacity-40"
           >
             {bulkLoading ? <FiRotateCw className="animate-spin" size={16} /> : <FiUploadCloud size={16} />}
@@ -177,7 +174,6 @@ const AdminUsers = () => {
 
           <button
             onClick={() => setOpenModal(true)}
-            disabled={isCompanyFull}
             className="flex-1 lg:flex-none flex items-center justify-center gap-2 md:gap-3 bg-[#87be00] hover:bg-[#76a500] text-white px-4 md:px-8 py-3.5 md:py-4 rounded-xl md:rounded-2xl font-black uppercase text-[9px] md:text-[10px] tracking-widest transition-all shadow-xl shadow-[#87be00]/20 disabled:opacity-40"
           >
             <FiUserPlus size={18} />
@@ -186,14 +182,14 @@ const AdminUsers = () => {
         </div>
       </div>
 
-      {/* STATS (Grilla adaptable) */}
+      {/* STATS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 px-2 md:px-0">
         <ProgressCard title="Supervisores" used={usedSupervisors} max={maxSupervisors} color="bg-[#87be00]" icon={<FiShield size={20}/>} />
         <ProgressCard title="Mercaderistas" used={usedUsers} max={maxUsers} color="bg-blue-600" icon={<FiUsers size={20}/>} />
         <ProgressCard title="Solo Vista" used={usedView} max={maxView} color="bg-gray-900" icon={<FiEye size={20}/>} />
       </div>
 
-      {/* 🚩 VISTA MÓVIL: CARDS (Oculta en md) */}
+      {/* VISTA MÓVIL */}
       <div className="md:hidden space-y-4 px-2">
         {users.map((user, idx) => (
           <motion.div 
@@ -229,7 +225,7 @@ const AdminUsers = () => {
               {user.role === 'SUPERVISOR' && (
                 <button onClick={() => setAssignSupervisor(user)} className="py-2.5 bg-gray-50 text-[#87be00] rounded-xl flex items-center justify-center border border-gray-100"><FiMapPin size={16}/></button>
               )}
-              <button onClick={() => setEditUser(user)} className={`py-2.5 bg-gray-50 text-gray-700 rounded-xl flex items-center justify-center border border-gray-100 ${user.role !== 'SUPERVISOR' ? 'col-span-1' : ''}`}><FiEdit size={16}/></button>
+              <button onClick={() => setEditUser(user)} className="py-2.5 bg-gray-50 text-gray-700 rounded-xl flex items-center justify-center border border-gray-100"><FiEdit size={16}/></button>
               <button onClick={() => setResetUser(user)} className="py-2.5 bg-gray-50 text-gray-700 rounded-xl flex items-center justify-center border border-gray-100"><FiRotateCw size={16}/></button>
               {user.role !== "ADMIN_CLIENTE" && user.id !== userLocal.id && (
                 <button onClick={() => deleteUser(user)} className="py-2.5 bg-red-50 text-red-400 rounded-xl flex items-center justify-center border border-red-50"><FiTrash size={16}/></button>
@@ -239,7 +235,7 @@ const AdminUsers = () => {
         ))}
       </div>
 
-      {/* 🚩 VISTA DESKTOP: TABLA ORIGINAL (Oculta en móvil) */}
+      {/* VISTA DESKTOP - ACTUALIZADA CON TELÉFONO Y CORREO */}
       <div className="hidden md:block bg-white rounded-[3.5rem] shadow-2xl shadow-gray-200/50 border border-gray-100 overflow-hidden mx-2 lg:mx-0">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -247,6 +243,8 @@ const AdminUsers = () => {
               <tr className="bg-gray-50/70 border-b border-gray-100">
                 <th className="p-8 text-[10px] font-black uppercase text-gray-400 tracking-[0.2em]">Colaborador</th>
                 <th className="p-8 text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] text-center">Rol</th>
+                <th className="p-8 text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] text-center">Teléfono</th>
+                <th className="p-8 text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] text-center">Correo</th>
                 <th className="p-8 text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] text-center">Estado</th>
                 <th className="p-8 text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] text-right">Acciones</th>
               </tr>
@@ -261,9 +259,6 @@ const AdminUsers = () => {
                       </div>
                       <div className="min-w-0">
                         <p className="text-base font-black text-gray-900 uppercase tracking-tighter leading-none italic truncate">{user.first_name} {user.last_name}</p>
-                        <p className="text-[10px] text-gray-400 mt-2 font-bold tracking-tight lowercase flex items-center gap-2 truncate">
-                           <FiFileText className="text-[#87be00] shrink-0" /> {user.email}
-                        </p>
                       </div>
                     </div>
                   </td>
@@ -271,6 +266,18 @@ const AdminUsers = () => {
                     <span className="bg-[#87be00]/10 text-[#87be00] px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest italic border border-[#87be00]/10">
                       {user.role}
                     </span>
+                  </td>
+                  {/* NUEVA COLUMNA TELÉFONO */}
+                  <td className="p-8 text-center">
+                    <p className="text-[11px] font-bold text-gray-500 flex items-center justify-center gap-2">
+                      <FiPhone className="text-[#87be00]/50" size={12} /> {user.phone || '—'}
+                    </p>
+                  </td>
+                  {/* NUEVA COLUMNA CORREO */}
+                  <td className="p-8 text-center">
+                    <p className="text-[11px] font-bold text-gray-500 flex items-center justify-center gap-2">
+                      <FiFileText className="text-[#87be00]/50" size={12} /> {user.email}
+                    </p>
                   </td>
                   <td className="p-8 text-center">
                     <button onClick={() => toggleUser(user.id)} className={`relative inline-flex h-7 w-14 items-center rounded-full transition-all duration-500 shadow-inner ${user.is_active ? "bg-[#87be00]" : "bg-gray-200"}`}>

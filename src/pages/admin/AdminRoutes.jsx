@@ -18,7 +18,7 @@ import * as XLSX from "xlsx";
 import { motion } from "framer-motion";
 
 /**
- * 📅 COMPONENTE: VISUALIZADOR MENSUAL CON TOOLTIP ASESORADO
+ * 📅 COMPONENTE: VISUALIZADOR MENSUAL CON TOOLTIP DINÁMICO
  */
 const MonthlyStatus = ({ scheduledDays = [] }) => {
   const weeks = [1, 2, 3, 4];
@@ -27,7 +27,6 @@ const MonthlyStatus = ({ scheduledDays = [] }) => {
     { id: 4, label: 'J' }, { id: 5, label: 'V' }, { id: 6, label: 'S' }, { id: 0, label: 'D' },
   ];
 
-  // Formatea la hora capturando el formato de la DB (08:00:00 -> 08:00)
   const formatTime = (time) => {
     if (!time || time === "null") return "N/A";
     return String(time).substring(0, 5);
@@ -57,7 +56,6 @@ const MonthlyStatus = ({ scheduledDays = [] }) => {
                     {d.label}
                   </div>
 
-                  {/* 🕒 TOOLTIP: MAPEADO A COLUMNAS DE LA DB */}
                   {isActive && (
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/day:opacity-100 pointer-events-none transition-all duration-200 z-[100]">
                       <div className="bg-gray-900 text-white text-[9px] px-2 py-1.5 rounded-lg shadow-xl border border-white/10 whitespace-nowrap flex flex-col items-center gap-0.5">
@@ -189,12 +187,6 @@ const Planificacion = () => {
     e.target.value = "";
   };
 
-  /**
-   * 🚀 LÓGICA DE AGRUPACIÓN CORREGIDA SEGÚN TU TABLA DB:
-   * nombre_turno -> turno
-   * entrada -> time
-   * salida -> endTime
-   */
   const groupedRoutes = useMemo(() => {
     const groups = {};
     routes.forEach((r) => {
@@ -208,9 +200,9 @@ const Planificacion = () => {
           scheduled_items: r.day_of_week !== null ? [{ 
             day: r.day_of_week, 
             week: weekNum, 
-            time: r.entrada,      // Mapeo asertivo a columna 'entrada'
-            endTime: r.salida,    // Mapeo asertivo a columna 'salida'
-            turno: r.nombre_turno  // Mapeo asertivo a columna 'nombre_turno'
+            time: r.entrada,      
+            endTime: r.salida,    
+            turno: r.nombre_turno  
           }] : [],
           all_statuses: [r.status],
         };
@@ -285,10 +277,10 @@ const Planificacion = () => {
         </div>
       </div>
 
-      {/* TABLA */}
+      {/* TABLA DESKTOP */}
       <div className="hidden md:block bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left border-collapse">
             <thead className="bg-gray-50/50 border-b border-gray-100">
               <tr>
                 <th className="p-6 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Punto de Venta / Local</th>
@@ -299,30 +291,53 @@ const Planificacion = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 text-[11px]">
-              {groupedRoutes.map((r) => (
-                <tr key={`${r.user_id}-${r.local_id}`} className="hover:bg-gray-50/50 transition-colors group">
-                  <td className="p-6">
-                    <div className="min-w-0">
-                      <p className="font-black text-gray-800 uppercase italic leading-none">{r.cadena}</p>
-                      <p className="text-[10px] text-gray-400 mt-1 truncate max-w-xs">{r.direccion}</p>
-                      <span className="inline-block mt-2 px-2 py-0.5 bg-gray-900 text-white text-[8px] font-black rounded-md">{r.codigo_local}</span>
-                    </div>
-                  </td>
-                  <td className="p-6">
-                    <div className="space-y-1">
-                        <p className="font-black text-gray-700 uppercase flex items-center gap-2 leading-none"><FiUser size={14} className="text-[#87be00]"/> {r.first_name} {r.last_name}</p>
-                        <span className="w-fit px-2 py-1 bg-gray-100 text-gray-500 rounded-md text-[8px] font-black uppercase">{r.nombre_turno || 'PLANIFICADO'}</span>
-                    </div>
-                  </td>
-                  <td className="p-6">
-                    <MonthlyStatus scheduledDays={r.scheduled_items} />
-                  </td>
-                  <td className="p-6 text-center">{getStatusBadge(r.displayStatus)}</td>
-                  <td className="p-6 text-right">
-                    <button onClick={() => { setSelectedRoute(r); setIsModalOpen(true); }} className="p-3 bg-gray-50 text-gray-400 hover:bg-[#87be00] hover:text-white rounded-xl shadow-sm transition-all"><FiEdit3 size={16}/></button>
-                  </td>
-                </tr>
-              ))}
+              {groupedRoutes.map((r) => {
+                // 🚩 MEJORA: Obtenemos los turnos únicos por cada semana (S1-S4)
+                const turnsByWeek = {};
+                r.scheduled_items.forEach(item => {
+                  if (!turnsByWeek[item.week]) {
+                    turnsByWeek[item.week] = item.turno;
+                  }
+                });
+
+                return (
+                  <tr key={`${r.user_id}-${r.local_id}`} className="hover:bg-gray-50/50 transition-colors group">
+                    <td className="p-6">
+                      <div className="min-w-0">
+                        <p className="font-black text-gray-800 uppercase italic leading-none">{r.cadena}</p>
+                        <p className="text-[10px] text-gray-400 mt-1 truncate max-w-xs">{r.direccion}</p>
+                        <span className="inline-block mt-2 px-2 py-0.5 bg-gray-900 text-white text-[8px] font-black rounded-md">{r.codigo_local}</span>
+                      </div>
+                    </td>
+                    <td className="p-6">
+                      <div className="space-y-2">
+                          <p className="font-black text-gray-700 uppercase flex items-center gap-2 leading-none"><FiUser size={14} className="text-[#87be00]"/> {r.first_name} {r.last_name}</p>
+                          
+                          {/* 🚩 DESGLOSE DE TURNOS POR SEMANA */}
+                          <div className="flex flex-col gap-1">
+                            {[1, 2, 3, 4].map(wNum => {
+                              const tName = turnsByWeek[wNum];
+                              if (!tName) return null;
+                              return (
+                                <div key={wNum} className="flex items-center gap-2">
+                                  <span className="text-[7px] font-black text-[#87be00] bg-[#87be00]/10 px-1 rounded uppercase tracking-tighter shrink-0">S{wNum}</span>
+                                  <span className="text-[8px] font-black text-gray-400 uppercase truncate max-w-[120px]">{tName}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                      </div>
+                    </td>
+                    <td className="p-6">
+                      <MonthlyStatus scheduledDays={r.scheduled_items} />
+                    </td>
+                    <td className="p-6 text-center">{getStatusBadge(r.displayStatus)}</td>
+                    <td className="p-6 text-right">
+                      <button onClick={() => { setSelectedRoute(r); setIsModalOpen(true); }} className="p-3 bg-gray-50 text-gray-400 hover:bg-[#87be00] hover:text-white rounded-xl shadow-sm transition-all"><FiEdit3 size={16}/></button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

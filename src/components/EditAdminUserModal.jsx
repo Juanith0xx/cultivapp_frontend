@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { FiX, FiCamera, FiUploadCloud, FiFileText, FiCheck, FiSave } from "react-icons/fi"
+import { FiX, FiCamera, FiUploadCloud, FiFileText, FiCheck, FiSave, FiPhone } from "react-icons/fi"
 import api from "../api/apiClient"
 
 const EditAdminUserModal = ({ isOpen, onClose, onUpdated, user, stats }) => {
@@ -7,10 +7,10 @@ const EditAdminUserModal = ({ isOpen, onClose, onUpdated, user, stats }) => {
     first_name: "",
     last_name: "",
     email: "",
+    phone: "", // 🚩 MEJORA: Campo de teléfono personal
     role: "",
     rut: "",
     position: "",
-    // 🚩 CAMBIO: Nuevos campos de fecha
     fecha_inicio_contrato: "",
     fecha_termino_contrato: "",
     tipo_contrato: "",
@@ -30,10 +30,10 @@ const EditAdminUserModal = ({ isOpen, onClose, onUpdated, user, stats }) => {
         first_name: user.first_name || "",
         last_name: user.last_name || "",
         email: user.email || "",
+        phone: user.phone || "", // 🚩 Sincronización del teléfono desde la DB
         role: user.role || "",
         rut: user.rut || "",
         position: user.position || "",
-        // 🚩 Sincronización de las nuevas fechas (formateo para input date)
         fecha_inicio_contrato: user.fecha_inicio_contrato ? user.fecha_inicio_contrato.split('T')[0] : "",
         fecha_termino_contrato: user.fecha_termino_contrato ? user.fecha_termino_contrato.split('T')[0] : "",
         tipo_contrato: user.tipo_contrato || "Plazo Fijo",
@@ -118,37 +118,43 @@ const EditAdminUserModal = ({ isOpen, onClose, onUpdated, user, stats }) => {
               </div>
 
               <div className="space-y-3">
-                <input type="text" value={form.first_name} placeholder="Nombres" required className="w-full border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 text-sm"
+                <input type="text" value={form.first_name} placeholder="Nombres" required className="w-full border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#87be00] outline-none"
                   onChange={e => setForm({...form, first_name: e.target.value})} />
-                <input type="text" value={form.last_name} placeholder="Apellidos" required className="w-full border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 text-sm"
+                <input type="text" value={form.last_name} placeholder="Apellidos" required className="w-full border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#87be00] outline-none"
                   onChange={e => setForm({...form, last_name: e.target.value})} />
-                <input type="text" value={form.rut} placeholder="RUT" required className="w-full border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 text-sm font-bold"
-                  onChange={e => setForm({...form, rut: e.target.value})} />
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <input type="text" value={form.rut} placeholder="RUT" required className="w-full border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-[#87be00] outline-none"
+                    onChange={e => setForm({...form, rut: e.target.value})} />
+                  
+                  {/* 🚩 NUEVO INPUT TELÉFONO PERSONAL */}
+                  <input type="text" value={form.phone} placeholder="Teléfono" className="w-full border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#87be00] outline-none"
+                    onChange={e => setForm({...form, phone: e.target.value})} />
+                </div>
               </div>
             </div>
 
             <div className="space-y-4">
               <div className="bg-[#87be00]/5 p-5 rounded-[2rem] border border-[#87be00]/10 space-y-3">
-                <input type="text" value={form.position} placeholder="Cargo" className="w-full border-white bg-white rounded-xl px-4 py-2 text-sm shadow-sm"
+                <input type="text" value={form.position} placeholder="Cargo" className="w-full border-white bg-white rounded-xl px-4 py-2 text-sm shadow-sm outline-none focus:ring-2 focus:ring-[#87be00]"
                   onChange={e => setForm({...form, position: e.target.value})} />
                 
                 <div className="grid grid-cols-2 gap-2">
-                  <select value={form.tipo_contrato} className="bg-white border-none rounded-xl px-3 py-2 text-xs shadow-sm col-span-2"
+                  <select value={form.tipo_contrato} className="bg-white border-none rounded-xl px-3 py-2 text-xs shadow-sm col-span-2 outline-none focus:ring-2 focus:ring-[#87be00]"
                     onChange={e => setForm({...form, tipo_contrato: e.target.value})}>
                     <option value="Indefinido">Indefinido</option>
                     <option value="Plazo Fijo">Plazo Fijo</option>
                     <option value="Part-Time">Part-Time</option>
                   </select>
 
-                  {/* 🚩 NUEVAS COLUMNAS DE FECHA EN EDICIÓN */}
                   <div className="flex flex-col">
                     <label className="text-[8px] font-black text-gray-400 uppercase mb-1 ml-1">Inicio</label>
-                    <input type="date" value={form.fecha_inicio_contrato} required className="bg-white border-none rounded-xl px-2 py-2 text-[10px] shadow-sm font-bold"
+                    <input type="date" value={form.fecha_inicio_contrato} required className="bg-white border-none rounded-xl px-2 py-2 text-[10px] shadow-sm font-bold outline-none focus:ring-2 focus:ring-[#87be00]"
                       onChange={e => setForm({...form, fecha_inicio_contrato: e.target.value})} />
                   </div>
                   <div className="flex flex-col">
                     <label className="text-[8px] font-black text-gray-400 uppercase mb-1 ml-1">Término</label>
-                    <input type="date" value={form.fecha_termino_contrato} className="bg-white border-none rounded-xl px-2 py-2 text-[10px] shadow-sm font-bold"
+                    <input type="date" value={form.fecha_termino_contrato} className="bg-white border-none rounded-xl px-2 py-2 text-[10px] shadow-sm font-bold outline-none focus:ring-2 focus:ring-[#87be00]"
                       onChange={e => setForm({...form, fecha_termino_contrato: e.target.value})} />
                   </div>
                 </div>
@@ -157,7 +163,7 @@ const EditAdminUserModal = ({ isOpen, onClose, onUpdated, user, stats }) => {
                   <div className="flex items-center gap-2">
                     {documentoAchs ? <FiCheck className="text-[#87be00]" /> : <FiFileText className="text-gray-400" />}
                     <span className="text-[9px] font-bold text-gray-500 truncate max-w-[100px]">
-                      {documentoAchs ? documentoAchs.name : "Nueva ACHS (PDF)"}
+                      {documentoAchs ? documentoAchs.name : "Actualizar ACHS"}
                     </span>
                   </div>
                   <label className="cursor-pointer bg-[#87be00] text-white px-3 py-1 rounded-lg text-[9px] font-black uppercase">
@@ -168,9 +174,9 @@ const EditAdminUserModal = ({ isOpen, onClose, onUpdated, user, stats }) => {
               </div>
 
               <div className="space-y-3">
-                <input type="email" value={form.email} placeholder="Email" required className="w-full border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 text-sm"
+                <input type="email" value={form.email} placeholder="Email" required className="w-full border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#87be00] outline-none"
                   onChange={e => setForm({...form, email: e.target.value})} />
-                <select value={form.role} className="w-full border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 text-sm"
+                <select value={form.role} className="w-full border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#87be00]"
                   onChange={e => setForm({...form, role: e.target.value})}>
                   <option value="USUARIO" disabled={isRoleFull("USUARIO")}>Usuario (Credencial)</option>
                   <option value="SUPERVISOR" disabled={isRoleFull("SUPERVISOR")}>Supervisor</option>
@@ -182,18 +188,18 @@ const EditAdminUserModal = ({ isOpen, onClose, onUpdated, user, stats }) => {
 
           <div className="bg-gray-900 p-6 rounded-[2rem] text-white flex flex-col md:flex-row gap-4 items-center">
             <div className="flex-1 w-full">
-               <p className="text-[9px] font-black text-[#87be00] uppercase tracking-[0.2em] mb-2">Contacto Supervisor</p>
+               <p className="text-[9px] font-black text-[#87be00] uppercase tracking-[0.2em] mb-2">Contacto Supervisor Directo</p>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                 <input type="text" value={form.supervisor_nombre} placeholder="Nombre" className="bg-white/10 border-none rounded-xl px-4 py-2 text-sm text-white w-full"
+                 <input type="text" value={form.supervisor_nombre} placeholder="Nombre" className="bg-white/10 border-none rounded-xl px-4 py-2 text-sm text-white w-full outline-none focus:ring-1 focus:ring-[#87be00]"
                   onChange={e => setForm({...form, supervisor_nombre: e.target.value})} />
-                 <input type="text" value={form.supervisor_telefono} placeholder="Teléfono" className="bg-white/10 border-none rounded-xl px-4 py-2 text-sm text-white w-full"
+                 <input type="text" value={form.supervisor_telefono} placeholder="Teléfono" className="bg-white/10 border-none rounded-xl px-4 py-2 text-sm text-white w-full outline-none focus:ring-1 focus:ring-[#87be00]"
                   onChange={e => setForm({...form, supervisor_telefono: e.target.value})} />
                </div>
             </div>
           </div>
 
-          <button type="submit" disabled={loading} className="w-full bg-[#87be00] text-white py-4 rounded-[1.5rem] font-black uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl transition-all">
-            {loading ? "Actualizando..." : <><FiSave size={20}/> Actualizar Colaborador</>}
+          <button type="submit" disabled={loading} className="w-full bg-[#87be00] text-white py-4 rounded-[1.5rem] font-black uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl hover:bg-[#76a500] transition-all active:scale-95">
+            {loading ? "Guardando Cambios..." : <><FiSave size={20}/> Actualizar Datos</>}
           </button>
         </form>
       </div>
